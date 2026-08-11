@@ -22,6 +22,12 @@ Spool is a protocol + SDK (`spools`) + relay (`spools-relay`) + static reference
 - Commit per ticket (or per coherent chunk within one). Conventional, plain messages.
 - T-002 (npm publish, org/domain claims) requires the user at the keyboard for auth — prompt them, don't attempt it headless.
 
+## Dev environment
+
+- Node 24 is pinned via `mise.toml`; non-interactive shells may not pick it up — prefix commands with `mise x --` if `node --version` shows the wrong version.
+- pnpm 11 is pinned via `packageManager` and runs through corepack. If bare `pnpm` isn't on PATH, use `mise x -- corepack pnpm …` (run package scripts from inside the package dir; `corepack pnpm -r <script>` from the root works, but the root `pnpm run` wrapper scripts don't in that setup).
+- Browser smoke tests: build a self-contained bundle with `tsup --config tsup.smoke.config.ts` (in `packages/spools`), serve the `scratch/smoke-*/` dir with `python3 -m http.server`, drive with the Chrome tools. ES modules don't load over `file://`.
+
 ## Layout
 
 - `packages/spools` — the SDK (TypeScript strict, tsup, vitest). The actual product.
