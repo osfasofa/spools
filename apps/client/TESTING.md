@@ -13,11 +13,18 @@ against the current code.
   profile, or another machine): `python3 -m http.server 8765` and `…8766` in
   `apps/client/` gives you two honest devices on one laptop.
 - **DevTools "offline" does not sever established WebSockets.** To take the
-  network away for real, kill the relay process. Scenarios 1–5 therefore run
-  against a local relay you control: `node scratch/torture-t021/relay-server.mjs 9401`
-  (the T-003 spike relay; becomes `npx spools-relay` after T-041). Craft the
-  link by hand: `http://localhost:8765/#spool=<code>&relay=ws%3A%2F%2Flocalhost%3A9401`
-  (any `adjective-noun-NNN` code works).
+  network away for real, kill the relay process. Scenarios 1–5 run against a
+  local relay you control: `PORT=9401 HOST=127.0.0.1 node packages/spools-relay/server.js`
+  (the real spools-relay since T-040). Craft the link by hand:
+  `http://localhost:8765/#spool=<code>&relay=ws%3A%2F%2Flocalhost%3A9401%2Fyjs`
+  (any `adjective-noun-NNN` code works; the `/yjs` suffix matters — it's the
+  one-URL convention that also derives signaling).
+- **WebRTC must be OFF for the offline scenarios (1–5).** Because the one-URL
+  convention gives even a local relay working signaling, two devices form a
+  WebRTC mesh — and an established mesh keeps syncing straight through a
+  relay kill, faking a pass. The harness deletes `RTCPeerConnection` before
+  page load for those scenarios; manually, run a browser/profile with WebRTC
+  disabled. Scenario 6 is where that redundancy is the thing being proven.
 - Winding/editing beyond what the UI offers uses the console escape hatch:
   the page exposes `window.spool`.
 
@@ -77,24 +84,27 @@ The manual steps below are the same scenarios for human hands.
 
 ### 6. Relay dies mid-session — WebRTC keeps syncing
 
-1. Two devices on the *default* relay (WebRTC signaling only exists there
-   until T-040), converged, and left alone ~10 s so the WebRTC mesh forms.
-2. Sever every connection to the relay host on both devices (automated run
-   patches `WebSocket` to cut and block them; manually, firewall the host).
+1. Two devices on the local relay (WebRTC on — signaling derives from the
+   `/yjs` URL), converged, and left alone ~10 s so the WebRTC mesh forms.
+2. Kill the relay process — sync **and** signaling die together, the honest
+   single-host outage.
 3. Wind an entry on A.
 4. **Expect:** B receives it — the established WebRTC data channel carries
    sync without the relay; status stays `connected` on the surviving path.
 
-## Results — 2026-08-11, automated run (2× consecutive, 6/6)
+## Results — 2026-08-11, against **spools-relay** (T-040), automated, 2× consecutive, 6/6
 
 | # | Scenario | Result | Measured |
 |---|---|---|---|
 | 1 | Refresh is IndexedDB | ✔ | 5/5 entries, status `connecting`, relay dead |
 | 2 | Offline wind → reconnect | ✔ | B caught up 19 s after relay restart |
 | 3 | Diverge offline, merge | ✔ | `A> the quick brown fox <B` on both sides |
-| 4 | Cold late join | ✔ | 20/20 on first poll (<0.5 s) |
+| 4 | Cold late join (peer online) | ✔ | 20/20 on first poll (<0.5 s) — the peer answers, not the relay |
 | 5 | Nobody home | ✔ | 10 s alone: 0 entries, 0 errors; converged instantly on peer wind |
-| 6 | Relay outage → WebRTC | ✔ | relay+signaling severed; entry crossed <0.5 s, status stayed `connected` |
+| 6 | Relay outage → WebRTC | ✔ | relay process SIGKILLed (sync + signaling); entry crossed <0.5 s, status stayed `connected` |
+
+*(The earlier same-day run against fosho's stateful relay also passed 6/6 —
+recorded in T-021's Notes; superseded by this run against the dumb relay.)*
 
 ## Honest asterisks
 
@@ -102,11 +112,12 @@ The manual steps below are the same scenarios for human hands.
   relay can't answer a waiting peer, so peers re-ask each other periodically
   (DESIGN_DOC §5, T-003). Live winds while connected are instant; *catching
   up* after a gap is bounded by the interval.
-- **Cold late join currently benefits from fosho's stateful relay.** The
-  deployed y-websocket server keeps a doc and answers newcomers even when no
-  peer is online. The dumb relay (T-040) changes the contract to "syncs when
-  we're together" — scenario 4 passes through the dumb relay only because A
-  is online to answer. Retest at M4.
+- **Cold late join needs a peer online — retested and confirmed against the
+  dumb relay (T-040).** spools-relay holds no doc, so a newcomer converges
+  because a *peer* answers (scenario 4: instant with A online) and waits
+  calmly when nobody's home (scenario 5). That's the v1 contract: "syncs when
+  we're together." fosho's stateful relay used to mask this; the deployed
+  default still does until T-041 flips the constant.
 - **`status: 'connected'` means "relay reachable", not "peer present".**
   Scenario 5 shows `connected` with nobody home. Truthful but easy to
   misread; a peer-presence signal (awareness) is unexposed SDK surface today.

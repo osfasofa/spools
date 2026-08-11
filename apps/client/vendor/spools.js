@@ -12537,6 +12537,7 @@ ${err.toString()}`);
     SpoolEngine: () => SpoolEngine,
     SpoolLinkError: () => SpoolLinkError,
     buildSpoolLink: () => buildSpoolLink,
+    deriveSignaling: () => deriveSignaling,
     generateCode: () => generateCode,
     isValidCode: () => isValidCode,
     newSpool: () => newSpool,
@@ -13643,7 +13644,16 @@ ${reason}`);
     }
   };
   var DEFAULT_RELAY = "wss://foshoio-production.up.railway.app/yjs";
-  var DEFAULT_SIGNALING = ["wss://foshoio-production.up.railway.app/"];
+  var deriveSignaling = (relay) => {
+    try {
+      const url = new URL(relay);
+      if (url.pathname === "/yjs" || url.pathname === "/yjs/") {
+        return [`${url.protocol}//${url.host}/`];
+      }
+    } catch {
+    }
+    return void 0;
+  };
   var _engine, _store2, _relay, _key;
   var Spool = class {
     /** @internal use newSpool/openSpool */
@@ -13714,10 +13724,7 @@ ${reason}`);
     const engine = new SpoolEngine({
       code,
       relay,
-      // signaling endpoints are only known for the default relay; a custom
-      // relay syncs over websocket alone until T-040 defines the one-URL
-      // convention for both jobs
-      signaling: relay === DEFAULT_RELAY ? DEFAULT_SIGNALING : void 0,
+      signaling: deriveSignaling(relay),
       persist: opts.persist
     });
     return new Spool(engine, relay, key, opts.author ?? "anonymous");

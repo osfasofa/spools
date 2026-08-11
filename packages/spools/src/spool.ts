@@ -15,7 +15,24 @@ export class NotImplementedError extends Error {
  * deployed spools-relay after T-041.
  */
 export const DEFAULT_RELAY = 'wss://foshoio-production.up.railway.app/yjs'
-const DEFAULT_SIGNALING = ['wss://foshoio-production.up.railway.app/']
+
+/**
+ * The one-URL convention (T-040): a relay URL ending in /yjs implies
+ * y-webrtc signaling at the same host's root — one link param, both jobs.
+ * spools-relay and fosho's deployed relay both fit the shape; a relay URL
+ * that doesn't match syncs over websocket alone.
+ */
+export const deriveSignaling = (relay: string): string[] | undefined => {
+  try {
+    const url = new URL(relay)
+    if (url.pathname === '/yjs' || url.pathname === '/yjs/') {
+      return [`${url.protocol}//${url.host}/`]
+    }
+  } catch {
+    // engine validates the relay URL; here an unparseable one just means no signaling
+  }
+  return undefined
+}
 
 export interface NewSpoolOptions {
   /** wss relay URL; default: the SDK's default relay */
@@ -120,10 +137,7 @@ const connect = (
   const engine = new SpoolEngine({
     code,
     relay,
-    // signaling endpoints are only known for the default relay; a custom
-    // relay syncs over websocket alone until T-040 defines the one-URL
-    // convention for both jobs
-    signaling: relay === DEFAULT_RELAY ? DEFAULT_SIGNALING : undefined,
+    signaling: deriveSignaling(relay),
     persist: opts.persist,
   })
   return new Spool(engine, relay, key, opts.author ?? 'anonymous')

@@ -1,16 +1,19 @@
-// T-021 sync torture harness. Executes apps/client/TESTING.md scenarios
-// against the real client (apps/client, vendor bundle included) in headless
-// Chrome via CDP. Zero npm deps — Node 24 built-ins only; the relay child
-// reuses the T-003 spike (which brings its own `ws`).
+// T-021 sync torture harness, upgraded in T-040 to run against the real
+// packages/spools-relay (dumb broadcaster + signaling). Executes the
+// apps/client/TESTING.md scenarios in headless Chrome via CDP. Zero npm
+// deps — Node 24 built-ins only; the relay brings its own `ws`.
 //
 // Run: node scratch/torture-t021/torture.mjs
-// Needs: Chrome at CHROME_BIN or the macOS default path; spike node_modules
-// installed (scratch/spike-dumb-relay: pnpm install --ignore-workspace).
+// Needs: Chrome at CHROME_BIN or the macOS default path; workspace installed.
 //
 // Origins stand in for devices: each port gets its own IndexedDB and
 // localStorage, and cross-origin tabs share no BroadcastChannel — so any
 // convergence below is genuine network sync. "Offline" = the relay process
 // is SIGKILLed (severs established sockets, which DevTools offline does not).
+// Scenarios 1–5 run with WebRTC disabled (patched out pre-load): the one-URL
+// convention gives local relays signaling, and an established rtc mesh would
+// otherwise carry sync straight through a relay kill and fake the results.
+// S6 is the scenario where that redundancy is the thing being proven.
 
 import { spawn } from 'node:child_process'
 import { createServer } from 'node:http'
@@ -51,8 +54,9 @@ const serveClient = (port) =>
 let relayProc = null
 const relayUp = async () => {
   if (relayProc) return
-  relayProc = spawn(process.execPath, [new URL('relay-server.mjs', here).pathname, String(RELAY_PORT)], {
+  relayProc = spawn(process.execPath, [new URL('../../packages/spools-relay/server.js', here).pathname], {
     stdio: ['ignore', 'pipe', 'inherit'],
+    env: { ...process.env, PORT: String(RELAY_PORT), HOST: '127.0.0.1' },
   })
   await new Promise((resolve) => relayProc.stdout.once('data', resolve))
 }
@@ -66,9 +70,10 @@ const relayDown = async () => {
 // ---------- minimal CDP ----------
 
 class Tab {
-  static async open(url) {
+  /** open a tab; opts.patch runs before any page script (e.g. to delete RTCPeerConnection) */
+  static async open(url, opts = {}) {
     const info = await (
-      await fetch(`http://127.0.0.1:${CDP_PORT}/json/new?${encodeURIComponent(url)}`, { method: 'PUT' })
+      await fetch(`http://127.0.0.1:${CDP_PORT}/json/new`, { method: 'PUT' })
     ).json()
     const tab = new Tab()
     tab.id = info.id
@@ -90,6 +95,8 @@ class Tab {
     })
     await tab.call('Runtime.enable')
     await tab.call('Page.enable')
+    if (opts.patch) await tab.call('Page.addScriptToEvaluateOnNewDocument', { source: opts.patch })
+    await tab.call('Page.navigate', { url })
     return tab
   }
 
@@ -145,28 +152,9 @@ class Tab {
   }
 }
 
-// injected before page scripts (scenario 6): lets the harness sever live
-// relay sockets and make new ones fail, like the relay host going dark.
-// WebRTC is untouched — that's the point.
-const WS_OUTAGE_PATCH = `(() => {
-  const Orig = window.WebSocket
-  const live = new Set()
-  let blocked = []
-  window.WebSocket = function (url, protocols) {
-    if (blocked.some((p) => String(url).includes(p))) return new Orig('ws://127.0.0.1:1')
-    const ws = protocols === undefined ? new Orig(url) : new Orig(url, protocols)
-    live.add(ws)
-    return ws
-  }
-  window.WebSocket.prototype = Orig.prototype
-  for (const k of ['CONNECTING', 'OPEN', 'CLOSING', 'CLOSED']) window.WebSocket[k] = Orig[k]
-  window.__wsOutage = (patterns) => {
-    blocked = patterns
-    let cut = 0
-    for (const ws of live) if (patterns.some((p) => ws.url.includes(p))) { ws.close(); cut++ }
-    return cut
-  }
-})()`
+// injected before page scripts in scenarios 1–5: no WebRTC, so killing the
+// relay process is a true total outage (see header comment)
+const RTC_OFF = 'delete window.RTCPeerConnection; delete window.webkitRTCPeerConnection;'
 
 // ---------- scenario plumbing ----------
 
@@ -184,7 +172,7 @@ const scenario = async (name, fn) => {
 }
 
 const linkFor = (origin, code) =>
-  `http://localhost:${origin}/#spool=${code}&relay=${encodeURIComponent(`ws://localhost:${RELAY_PORT}`)}`
+  `http://localhost:${origin}/#spool=${code}&relay=${encodeURIComponent(`ws://localhost:${RELAY_PORT}/yjs`)}`
 
 const freshCode = () => `torture-relay-${String(Math.floor(Math.random() * 1000)).padStart(3, '0')}`
 
@@ -221,7 +209,7 @@ try {
   // S1 — refresh survives with the network dead: entries come from IndexedDB
   await scenario('S1 refresh-is-IndexedDB (5 entries, relay killed, hard reload)', async () => {
     await relayUp()
-    tabA = await Tab.open(linkFor(ORIGINS[0], code1))
+    tabA = await Tab.open(linkFor(ORIGINS[0], code1), { patch: RTC_OFF })
     await tabA.ready()
     await tabA.eval(`for (let i = 1; i <= 5; i++) void window.spool.wind({ kind: 'note', body: 'entry ' + i })`)
     await tabA.until(`${ENTRY_COUNT} === 5`, 5_000)
@@ -240,7 +228,7 @@ try {
   await scenario('S2 offline wind → reconnect converges', async () => {
     await relayUp()
     await tabA.until(`window.spool.status === 'connected'`, 15_000)
-    tabB = await Tab.open(linkFor(ORIGINS[1], code1))
+    tabB = await Tab.open(linkFor(ORIGINS[1], code1), { patch: RTC_OFF })
     await tabB.ready()
     await tabB.until(`${ENTRY_COUNT} === 5`, 30_000, 'B converges to 5')
     await relayDown()
@@ -248,7 +236,7 @@ try {
     await tabA.eval(`for (let i = 1; i <= 3; i++) void window.spool.wind({ kind: 'note', body: 'offline ' + i })`)
     const n = await tabA.eval(ENTRY_COUNT)
     if (n !== 8) throw new Error(`offline wind broke locally: ${n}/8`)
-    const rows = await tabA.eval(`document.getElementById('list').children.length`)
+    const rows = await tabA.eval(`document.querySelectorAll('[data-id]').length`)
     if (rows !== 8) throw new Error(`UI did not render offline entries: ${rows}/8 rows`)
     await relayUp()
     const ms = await tabB.until(`${ENTRY_COUNT} === 8`, 60_000, 'B converges to 8 after reconnect')
@@ -257,6 +245,7 @@ try {
 
   // S3 — both sides diverge offline, same entry body, character-level merge
   await scenario('S3 both diverge offline → merge, no lost characters', async () => {
+    await relayUp() // scenarios own their starting relay state (a failed predecessor may leave it down)
     const id = await tabA.eval(`window.spool.wind({ kind: 'note', body: 'the quick brown fox' }).id`)
     await tabB.until(`window.spool.entries.some((e) => e.id === ${JSON.stringify(id)})`, 30_000, 'B has the target entry')
     await relayDown()
@@ -276,9 +265,10 @@ try {
 
   // S4 — cold late join through the dumb relay (peer online answers step1)
   await scenario('S4 cold late join (fresh device, 20 entries, peer online)', async () => {
+    await relayUp()
     await tabA.eval(`for (let i = ${ENTRY_COUNT}; i < 20; i++) void window.spool.wind({ kind: 'note', body: 'filler ' + i })`)
     await tabA.until(`${ENTRY_COUNT} === 20`, 5_000)
-    const tabC = await Tab.open(linkFor(ORIGINS[2], code1))
+    const tabC = await Tab.open(linkFor(ORIGINS[2], code1), { patch: RTC_OFF })
     await tabC.ready()
     const ms = await tabC.until(`${ENTRY_COUNT} === 20`, 30_000, 'C converges to 20')
     await tabC.close()
@@ -287,8 +277,9 @@ try {
 
   // S5 — nobody home: clean empty state, no error spiral; converges when a peer arrives
   await scenario('S5 nobody home → quiet wait → peer arrives', async () => {
+    await relayUp()
     const code2 = freshCode()
-    const tabC = await Tab.open(linkFor(ORIGINS[2], code2))
+    const tabC = await Tab.open(linkFor(ORIGINS[2], code2), { patch: RTC_OFF })
     await tabC.ready()
     await sleep(10_000) // sit alone for a while
     const n = await tabC.eval(ENTRY_COUNT)
@@ -305,28 +296,26 @@ try {
     return `10 s alone: 0 entries, 0 errors, status '${status}'; converged ${Math.round(ms / 1000)} s after peer wound`
   })
 
-  // S6 — relay host dark, established WebRTC keeps syncing (fosho relay + signaling)
+  // S6 — relay process dies mid-session, established WebRTC keeps syncing.
+  // The one-URL convention gives the local relay signaling, so this now runs
+  // fully against spools-relay: SIGKILL takes down sync AND rendezvous (the
+  // honest single-host outage) and the already-formed mesh carries on.
   await scenario('S6 relay outage mid-session → WebRTC carries on', async () => {
+    await relayUp()
     for (const tab of [tabA, tabB]) await tab.close()
-    tabA = await Tab.open('about:blank')
-    await tabA.call('Page.addScriptToEvaluateOnNewDocument', { source: WS_OUTAGE_PATCH })
-    await tabA.navigate(`http://localhost:${ORIGINS[0]}/`)
+    const code = freshCode()
+    tabA = await Tab.open(linkFor(ORIGINS[0], code)) // no RTC_OFF: rtc is the subject here
     await tabA.ready()
-    const share = await tabA.eval(`window.spool.share()`)
-    const fragment = share.slice(share.indexOf('#'))
-    tabB = await Tab.open('about:blank')
-    await tabB.call('Page.addScriptToEvaluateOnNewDocument', { source: WS_OUTAGE_PATCH })
-    await tabB.navigate(`http://localhost:${ORIGINS[1]}/${fragment}`)
+    tabB = await Tab.open(linkFor(ORIGINS[1], code))
     await tabB.ready()
     await tabA.eval(`void window.spool.wind({ kind: 'note', body: 'baseline over the relay' })`)
     await tabB.until(`${ENTRY_COUNT} === 1`, 30_000, 'baseline sync')
     await sleep(10_000) // give the webrtc mesh time to form after signaling
-    const cutA = await tabA.eval(`window.__wsOutage(['foshoio'])`)
-    const cutB = await tabB.eval(`window.__wsOutage(['foshoio'])`)
+    await relayDown() // SIGKILL: sync ws + signaling both die for real
     await tabA.eval(`void window.spool.wind({ kind: 'note', body: 'through the side door' })`)
     const ms = await tabB.until(`${ENTRY_COUNT} === 2`, 25_000, 'entry crosses without the relay')
     const statusB = await tabB.eval('window.spool.status')
-    return `severed ${cutA}+${cutB} sockets (relay+signaling); entry crossed in ${(ms / 1000).toFixed(1)} s; B status '${statusB}'`
+    return `relay SIGKILLed; entry crossed in ${(ms / 1000).toFixed(1)} s; B status '${statusB}'`
   })
 } finally {
   await relayDown()

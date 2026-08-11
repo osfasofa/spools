@@ -90,3 +90,15 @@ it('author defaults to anonymous and is carried when given', async () => {
   const b = track(await newSpool({ relay: 'ws://127.0.0.1:1', persist: false, author: 'jules' }))
   expect(b.author).toBe('jules')
 })
+
+it('one-URL convention: /yjs relay implies signaling at the host root (T-040)', async () => {
+  const { deriveSignaling } = await import('./spool')
+  expect(deriveSignaling('wss://relay.example/yjs')).toEqual(['wss://relay.example/'])
+  expect(deriveSignaling('ws://localhost:9401/yjs')).toEqual(['ws://localhost:9401/'])
+  expect(deriveSignaling('wss://foshoio-production.up.railway.app/yjs')).toEqual([
+    'wss://foshoio-production.up.railway.app/',
+  ]) // the default relay needs no special case
+  expect(deriveSignaling('wss://relay.example/other')).toBeUndefined()
+  expect(deriveSignaling('wss://relay.example/')).toBeUndefined()
+  expect(deriveSignaling('not a url')).toBeUndefined()
+})

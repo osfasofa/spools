@@ -38,7 +38,7 @@ Session-sized chunks of the build order (DESIGN_DOC §4). Each ticket is one fil
 
 | Ticket | Title | Depends | Status |
 |---|---|---|---|
-| [T-040](T-040-spools-relay.md) | `spools-relay`: dumb broadcaster + signaling | T-003 | todo |
+| [T-040](T-040-spools-relay.md) | `spools-relay`: dumb broadcaster + signaling | T-003 | done |
 | [T-041](T-041-relay-shipping.md) | `npx spools-relay` + deploy button + honesty clause | T-040 | todo |
 
 ## M5 — Encryption
