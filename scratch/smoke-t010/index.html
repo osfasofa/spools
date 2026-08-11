@@ -11,7 +11,7 @@
 </head>
 <body>
   <h1>T-010 smoke</h1>
-  <p>status: <span id="status">–</span> · ready: <span id="ready">no</span></p>
+  <p>status: <span id="st">–</span> · ready: <span id="ready">no</span></p>
   <input id="key" placeholder="key"> <input id="val" placeholder="value">
   <button id="setBtn">set</button> <button id="leaveBtn">leave</button>
   <pre id="out">(map empty)</pre>
@@ -29,11 +29,16 @@
       out.textContent = JSON.stringify(m.toJSON(), null, 2)
     }
     m.observe(render)
-    engine.whenReady.then(() => { ready.textContent = 'yes'; render() })
-    engine.onStatus((s) => { status.textContent = s })
-    status.textContent = engine.status
+    engine.whenReady.then(() => {
+      // capture what IDB alone delivered, and whether network was involved yet
+      window.__atReady = { map: m.toJSON(), statusAtReady: engine.status }
+      ready.textContent = 'yes'
+      render()
+    })
+    engine.onStatus((s) => { st.textContent = s })
+    st.textContent = engine.status
     setBtn.onclick = () => m.set(key.value || 'k', val.value)
-    leaveBtn.onclick = () => engine.leave().then(() => { status.textContent = 'left' })
+    leaveBtn.onclick = () => engine.leave().then(() => { st.textContent = 'left' })
     window.engine = engine
   </script>
 </body>

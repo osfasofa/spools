@@ -1,7 +1,7 @@
 ---
 id: T-010
 title: Engine extraction from fosho
-status: doing
+status: done
 milestone: M1
 depends: [T-001]
 ---
@@ -32,7 +32,7 @@ A minimal-shape reference: fosho `src/lib/ecs/components/note-stage.ts:63–110`
 - [x] Status derivation from provider events (`offline`/`connecting`/`connected`).
 - [x] `persist: false` path (memory-only; needed by tests and Node).
 - [x] Guard browser-only APIs so the module *imports* cleanly in Node (indexeddb only touched when persisting; ws provider accepts a polyfill for tests — see backup-daemon pattern).
-- [ ] Manual smoke: two browser tabs (throwaway HTML), same code, doc converges via fosho's relay. *(page ready at `scratch/smoke-t010/`; Node clients already converge through the deployed relay — browser tabs + IndexedDB refresh check pending)*
+- [x] Manual smoke: two browser tabs (throwaway HTML), same code, doc converges via fosho's relay.
 
 ## Acceptance criteria
 
@@ -53,3 +53,5 @@ A minimal-shape reference: fosho `src/lib/ecs/components/note-stage.ts:63–110`
 - y-websocket **3.1** (major bump over fosho's 2.x): constructor/options/events used by the engine are unchanged from 2.x; v3 adds `shouldReconnect` + a `closed` event we don't yet use. No migration pain.
 - Verified against fosho's deployed relay from Node (two engines, `smoke-t010-node-*` room): connect, converge both directions, clean leave. Note the deployed relay is a *y-websocket server* (parses frames, server-side doc) — acceptable for M1 per DESIGN_DOC §3; our dumb relay replaces it in T-040.
 - Awareness exposed on the engine (`engine.awareness`, shared ws↔rtc per fosho sync.ts:1032); pulled `y-protocols` in as a direct dep since its `Awareness` type is part of the public surface.
+- **Browser smoke (all acceptance criteria met, driven via Chrome automation):** two tabs on `scratch/smoke-t010/` (BroadcastChannel disabled, webrtc off — isolating the ws-relay path) converged `{"tape":"deck-A"}` through fosho's deployed relay. Refresh check: at `whenReady` the map already held the data while `engine.status` was still `offline` — IndexedDB delivered before any network. `leave()`: status → left, 8 s of console silence, no reconnect loop.
+- Smoke-page gotcha worth remembering for T-020: an element with `id="status"` is shadowed by `window.status` (the status-bar string) — assignments silently no-op. Renamed to `st`.
