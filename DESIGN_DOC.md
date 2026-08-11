@@ -161,8 +161,8 @@ Honesty clause for the README: pure zero-server P2P discovery doesn't exist on t
 Sequenced to always have something working, never to design in the abstract. The spec is written **last** — describing what demonstrably works, not what might. Spec-first is how protocol projects die in RFC purgatory; you write the constitution after the country exists.
 
 - [x] **0. Ship the mixtape** — blackpeople.lol live *(done, Aug 2026)*
-- [ ] **1. SDK core** — strip fosho `sync.ts` → engine (~150 lines); Entry helpers (`wind`, `on('entry')`, soft delete); `openSpool`/`newSpool` parsing links. **Use fosho's already-deployed relay** — zero new infrastructure between here and a working demo.
-- [ ] **2. Reference client v0** — ugliest possible list/chat on the SDK. Success = two browser tabs winding entries onto the same spool, surviving refresh (IndexedDB) and offline/reconnect.
+- [x] **1. SDK core** — strip fosho `sync.ts` → engine (~150 lines); Entry helpers (`wind`, `on('entry')`, soft delete); `openSpool`/`newSpool` parsing links. **Use fosho's already-deployed relay** — zero new infrastructure between here and a working demo. *(done Aug 2026, T-010–T-013)*
+- [x] **2. Reference client v0** — ugliest possible list/chat on the SDK. Success = two browser tabs winding entries onto the same spool, surviving refresh (IndexedDB) and offline/reconnect. *(done Aug 2026, T-020–T-021; torture checklist lives in `apps/client/TESTING.md`)*
 - [ ] **3. Mixtape renderer** — second `kind` set (`track`, `reaction`), same engine, proves views-are-skins.
 - [ ] **4. Relay packaging** — extract fosho `server.js` → `spools-relay`, `npx` + deploy button.
 - [ ] **5. `rewind()`** — Yjs snapshot history + a scrubber in the reference client. The memory feature; the demo that sells the vision.

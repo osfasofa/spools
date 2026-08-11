@@ -67,4 +67,8 @@ async function main() {
   window.spool = spool // console escape hatch
 }
 
+// pasting a different spool link into the URL bar is a fragment-only
+// navigation — nothing reloads on its own (found by T-021's torture run)
+window.addEventListener('hashchange', () => location.reload())
+
 main()

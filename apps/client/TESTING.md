@@ -1,0 +1,118 @@
+# Sync torture checklist (T-021)
+
+The local-first promises under test (DESIGN_DOC §1): copies sync live when
+people are online together, reconcile automatically on reconnect, and persist
+locally forever. Run this before every release; every scenario must pass
+against the current code.
+
+## Ground rules (or the test lies to you)
+
+- **Two tabs on the same origin cheat.** They share BroadcastChannel and
+  IndexedDB, so they "converge" even with the network unplugged. Always put
+  the second device on a different origin (second port, second browser
+  profile, or another machine): `python3 -m http.server 8765` and `…8766` in
+  `apps/client/` gives you two honest devices on one laptop.
+- **DevTools "offline" does not sever established WebSockets.** To take the
+  network away for real, kill the relay process. Scenarios 1–5 therefore run
+  against a local relay you control: `node scratch/torture-t021/relay-server.mjs 9401`
+  (the T-003 spike relay; becomes `npx spools-relay` after T-041). Craft the
+  link by hand: `http://localhost:8765/#spool=<code>&relay=ws%3A%2F%2Flocalhost%3A9401`
+  (any `adjective-noun-NNN` code works).
+- Winding/editing beyond what the UI offers uses the console escape hatch:
+  the page exposes `window.spool`.
+
+## Automated run
+
+`node scratch/torture-t021/torture.mjs` executes this entire checklist
+headlessly (three origins, killable relay child, CDP) and prints a ✔/✘ table.
+The manual steps below are the same scenarios for human hands.
+
+## Scenarios
+
+### 1. Refresh — entries come from IndexedDB, not the network
+
+1. Open a spool on the local relay, wind 5 entries.
+2. Kill the relay (Ctrl-C). Status leaves `connected`.
+3. Hard-refresh the tab.
+4. **Expect:** all 5 entries render immediately while status is still
+   `connecting`/`offline` — the network cannot have supplied them.
+
+### 2. Offline wind → reconnect converges
+
+1. Relay up; devices A and B on the same spool, converged.
+2. Kill the relay. Wind 3 entries on A.
+3. **Expect:** A stays responsive, entries render locally.
+4. Restart the relay.
+5. **Expect:** B converges without any user action, within ~20 s (one resync
+   interval — see asterisks).
+
+### 3. Both sides diverge offline — same entry, no lost characters
+
+1. A winds an entry (`the quick brown fox`); wait until B has it.
+2. Kill the relay.
+3. On A: `spool.entries.at(-1).text.insert(0, 'A> ')` and wind one entry.
+   On B: insert ` <B` at the end of the same entry's `text`, wind one entry.
+4. Restart the relay.
+5. **Expect:** both sides converge to the identical body
+   (`A> the quick brown fox <B`) — every character from both edits survives —
+   and both offline-wound entries appear everywhere.
+
+### 4. Cold late join — fresh device, peer online
+
+1. A winds 20 entries, stays online.
+2. A fresh device (never saw this spool: new profile/origin) opens the link.
+3. **Expect:** converges to all 20 within seconds. Through the dumb relay
+   this works because *A answers* the newcomer's sync request — see asterisks
+   for what changes when nobody is online.
+
+### 5. Nobody home — quiet wait, then a peer arrives
+
+1. Open a link to a spool no one else has open (fresh code), on a fresh device.
+2. **Expect:** clean empty state, zero console errors, no reconnect storm.
+   Note: status reads `connected` — that means "connected to the relay",
+   not "a peer is here" (see asterisks).
+3. Later, a peer opens the same link and winds an entry.
+4. **Expect:** the waiting device converges (instantly for live winds; within
+   one resync interval for state wound before it arrived).
+
+### 6. Relay dies mid-session — WebRTC keeps syncing
+
+1. Two devices on the *default* relay (WebRTC signaling only exists there
+   until T-040), converged, and left alone ~10 s so the WebRTC mesh forms.
+2. Sever every connection to the relay host on both devices (automated run
+   patches `WebSocket` to cut and block them; manually, firewall the host).
+3. Wind an entry on A.
+4. **Expect:** B receives it — the established WebRTC data channel carries
+   sync without the relay; status stays `connected` on the surviving path.
+
+## Results — 2026-08-11, automated run (2× consecutive, 6/6)
+
+| # | Scenario | Result | Measured |
+|---|---|---|---|
+| 1 | Refresh is IndexedDB | ✔ | 5/5 entries, status `connecting`, relay dead |
+| 2 | Offline wind → reconnect | ✔ | B caught up 19 s after relay restart |
+| 3 | Diverge offline, merge | ✔ | `A> the quick brown fox <B` on both sides |
+| 4 | Cold late join | ✔ | 20/20 on first poll (<0.5 s) |
+| 5 | Nobody home | ✔ | 10 s alone: 0 entries, 0 errors; converged instantly on peer wind |
+| 6 | Relay outage → WebRTC | ✔ | relay+signaling severed; entry crossed <0.5 s, status stayed `connected` |
+
+## Honest asterisks
+
+- **Reconnect convergence costs up to one resync interval (20 s).** A dumb
+  relay can't answer a waiting peer, so peers re-ask each other periodically
+  (DESIGN_DOC §5, T-003). Live winds while connected are instant; *catching
+  up* after a gap is bounded by the interval.
+- **Cold late join currently benefits from fosho's stateful relay.** The
+  deployed y-websocket server keeps a doc and answers newcomers even when no
+  peer is online. The dumb relay (T-040) changes the contract to "syncs when
+  we're together" — scenario 4 passes through the dumb relay only because A
+  is online to answer. Retest at M4.
+- **`status: 'connected'` means "relay reachable", not "peer present".**
+  Scenario 5 shows `connected` with nobody home. Truthful but easy to
+  misread; a peer-presence signal (awareness) is unexposed SDK surface today.
+- **WebRTC redundancy only covers outages that start after peers met.** The
+  default host serves both sync relay and WebRTC signaling, so "relay down"
+  also takes down rendezvous: two devices that haven't met can't find each
+  other during an outage; devices already connected keep syncing (scenario 6).
+- **Same-origin tabs and DevTools offline both produce fake test passes** —
+  see ground rules. This is why the automated harness exists.

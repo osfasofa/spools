@@ -26,7 +26,7 @@ Session-sized chunks of the build order (DESIGN_DOC §4). Each ticket is one fil
 | Ticket | Title | Depends | Status |
 |---|---|---|---|
 | [T-020](T-020-ugly-list-client.md) | Ugliest possible list client | T-012 | done |
-| [T-021](T-021-sync-torture-checklist.md) | Sync torture checklist (refresh, offline, reconnect) | T-020 | todo |
+| [T-021](T-021-sync-torture-checklist.md) | Sync torture checklist (refresh, offline, reconnect) | T-020 | done |
 
 ## M3 — Mixtape renderer
 
