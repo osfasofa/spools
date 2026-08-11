@@ -4,6 +4,7 @@
   "packageManager": "pnpm@11.21.0",
   "scripts": {
     "build": "pnpm -r build",
-    "test": "pnpm -r test"
+    "test": "pnpm -r test",
+    "client:vendor": "pnpm --dir packages/spools exec tsup --config tsup.client.config.ts"
   }
 }
