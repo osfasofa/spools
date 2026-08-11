@@ -43,6 +43,7 @@ One spool = one Y.Doc = one sync boundary = one link. Instance object — many s
 interface Spool {
   readonly code: string
   readonly entries: Entry[]          // live truth: sorted by createdAt, soft-deleted excluded
+  readonly deleted: Entry[]          // the complement: soft-deleted only, same handles/sort; restore() brings one back
   readonly whenReady: Promise<void>  // local persistence loaded (same signal open/new await)
   readonly status: 'offline' | 'connecting' | 'connected'
   readonly doc: Y.Doc                // escape hatch for power users binding editors

@@ -47,18 +47,8 @@ async function main() {
       list.appendChild(row(e.author, e.createdAt, e.body, 'delete', () => e.delete()))
     }
     if ($('showDeleted').checked) {
-      // SDK friction, recorded in T-020 Notes: spool.entries excludes
-      // soft-deleted entries and there's no public way to list or re-handle
-      // them, so "show deleted" goes through the spool.doc escape hatch.
-      for (const [id, meta] of spool.doc.getMap('entries')) {
-        if (meta.get('deletedAt') == null) continue
-        const body = spool.doc.share.has('entry:' + id)
-          ? spool.doc.getText('entry:' + id).toString()
-          : ''
-        list.appendChild(
-          row(meta.get('author'), meta.get('createdAt'), body, 'restore',
-            () => meta.delete('deletedAt'), true)
-        )
+      for (const e of spool.deleted) {
+        list.appendChild(row(e.author, e.createdAt, e.body, 'restore', () => e.restore(), true))
       }
     }
   }

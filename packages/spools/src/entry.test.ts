@@ -77,6 +77,23 @@ describe('soft delete', () => {
     expect(spool.entries).toHaveLength(1)
     expect(entry.body).toBe('oops') // body untouched by the tombstone
   })
+
+  it('spool.deleted lists tombstoned entries as the same live handles', async () => {
+    const spool = mkSpool()
+    await spool.whenReady
+    const a = spool.wind({ kind: 'note', body: 'keep' })
+    const b = spool.wind({ kind: 'note', body: 'toss' })
+    expect(spool.deleted).toEqual([])
+
+    b.delete()
+    expect(spool.deleted).toHaveLength(1)
+    expect(spool.deleted[0]).toBe(b) // handle identity, not a copy
+    expect(spool.entries).toEqual([a])
+
+    spool.deleted[0]!.restore() // the T-020 restore-UI path
+    expect(spool.deleted).toEqual([])
+    expect(spool.entries).toHaveLength(2)
+  })
 })
 
 describe('events: diff + getter, no replay', () => {

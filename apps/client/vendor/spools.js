@@ -13273,6 +13273,7 @@ ${reason}`);
   init_yjs();
   var ENTRIES = "entries";
   var bodyKey = (id2) => `entry:${id2}`;
+  var byCreation = (a, b) => a.createdAt - b.createdAt || (a.id < b.id ? -1 : 1);
   var _store, _Entry_instances, meta_fn;
   var Entry = class {
     /** @internal handles come from the store */
@@ -13392,7 +13393,15 @@ ${reason}`);
       for (const id2 of this.entriesMap.keys()) {
         if (__privateMethod(this, _EntryStore_instances, visible_fn).call(this, id2)) out.push(this.handle(id2));
       }
-      return out.sort((a, b) => a.createdAt - b.createdAt || (a.id < b.id ? -1 : 1));
+      return out.sort(byCreation);
+    }
+    /** the complement of list(): only the soft-deleted, same handles, same sort */
+    listDeleted() {
+      const out = [];
+      for (const id2 of this.entriesMap.keys()) {
+        if (this.entriesMap.get(id2)?.get("deletedAt") != null) out.push(this.handle(id2));
+      }
+      return out.sort(byCreation);
     }
     wind(input) {
       if (typeof input.kind !== "string" || input.kind === "") {
@@ -13660,6 +13669,10 @@ ${reason}`);
     /** live truth: sorted by createdAt (id tie-break), soft-deleted excluded */
     get entries() {
       return __privateGet(this, _store2).list();
+    }
+    /** soft-deleted entries — same live handles and sort as entries; entry.restore() brings one back */
+    get deleted() {
+      return __privateGet(this, _store2).listDeleted();
     }
     /** add an entry; synchronous — local-first means there's nothing to await */
     wind(input) {

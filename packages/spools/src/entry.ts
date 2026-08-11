@@ -17,6 +17,8 @@ export interface EntryChange {
 
 const ENTRIES = 'entries'
 const bodyKey = (id: string) => `entry:${id}`
+/** createdAt with id tie-break — deterministic across peers */
+const byCreation = (a: Entry, b: Entry) => a.createdAt - b.createdAt || (a.id < b.id ? -1 : 1)
 
 /**
  * A live view over the underlying Yjs state — never a snapshot. One handle
@@ -149,7 +151,16 @@ export class EntryStore {
     for (const id of this.entriesMap.keys()) {
       if (this.#visible(id)) out.push(this.handle(id))
     }
-    return out.sort((a, b) => a.createdAt - b.createdAt || (a.id < b.id ? -1 : 1))
+    return out.sort(byCreation)
+  }
+
+  /** the complement of list(): only the soft-deleted, same handles, same sort */
+  listDeleted(): Entry[] {
+    const out: Entry[] = []
+    for (const id of this.entriesMap.keys()) {
+      if (this.entriesMap.get(id)?.get('deletedAt') != null) out.push(this.handle(id))
+    }
+    return out.sort(byCreation)
   }
 
   wind(input: WindInput): Entry {

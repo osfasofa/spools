@@ -68,6 +68,11 @@ export class Spool {
     return this.#store.list()
   }
 
+  /** soft-deleted entries — same live handles and sort as entries; entry.restore() brings one back */
+  get deleted(): Entry[] {
+    return this.#store.listDeleted()
+  }
+
   /** add an entry; synchronous — local-first means there's nothing to await */
   wind(input: WindInput): Entry {
     return this.#store.wind(input)

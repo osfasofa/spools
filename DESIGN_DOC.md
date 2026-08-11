@@ -200,6 +200,7 @@ Decisions made deliberately, with the reasoning — so future sessions don't rel
 | Authorship | `author` is a self-declared string in v1 | Trust, not proof — that *is* intimate scale. Banked: crypto attribution, if ever wanted, arrives as an additive `sig` field, never a migration |
 | Relay persistence | Parked for v2 | Dumb relay keeps the door wide open (append forwarded bytes, replay on join); v1 story stays "syncs when we're together" |
 | Client resync | Spool clients MUST run periodic resync (SDK sets `resyncInterval`, ~15–30 s) | A dumb relay can't answer a waiting peer; peers must re-ask. Proven in T-003: without it, offline-gap reunions never heal the waiting side (y-websocket sends SyncStep1 only at connect). Cost: one tiny state-vector frame per client per interval *(Aug 2026, T-003 spike)* |
+| Deleted-entry access | `spool.deleted` getter — same live handles and sort as `entries` | The API's first consumer (T-020's client) needed a restore UI on day one and had to fall back to the raw-doc escape hatch; the getter mirrors `entries`, and `restore()` already lives on the handle *(Aug 2026, T-020)* |
 
 ---
 
