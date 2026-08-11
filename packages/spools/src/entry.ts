@@ -7,6 +7,12 @@ export interface WindInput {
   body?: string
   /** entry id — threading, reactions, replies */
   parent?: string
+  /**
+   * Plain-JSON machine fields (a track's url/title/artist); body stays the
+   * human text. Write-once by convention: the whole value is last-write-wins,
+   * which is only honest for data set at wind time (DESIGN_DOC §5, T-030).
+   */
+  data?: Record<string, unknown>
 }
 
 export interface EntryChange {
@@ -59,6 +65,11 @@ export class Entry {
 
   get deletedAt(): number | undefined {
     return this.#meta().get('deletedAt') as number | undefined
+  }
+
+  /** plain-JSON machine fields set at wind time; read-only by convention (mutations don't sync) */
+  get data(): Record<string, unknown> | undefined {
+    return this.#meta().get('data') as Record<string, unknown> | undefined
   }
 
   /**
@@ -175,6 +186,8 @@ export class EntryStore {
       meta.set('kind', input.kind)
       meta.set('createdAt', Date.now())
       if (input.parent !== undefined) meta.set('parent', input.parent)
+      // cloned so a caller mutating their object can't desync local state
+      if (input.data !== undefined) meta.set('data', structuredClone(input.data))
       this.entriesMap.set(id, meta)
       if (input.body !== undefined) this.doc.getText(bodyKey(id)).insert(0, input.body)
     })

@@ -96,6 +96,37 @@ describe('soft delete', () => {
   })
 })
 
+describe('structured data field (T-030 verdict)', () => {
+  it('data round-trips, syncs, and is absent when not wound', async () => {
+    const a = mkSpool('a')
+    const b = mkSpool('b')
+    await a.whenReady
+    await b.whenReady
+    link(a, b)
+
+    const fields = { url: 'https://example.com/song', title: 'the song', artist: 'the band' }
+    const track = a.wind({ kind: 'track', body: 'why this one: late shifts', data: fields })
+    expect(track.data).toEqual(fields)
+    expect(track.body).toBe('why this one: late shifts') // body stays the human text
+
+    const plain = a.wind({ kind: 'note', body: 'no data here' })
+    expect(plain.data).toBeUndefined()
+
+    await tick()
+    const remote = b.entries.find((e) => e.id === track.id)!
+    expect(remote.data).toEqual(fields)
+  })
+
+  it('wind clones data — caller mutations after wind do not leak in', async () => {
+    const spool = mkSpool()
+    await spool.whenReady
+    const fields: Record<string, unknown> = { title: 'original' }
+    const entry = spool.wind({ kind: 'track', data: fields })
+    fields.title = 'mutated'
+    expect(entry.data).toEqual({ title: 'original' })
+  })
+})
+
 describe('events: diff + getter, no replay', () => {
   it('no replay on load: seeded doc fires zero events, then events resume', async () => {
     const source = mkSpool('alice')

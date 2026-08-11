@@ -62,6 +62,7 @@ interface WindInput {
   kind: string          // app-level flavor; protocol doesn't care
   body?: string         // initial body text (creates the Y.Text lazily)
   parent?: string       // entry id — threading, reactions, replies
+  data?: Record<string, unknown>  // plain-JSON machine fields; write-once by convention (whole-value LWW). Body stays the human text
 }
 ```
 
@@ -98,6 +99,7 @@ interface Entry {
   readonly parent?: string
   readonly createdAt: number   // wall-clock ms, writer's clock
   readonly deletedAt?: number
+  readonly data?: Record<string, unknown>  // machine fields from wind time; read-only by convention (mutations don't sync)
 
   body: string                 // getter/setter over the Y.Text; '' if no body exists
   readonly text: Y.Text | null // raw Y.Text for editor bindings; null until a body exists
@@ -114,7 +116,7 @@ Setting `entry.body` on an entry with no body creates the `Y.Text` at that momen
 
 ## Document shape (what's actually in the Y.Doc)
 
-- `Y.Map` named `entries` — one nested `Y.Map` per entry id, holding `{ id, author, parent, kind, createdAt, deletedAt }`. Plain values, last-write-wins per field — acceptable because metadata fields are write-once or tombstones.
+- `Y.Map` named `entries` — one nested `Y.Map` per entry id, holding `{ id, author, parent, kind, createdAt, deletedAt, data? }`. Plain values, last-write-wins per field — acceptable because metadata fields are write-once or tombstones. `data` is a plain-JSON object of machine fields (a track's url/title/artist), written once at wind time (T-030 verdict, §5); the human text lives in the body.
 - Per-entry `Y.Text` at doc root, keyed `entry:<id>` — created lazily, only when a body exists. Absence of the key = no body.
 - Clients ignore `kind`s **and metadata fields** they don't understand — the forward-compatibility rule. (This is what makes a future `data` or `sig` field additive.)
 

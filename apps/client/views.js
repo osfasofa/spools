@@ -8,19 +8,28 @@
 // it doesn't understand harmlessly (generic fallback, never a crash).
 /* global spools */
 
-// ---- track bodies: the markdown-smuggle experiment (T-030 forcing function)
-// A track is `[Title — Artist](url)` on line 1, note on the lines after.
-// Naive views show a readable line instead of a JSON blob — that's the
-// argument FOR smuggling; the parser fragility below is the argument against.
-const encodeTrack = ({ title, artist, url, note }) =>
-  `[${title} — ${artist}](${url})` + (note ? `\n${note}` : '')
-
+// ---- track fields live in entry.data (T-030 verdict, DESIGN_DOC §5);
+// the body is the human note. The markdown-smuggle parser below survives
+// only as a fallback so tracks wound during the M3 build still render.
 const parseTrack = (body) => {
   const nl = body.indexOf('\n')
   const head = nl === -1 ? body : body.slice(0, nl)
   const m = /^\[(.+) — (.+)\]\((.+)\)$/.exec(head)
-  if (!m) return null // a title containing " — ", a url containing ")" … smuggling is guesswork
+  if (!m) return null
   return { title: m[1], artist: m[2], url: m[3], note: nl === -1 ? '' : body.slice(nl + 1) }
+}
+
+const trackData = (entry) => {
+  const d = entry.data
+  if (d && typeof d.url === 'string' && typeof d.title === 'string') {
+    return {
+      url: d.url,
+      title: d.title,
+      artist: typeof d.artist === 'string' && d.artist ? d.artist : 'unknown artist',
+      note: entry.body,
+    }
+  }
+  return parseTrack(entry.body) // legacy smuggled track, or null → render raw
 }
 
 // entries come from peers; a smuggled "url" is untrusted input
@@ -103,12 +112,12 @@ const VIEWS = {
         if (!inputs.title.value.trim() || !inputs.url.value.trim()) return
         void spool.wind({
           kind: 'track',
-          body: encodeTrack({
-            title: inputs.title.value.trim(),
-            artist: inputs.artist.value.trim() || 'unknown artist',
+          body: inputs.note.value.trim(), // the human note — readable in any view
+          data: {
             url: inputs.url.value.trim(),
-            note: inputs.note.value.trim(),
-          }),
+            title: inputs.title.value.trim(),
+            artist: inputs.artist.value.trim(),
+          },
         })
         for (const input of Object.values(inputs)) input.value = ''
       }
@@ -121,7 +130,7 @@ const VIEWS = {
         const rest = []
         for (const entry of topLevel(spool)) {
           if (entry.kind === 'track') {
-            const track = parseTrack(entry.body)
+            const track = trackData(entry)
             const div = el('div', 'track')
             div.dataset.id = entry.id
             if (track) {
@@ -182,7 +191,7 @@ const VIEWS = {
           if (entry.kind === 'note') {
             div.appendChild(el('div', null, entry.body))
           } else if (entry.kind === 'track') {
-            const track = parseTrack(entry.body)
+            const track = trackData(entry)
             if (track) {
               div.appendChild(el('div', null, '🎵 ')).appendChild(trackLink(track))
               if (track.note) div.appendChild(el('div', 'note', track.note))
@@ -232,7 +241,8 @@ const VIEWS = {
         const li = el('li', struck ? 'deleted' : undefined)
         li.dataset.id = entry.id
         li.appendChild(el('span', 'kind-tag', entry.kind))
-        li.appendChild(el('span', null, `${entry.author} @ ${new Date(entry.createdAt).toLocaleString()}: ${entry.body} `))
+        const data = entry.data ? ` ${JSON.stringify(entry.data)}` : ''
+        li.appendChild(el('span', null, `${entry.author} @ ${new Date(entry.createdAt).toLocaleString()}: ${entry.body}${data} `))
         const button = el('button', null, btnLabel)
         button.onclick = onClick
         li.appendChild(button)

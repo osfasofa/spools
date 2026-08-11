@@ -13299,6 +13299,10 @@ ${reason}`);
     get deletedAt() {
       return __privateMethod(this, _Entry_instances, meta_fn).call(this).get("deletedAt");
     }
+    /** plain-JSON machine fields set at wind time; read-only by convention (mutations don't sync) */
+    get data() {
+      return __privateMethod(this, _Entry_instances, meta_fn).call(this).get("data");
+    }
     /**
      * Raw Y.Text for editor bindings; null until a body exists. Existence =
      * the root type is materialized in this doc (a body created empty on
@@ -13415,6 +13419,7 @@ ${reason}`);
         meta.set("kind", input.kind);
         meta.set("createdAt", Date.now());
         if (input.parent !== void 0) meta.set("parent", input.parent);
+        if (input.data !== void 0) meta.set("data", structuredClone(input.data));
         this.entriesMap.set(id2, meta);
         if (input.body !== void 0) this.doc.getText(bodyKey(id2)).insert(0, input.body);
       });
