@@ -1,6 +1,14 @@
 import type * as Y from 'yjs'
 import { SpoolEngine, type SpoolStatus } from './engine'
+import { EntryStore, type Entry, type EntryChange, type WindInput } from './entry'
 import { buildSpoolLink, generateCode, generateKey, parseSpoolLink } from './link'
+
+export class NotImplementedError extends Error {
+  constructor(what: string, milestone: string) {
+    super(`${what} is not implemented yet (lands in ${milestone})`)
+    this.name = 'NotImplementedError'
+  }
+}
 
 /**
  * fosho's deployed relay — zero new infrastructure for M1. Flips to our own
@@ -34,6 +42,7 @@ export class Spool {
   readonly author: string
 
   #engine: SpoolEngine
+  #store: EntryStore
   #relay: string
   /** carried from the link / generated fresh; cryptographically live in M5 */
   #key: Uint8Array | undefined
@@ -47,15 +56,42 @@ export class Spool {
     this.code = engine.code
     this.doc = engine.doc
     this.whenReady = engine.whenReady
+    this.#store = new EntryStore(engine.doc, author, engine.whenReady)
   }
 
   get status(): SpoolStatus {
     return this.#engine.status
   }
 
-  on(event: 'status', cb: (status: SpoolStatus) => void): () => void {
-    if (event !== 'status') throw new Error(`unknown event: ${event}`)
-    return this.#engine.onStatus(cb)
+  /** live truth: sorted by createdAt (id tie-break), soft-deleted excluded */
+  get entries(): Entry[] {
+    return this.#store.list()
+  }
+
+  /** add an entry; synchronous — local-first means there's nothing to await */
+  wind(input: WindInput): Entry {
+    return this.#store.wind(input)
+  }
+
+  on(event: 'entry', cb: (change: EntryChange) => void): () => void
+  on(event: 'status', cb: (status: SpoolStatus) => void): () => void
+  on(
+    event: 'entry' | 'status',
+    cb: ((change: EntryChange) => void) | ((status: SpoolStatus) => void)
+  ): () => void {
+    if (event === 'entry') return this.#store.onEntry(cb as (change: EntryChange) => void)
+    if (event === 'status') return this.#engine.onStatus(cb as (status: SpoolStatus) => void)
+    throw new Error(`unknown event: ${String(event)}`)
+  }
+
+  /** view history at an earlier point in time — M6 */
+  rewind(_ts: number): never {
+    throw new NotImplementedError('rewind()', 'M6')
+  }
+
+  /** portable file, yours forever — M8 */
+  export(): never {
+    throw new NotImplementedError('export()', 'M8')
   }
 
   /** the shareable link — hand it to someone */
@@ -65,6 +101,7 @@ export class Spool {
 
   /** disconnect and release resources; local data is retained (a spool is a keepsake) */
   leave(): Promise<void> {
+    this.#store.destroy()
     return this.#engine.leave()
   }
 }

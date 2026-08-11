@@ -100,7 +100,7 @@ interface Entry {
 
   body: string                 // getter/setter over the Y.Text; '' if no body exists
   readonly text: Y.Text | null // raw Y.Text for editor bindings; null until a body exists
-  readonly children: Entry[]   // entries whose parent === this.id
+  readonly children: Entry[]   // entries whose parent === this.id (soft-deleted excluded, like spool.entries)
 
   delete(): void               // soft: sets deletedAt (DESIGN_DOC §5)
   restore(): void              // clears deletedAt — archiving falls out free

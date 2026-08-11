@@ -1,7 +1,9 @@
 // The spools SDK. Entry layer (wind/entries/events) lands in T-012
 // (docs/SDK-API.md is the map).
-export { newSpool, openSpool, Spool, DEFAULT_RELAY } from './spool'
+export { newSpool, openSpool, Spool, DEFAULT_RELAY, NotImplementedError } from './spool'
 export type { NewSpoolOptions, OpenSpoolOptions } from './spool'
+export { Entry } from './entry'
+export type { EntryChange, WindInput } from './entry'
 export { parseSpoolLink, buildSpoolLink, generateCode, isValidCode, SpoolLinkError } from './link'
 export type { ParsedLink, BuildLinkInput } from './link'
 export { SpoolEngine } from './engine'

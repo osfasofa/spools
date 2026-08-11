@@ -1,7 +1,7 @@
 ---
 id: T-012
 title: "Entry layer: wind, entries, events, soft delete"
-status: todo
+status: done
 milestone: M1
 depends: [T-010, T-011]
 ---
@@ -23,12 +23,12 @@ Nobody outside the SDK touches raw `Y.Map`/`Y.Text` — but `spool.doc` and `ent
 
 ## Tasks
 
-- [ ] Entry class: metadata getters, `body` get/set (lazy Y.Text creation on first set), `text` (null until body exists), `children`, `delete()`, `restore()`.
-- [ ] `wind(input)`: validate `kind` non-empty, uuid, stamp `author` (spool's option) + `createdAt`, write metadata map (+ body Y.Text if `body` given) in **one Yjs transaction**.
-- [ ] `spool.entries`: sorted by `createdAt`, deleted excluded; document tie-break (id) so order is deterministic across peers.
-- [ ] Observer wiring: deep observer on `entries` map + body Y.Text events → coalesce per transaction → `EntryChange`. Body edits surface as `updated`.
-- [ ] Deleted↔restored transitions map to `deleted`/`added` in the diff (define + test, note in SDK-API if the shape needs amending).
-- [ ] Unit tests for the above (two in-memory docs synced via `Y.applyUpdate` — no network needed).
+- [x] Entry class: metadata getters, `body` get/set (lazy Y.Text creation on first set), `text` (null until body exists), `children`, `delete()`, `restore()`.
+- [x] `wind(input)`: validate `kind` non-empty, uuid, stamp `author` (spool's option) + `createdAt`, write metadata map (+ body Y.Text if `body` given) in **one Yjs transaction**.
+- [x] `spool.entries`: sorted by `createdAt`, deleted excluded; document tie-break (id) so order is deterministic across peers.
+- [x] Observer wiring: deep observer on `entries` map + body Y.Text events → coalesce per transaction → `EntryChange`. Body edits surface as `updated`.
+- [x] Deleted↔restored transitions map to `deleted`/`added` in the diff (define + test, note in SDK-API if the shape needs amending).
+- [x] Unit tests for the above (two in-memory docs synced via `Y.applyUpdate` — no network needed).
 
 ## Acceptance criteria
 
@@ -38,4 +38,12 @@ Nobody outside the SDK touches raw `Y.Map`/`Y.Text` — but `spool.doc` and `ent
 
 ## Notes / open questions
 
-- `createdAt` is writer's wall clock — fine for intimate scale; note any test flakiness it causes (would motivate a logical-clock tiebreak, *not* a protocol change).
+- `createdAt` is writer's wall clock — fine for intimate scale; note any test flakiness it causes (would motivate a logical-clock tiebreak, *not* a protocol change). → No flakiness; ties forced with fake timers confirm the id tie-break holds.
+- **Event pipeline shape:** one `doc.on('afterTransaction')` handler + a shadow visibility map (`id → visible`), instead of stacked observers. A transaction's touched entry ids are recovered from `tr.changed` (the entries map, nested meta maps, and root `entry:<id>` texts via reverse lookup in `doc.share`); each id classifies against the shadow: invisible→visible = `added`, visible→invisible = `deleted`, visible→visible = `updated`. Natural per-transaction batching, one code path for local and remote changes.
+- **No-replay mechanics:** the store arms after `whenReady`, snapshotting what already exists into the shadow. Corollary (documented contract, tested): changes made *before* `await`ing new/openSpool fire no events either.
+- Decisions made where SDK-API was silent, none amending the shape:
+  - Touching an *invisible* entry (e.g. body edit on a soft-deleted one) fires nothing; `restore()` surfaces it as `added`. Deleted→restored = `deleted`/`added`, as the ticket suggested.
+  - A body text arriving *before* its metadata (partial sync) stays silent; the entry events once metadata lands.
+  - `children` excludes soft-deleted, matching `spool.entries` (SDK-API note clarified).
+  - Body existence = the root `Y.Text` is materialized in the local doc. A body created empty on another peer produces no update, so it doesn't exist here until its first character arrives — one honest sentence instead of an existence-tracking side channel.
+- 43 tests green (14 new). `rewind()`/`export()` stubs throw `NotImplementedError` naming their milestone.
