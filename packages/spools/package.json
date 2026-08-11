@@ -1,7 +1,13 @@
 {
   "name": "spools",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "Intimate, local-first, P2P shared documents. An artifact that can change, that's passed around.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/osfasofa/spools.git",
+    "directory": "packages/spools"
+  },
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
