@@ -32,7 +32,7 @@ Session-sized chunks of the build order (DESIGN_DOC §4). Each ticket is one fil
 
 | Ticket | Title | Depends | Status |
 |---|---|---|---|
-| [T-030](T-030-mixtape-renderer.md) | `track`/`reaction` kinds + view switcher (views-are-skins) | T-021 | todo |
+| [T-030](T-030-mixtape-renderer.md) | `track`/`reaction` kinds + view switcher (views-are-skins) | T-021 | done |
 
 ## M4 — Relay packaging
 

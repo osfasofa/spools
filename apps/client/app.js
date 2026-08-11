@@ -1,6 +1,7 @@
-// The ugliest possible list client (T-020). Read top to bottom — this file is
-// demo-as-documentation for the spools SDK.
-/* global spools */
+// The spool reference client shell. T-020 built the bones; T-030 made the
+// content area a swappable renderer (views.js) — the switcher swaps skins
+// over the same live spool, no reconnection.
+/* global spools, VIEWS */
 const $ = (id) => document.getElementById(id)
 
 // Author is fixed when the spool opens, so changing your name reloads the page.
@@ -27,42 +28,30 @@ async function main() {
   $('st').textContent = spool.status
   spool.on('status', (s) => { $('st').textContent = s })
 
-  const row = (who, when, body, btnLabel, onClick, struck) => {
-    const li = document.createElement('li')
-    if (struck) li.style.textDecoration = 'line-through'
-    li.textContent = `${who} @ ${new Date(when).toLocaleString()}: ${body} `
-    const btn = document.createElement('button')
-    btn.textContent = btnLabel
-    btn.onclick = onClick
-    li.appendChild(btn)
-    return li
-  }
+  // ---- the view switcher: same spool, different skin ----
+  let update = null
+  let current = localStorage.getItem('spool-view') || 'mixtape'
+  if (!VIEWS[current]) current = 'mixtape'
 
-  // The naive path, on purpose: any entry event → rerender everything from
-  // spool.entries. Can never drift. (The diff payload gets exercised in T-030.)
-  const render = () => {
-    const list = $('list')
-    list.textContent = ''
-    for (const e of spool.entries) {
-      list.appendChild(row(e.author, e.createdAt, e.body, 'delete', () => e.delete()))
+  const mount = () => {
+    for (const btn of document.querySelectorAll('nav [data-view]')) {
+      btn.setAttribute('aria-pressed', String(btn.dataset.view === current))
     }
-    if ($('showDeleted').checked) {
-      for (const e of spool.deleted) {
-        list.appendChild(row(e.author, e.createdAt, e.body, 'restore', () => e.restore(), true))
-      }
+    const root = $('view')
+    root.textContent = ''
+    update = VIEWS[current].mount(spool, root)
+    update(null) // full repaint; entry events pass the diff for polish
+  }
+  for (const btn of document.querySelectorAll('nav [data-view]')) {
+    btn.onclick = () => {
+      current = btn.dataset.view
+      localStorage.setItem('spool-view', current)
+      mount()
     }
   }
 
-  spool.on('entry', render)
-  $('showDeleted').onchange = render
-  render()
-
-  $('windForm').onsubmit = (ev) => {
-    ev.preventDefault()
-    const body = $('body').value.trim()
-    if (body) spool.wind({ kind: 'note', body })
-    $('body').value = ''
-  }
+  spool.on('entry', (change) => update(change))
+  mount()
 
   window.spool = spool // console escape hatch
 }

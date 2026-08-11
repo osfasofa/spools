@@ -3,26 +3,49 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Spool — list client</title>
-  <!-- T-020: the ugliest possible list client. Zero styling budget on purpose —
-       this page proves the SDK, not the design. -->
+  <title>Spool</title>
+  <!-- T-020 gave this page its bones (ugliest possible list); T-030 adds the
+       pitch: three renderers over the same live spool. Still static files,
+       still no build step. -->
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 44rem; margin: 1.5rem auto; padding: 0 1rem; line-height: 1.45; }
+    h1 { font-size: 1.2rem; }
+    code#share { word-break: break-all; font-size: 0.8rem; }
+    nav button { margin-right: 0.3rem; }
+    nav button[aria-pressed="true"] { font-weight: bold; text-decoration: underline; }
+    ul { padding-left: 1.2rem; }
+    .card { border: 1px solid #999; border-radius: 6px; padding: 0.4rem 0.6rem; margin: 0.4rem 0; }
+    .meta { font-size: 0.75rem; opacity: 0.7; }
+    .kind-tag { font-size: 0.7rem; border: 1px solid #999; border-radius: 3px; padding: 0 0.25rem; margin-right: 0.3rem; }
+    .note { font-style: italic; }
+    .tape { font-family: ui-monospace, monospace; }
+    .tape .track { border-bottom: 1px dashed #999; padding: 0.45rem 0; }
+    .reactions button { border: none; background: none; cursor: pointer; font-size: 1rem; padding: 0 0.15rem; }
+    .fresh { animation: fresh 1.6s ease-out; }
+    @keyframes fresh { from { background: #ffe98a; } to { background: transparent; } }
+    form.stack input { display: block; margin: 0.2rem 0; width: 100%; box-sizing: border-box; }
+    .row input { width: 60%; }
+    .deleted { text-decoration: line-through; }
+  </style>
 </head>
 <body>
   <h1>spool: <span id="code">…</span> · <span id="st">…</span></h1>
-  <p>send this to a friend: <code id="share" style="word-break: break-all">…</code></p>
-  <p>
-    <label>your name: <input id="author"></label>
+  <p class="meta">send this to a friend: <code id="share">…</code></p>
+  <p class="meta">
+    <label>your name: <input id="author" size="12"></label>
     <button id="saveAuthor">set name (reloads)</button>
-    · <label><input type="checkbox" id="showDeleted"> show deleted</label>
   </p>
-  <form id="windForm">
-    <input id="body" placeholder="write something" autocomplete="off" size="40">
-    <button>wind</button>
-  </form>
-  <ul id="list"></ul>
+  <nav>
+    view:
+    <button data-view="mixtape">mixtape</button>
+    <button data-view="chat">chat</button>
+    <button data-view="list">list</button>
+  </nav>
+  <div id="view"></div>
   <!-- classic scripts, not modules: modules don't load over file:// and this
        page must work from a USB stick. vendor/spools.js defines `spools`. -->
   <script src="vendor/spools.js"></script>
+  <script src="views.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
