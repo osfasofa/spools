@@ -9,7 +9,7 @@ Session-sized chunks of the build order (DESIGN_DOC §4). Each ticket is one fil
 | Ticket | Title | Depends | Status |
 |---|---|---|---|
 | [T-001](T-001-monorepo-scaffold.md) | Monorepo scaffold | — | done |
-| [T-002](T-002-claim-names.md) | Claim the name (npm, GitHub, domains) | — | doing |
+| [T-002](T-002-claim-names.md) | Claim the name (npm, GitHub, domains) | — | todo |
 | [T-003](T-003-spike-dumb-relay.md) | **Spike:** dumb-relay feasibility | — | done |
 
 ## M1 — SDK core
@@ -17,7 +17,7 @@ Session-sized chunks of the build order (DESIGN_DOC §4). Each ticket is one fil
 | Ticket | Title | Depends | Status |
 |---|---|---|---|
 | [T-010](T-010-engine-extraction.md) | Engine extraction from fosho | T-001 | done |
-| [T-011](T-011-links-and-codes.md) | Links, codes, `newSpool`/`openSpool`/`share` | T-001 | todo |
+| [T-011](T-011-links-and-codes.md) | Links, codes, `newSpool`/`openSpool`/`share` | T-001 | done |
 | [T-012](T-012-entry-layer.md) | Entry layer: `wind`, entries, events, soft delete | T-010, T-011 | todo |
 | [T-013](T-013-sdk-tests.md) | SDK tests incl. multi-writer verification | T-012 | todo |
 

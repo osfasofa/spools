@@ -1,7 +1,7 @@
 ---
 id: T-002
 title: Claim the name (npm, GitHub, domains)
-status: doing
+status: todo
 milestone: M0
 depends: []
 ---
@@ -31,4 +31,5 @@ DESIGN_DOC §2: `spools` verified available on npm as of Aug 2026; bare `spool` 
   - npm: `spools` **free**, `spools-relay` **free** (both 404 on the registry) — claim both.
   - Domains (RDAP): `spools.dev` **taken**, `spools.app` **taken**, `spool.link` **available**, `spools.io` unknown (.io has no public RDAP — check at a registrar).
 - Both packages prepped for publish at 0.0.1: claim READMEs, `license: MIT` *(flagged for user confirmation before publish)*, repository fields pointing at `github.com/osfasofa/spools` (update if an org is claimed).
-- (record publish outcomes + GitHub-org and domain decisions here)
+- **Deprioritized by user (Aug 2026):** "underground, obfuscated thing anyway" — claiming would be nice but is explicitly not urgent; don't treat the squatting clock as pressure. Publish prep stays committed and ready whenever the mood strikes. Back to `todo`, unblocking nothing.
+- (record publish outcomes + GitHub-org and domain decisions here, if/when)

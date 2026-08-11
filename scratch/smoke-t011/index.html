@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>T-011 smoke</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 36rem; margin: 2rem auto; }
+    pre { background: #f4f4f4; padding: 0.5rem; min-height: 4rem; }
+    #link { word-break: break-all; font-size: 0.8rem; background: #ffc; padding: 0.3rem; display: block; }
+  </style>
+</head>
+<body>
+  <h1>T-011 smoke</h1>
+  <p>code: <b id="codeEl">–</b> · status: <b id="st">–</b> · ready: <b id="ready">no</b></p>
+  <p>share link: <code id="link">–</code></p>
+  <input id="key" placeholder="key"> <input id="val" placeholder="value">
+  <button id="setBtn">set</button> <button id="leaveBtn">leave</button>
+  <pre id="out">(map empty)</pre>
+  <script type="module">
+    import { newSpool, openSpool } from './engine.js'
+    // tab 1: no fragment → fresh spool. tab 2: opened via a share() link.
+    const spool = location.hash.includes('spool=')
+      ? await openSpool(location.href)
+      : await newSpool()
+    codeEl.textContent = spool.code
+    link.textContent = spool.share()
+    const m = spool.doc.getMap('m')
+    const render = () => { out.textContent = JSON.stringify(m.toJSON(), null, 2) }
+    m.observe(render)
+    ready.textContent = 'yes'; render()
+    spool.on('status', (s) => { st.textContent = s })
+    st.textContent = spool.status
+    setBtn.onclick = () => m.set(key.value || 'k', val.value)
+    leaveBtn.onclick = () => spool.leave().then(() => { st.textContent = 'left' })
+    window.spool = spool
+  </script>
+</body>
+</html>

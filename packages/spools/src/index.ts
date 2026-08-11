@@ -1,5 +1,8 @@
-// SDK surface grows here: openSpool/newSpool land in T-011, the entry layer
-// in T-012 (docs/SDK-API.md). SpoolEngine is exported for now; it becomes
-// internal once the Spool handle wraps it.
+// The spools SDK. Entry layer (wind/entries/events) lands in T-012
+// (docs/SDK-API.md is the map).
+export { newSpool, openSpool, Spool, DEFAULT_RELAY } from './spool'
+export type { NewSpoolOptions, OpenSpoolOptions } from './spool'
+export { parseSpoolLink, buildSpoolLink, generateCode, isValidCode, SpoolLinkError } from './link'
+export type { ParsedLink, BuildLinkInput } from './link'
 export { SpoolEngine } from './engine'
 export type { SpoolEngineOptions, SpoolStatus } from './engine'
