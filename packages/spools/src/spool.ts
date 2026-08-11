@@ -2,6 +2,7 @@ import type * as Y from 'yjs'
 import { SpoolEngine, type SpoolStatus } from './engine'
 import { EntryStore, type Entry, type EntryChange, type WindInput } from './entry'
 import { buildSpoolLink, generateCode, generateKey, parseSpoolLink } from './link'
+import { keyFingerprint } from './crypto'
 
 export class NotImplementedError extends Error {
   constructor(what: string, milestone: string) {
@@ -42,9 +43,15 @@ export interface NewSpoolOptions {
   author?: string
   /** default true in browsers; false = memory-only (tests, previews) */
   persist?: boolean
+  /**
+   * default true: newSpool generates a key, carried in the link's k= and
+   * used to encrypt local storage (M5). false = keyless spool, plaintext
+   * at rest, link without k=. openSpool ignores this — the link decides.
+   */
+  encrypted?: boolean
 }
 
-export type OpenSpoolOptions = Omit<NewSpoolOptions, 'relay'>
+export type OpenSpoolOptions = Omit<NewSpoolOptions, 'relay' | 'encrypted'>
 
 /**
  * The spool handle: one spool = one Y.Doc = one sync boundary = one link.
@@ -79,6 +86,11 @@ export class Spool {
 
   get status(): SpoolStatus {
     return this.#engine.status
+  }
+
+  /** short key fingerprint for "are we on the same key?" UX; null for keyless spools */
+  get keyFingerprint(): string | null {
+    return this.#key ? keyFingerprint(this.#key) : null
   }
 
   /** live truth: sorted by createdAt (id tie-break), soft-deleted excluded */
@@ -140,13 +152,15 @@ const connect = (
     relay,
     signaling: deriveSignaling(relay),
     persist: opts.persist,
+    key,
   })
   return new Spool(engine, relay, key, opts.author ?? 'anonymous')
 }
 
-/** Start a fresh spool: new code, new key, connected, resolved when local persistence is ready. */
+/** Start a fresh spool: new code, new key (unless `encrypted: false`), connected, resolved when local persistence is ready. */
 export const newSpool = async (opts: NewSpoolOptions = {}): Promise<Spool> => {
-  const spool = connect(generateCode(), opts.relay ?? DEFAULT_RELAY, generateKey(), opts)
+  const key = opts.encrypted === false ? undefined : generateKey()
+  const spool = connect(generateCode(), opts.relay ?? DEFAULT_RELAY, key, opts)
   await spool.whenReady
   return spool
 }

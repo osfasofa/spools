@@ -3,6 +3,7 @@ import { WebsocketProvider } from 'y-websocket'
 import { IndexeddbPersistence } from 'y-indexeddb'
 import type { WebrtcProvider } from 'y-webrtc'
 import type { Awareness } from 'y-protocols/awareness'
+import { EncryptedIndexeddbPersistence } from './encrypted-idb'
 
 export type SpoolStatus = 'offline' | 'connecting' | 'connected'
 
@@ -15,6 +16,8 @@ export interface SpoolEngineOptions {
   signaling?: string[]
   /** persist to IndexedDB; false = memory-only (tests, previews). Default true in browsers */
   persist?: boolean
+  /** 32-byte key: local persistence is encrypted at rest (M5). Absent = plaintext storage */
+  key?: Uint8Array
   /** create the webrtc provider. Default: only where WebRTC exists (browsers) */
   webrtc?: boolean
   /**
@@ -42,7 +45,7 @@ export class SpoolEngine {
   readonly doc: Y.Doc
   readonly whenReady: Promise<void>
 
-  #idb: IndexeddbPersistence | null = null
+  #idb: IndexeddbPersistence | EncryptedIndexeddbPersistence | null = null
   #websocket: WebsocketProvider | null = null
   #webrtc: WebrtcProvider | null = null
   #webrtcPending: Promise<void> = Promise.resolve()
@@ -59,11 +62,12 @@ export class SpoolEngine {
     const persist = opts.persist ?? inBrowser
     if (persist) {
       if (!inBrowser) throw new Error('persist requires IndexedDB; pass persist: false outside browsers')
-      this.#idb = new IndexeddbPersistence(opts.code, this.doc)
-      const idb = this.#idb
-      this.whenReady = idb.synced
-        ? Promise.resolve()
-        : new Promise((resolve) => idb.once('synced', () => resolve()))
+      // a keyed spool is sealed at rest; a keyless one stores plaintext
+      this.#idb = opts.key
+        ? new EncryptedIndexeddbPersistence(opts.code, this.doc, opts.key)
+        : new IndexeddbPersistence(opts.code, this.doc)
+      // rejects on SpoolKeyError (wrong key for existing local data) — loud, not silent
+      this.whenReady = this.#idb.whenSynced.then(() => undefined)
     } else {
       this.whenReady = Promise.resolve()
     }

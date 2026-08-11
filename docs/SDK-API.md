@@ -24,6 +24,7 @@ interface NewSpoolOptions {
   relay?: string      // wss URL; default: the SDK's default relay constant
   author?: string     // self-declared display name stamped on entries you wind
   persist?: boolean   // default true; false = memory-only (tests, previews)
+  encrypted?: boolean // default true: key generated, carried in k=, local storage sealed (M5). false = keyless, plaintext at rest
 }
 ```
 
@@ -31,7 +32,7 @@ interface NewSpoolOptions {
 
 Accepts a full URL, a bare fragment (`#spool=…&relay=…&k=…`), or a bare spool code (uses default relay, no key). Resolves when local persistence has loaded — **not** when the network syncs; a spool opens instantly offline and catches up when peers appear. `opts` is `NewSpoolOptions` minus `relay` (the link's relay wins).
 
-Errors: `SpoolLinkError` (unparseable link / bad key encoding). An unreachable relay is **not** an open error — it surfaces through `spool.status`.
+Errors: `SpoolLinkError` (unparseable link / bad key encoding); `SpoolKeyError` (the link's `k=` cannot decrypt existing local data for that spool code — wrong or changed key; fails loud at open, never silent garbage). An unreachable relay is **not** an open error — it surfaces through `spool.status`.
 
 ---
 
@@ -46,6 +47,7 @@ interface Spool {
   readonly deleted: Entry[]          // the complement: soft-deleted only, same handles/sort; restore() brings one back
   readonly whenReady: Promise<void>  // local persistence loaded (same signal open/new await)
   readonly status: 'offline' | 'connecting' | 'connected'
+  readonly keyFingerprint: string | null  // 8 chars for "same key?" UX; null for keyless spools
   readonly doc: Y.Doc                // escape hatch for power users binding editors
 
   wind(input: WindInput): Entry
@@ -129,7 +131,7 @@ https://anyhost.example/#spool=<code>&relay=<wss-url>&k=<key>
 - Fragment only — browsers never transmit it to servers, including the host serving the client files.
 - `code`: `adjective-noun-NNN` (readable) — generator/validator adapted from fosho `note.ts`.
 - `relay`: URL-encoded wss URL; the link says where to rendezvous, no hardcoded servers.
-- `k`: 32-byte key, URL-safe unpadded base64. Absent = unencrypted spool. Parsed and carried from M1; cryptographically live in M5.
+- `k`: 32-byte key, URL-safe unpadded base64. Absent = unencrypted spool. Live for **storage** since M5 (XSalsa20-Poly1305 seals every IndexedDB row; no KDF — the 32 random bytes are the key); live for **transport** in T-051. Until then the ws provider still sends plaintext frames.
 
 ## Under the hood (M1 shape)
 

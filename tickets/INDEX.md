@@ -45,7 +45,7 @@ Session-sized chunks of the build order (DESIGN_DOC §4). Each ticket is one fil
 
 | Ticket | Title | Depends | Status |
 |---|---|---|---|
-| [T-050](T-050-encryption-primitives.md) | Lift primitives + encrypted IndexedDB | T-012 | todo |
+| [T-050](T-050-encryption-primitives.md) | Lift primitives + encrypted IndexedDB | T-012 | done |
 | [T-051](T-051-encrypted-transport.md) | Encrypted transport over the dumb relay | T-050, T-040 | todo |
 
 ## M6 — rewind()

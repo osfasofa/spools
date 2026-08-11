@@ -12,6 +12,9 @@ importers:
 
   packages/spools:
     dependencies:
+      tweetnacl:
+        specifier: ^1.0.3
+        version: 1.0.3
       y-indexeddb:
         specifier: ^9.0.12
         version: 9.0.12(yjs@13.6.32)
@@ -31,6 +34,9 @@ importers:
       '@types/ws':
         specifier: ^8.18.1
         version: 8.18.1
+      fake-indexeddb:
+        specifier: ^6.2.5
+        version: 6.2.5
       tsup:
         specifier: ^8.5.1
         version: 8.5.1(postcss@8.5.26)(typescript@7.0.2)
@@ -713,6 +719,10 @@ packages:
     resolution: {integrity: sha512-KfYbmpRm0VbLjEvVa9yGwCi9GI34xvi7A/HXYWQO65CSD2u3MczUJSuwXKFIxlGsgBQizV9q5J9NHj4VG0n+pA==}
     engines: {node: '>=12.0.0'}
 
+  fake-indexeddb@6.2.5:
+    resolution: {integrity: sha512-CGnyrvbhPlWYMngksqrSSUT1BAVP49dZocrHuK0SvtR0D5TMs5wP0o3j7jexDJW01KSadjBp1M/71o/KR3nD1w==}
+    engines: {node: '>=18'}
+
   fdir@6.5.0:
     resolution: {integrity: sha512-tIbYtZbucOs0BRGqPJkshJUYdL+SDH7dVM8gjy+ERp3WAUjLEFJE+02kanyHtwjWOnwrKYBiwAmM0p4kLJAnXg==}
     engines: {node: '>=12.0.0'}
@@ -1009,6 +1019,9 @@ packages:
         optional: true
       typescript:
         optional: true
+
+  tweetnacl@1.0.3:
+    resolution: {integrity: sha512-6rt+RN7aOi1nGMyC4Xa5DdYiukl2UWCbcJft7YhxReBGQD7OAM8Pbxw6YMo4r2diNEA8FEmu32YOn9rhaiE5yw==}
 
   typescript@7.0.2:
     resolution: {integrity: sha512-8FYau96o3NKOhbjKi/qNvG/W5jhzxkbdm5sj9AbZ/5T5sWqn3hJgLfGx27sRKZWTvyzCP8dLRBTf5tBTSRVUNA==}
@@ -1571,6 +1584,8 @@ snapshots:
 
   expect-type@1.4.0: {}
 
+  fake-indexeddb@6.2.5: {}
+
   fdir@6.5.0(picomatch@4.0.5):
     optionalDependencies:
       picomatch: 4.0.5
@@ -1862,6 +1877,8 @@ snapshots:
       - supports-color
       - tsx
       - yaml
+
+  tweetnacl@1.0.3: {}
 
   typescript@7.0.2:
     optionalDependencies:

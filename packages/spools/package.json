@@ -25,6 +25,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "tweetnacl": "^1.0.3",
     "y-indexeddb": "^9.0.12",
     "y-protocols": "^1.0.7",
     "y-webrtc": "^10.3.0",
@@ -33,6 +34,7 @@
   },
   "devDependencies": {
     "@types/ws": "^8.18.1",
+    "fake-indexeddb": "^6.2.5",
     "tsup": "^8.5.1",
     "typescript": "^7.0.2",
     "vitest": "^4.1.10",

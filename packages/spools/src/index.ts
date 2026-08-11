@@ -8,3 +8,5 @@ export { parseSpoolLink, buildSpoolLink, generateCode, isValidCode, SpoolLinkErr
 export type { ParsedLink, BuildLinkInput } from './link'
 export { SpoolEngine } from './engine'
 export type { SpoolEngineOptions, SpoolStatus } from './engine'
+export { SpoolKeyError, keyFingerprint } from './crypto'
+export { EncryptedIndexeddbPersistence } from './encrypted-idb'
