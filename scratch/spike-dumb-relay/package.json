@@ -1,0 +1,16 @@
+{
+  "name": "spike-dumb-relay",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "T-003 throwaway spike: do y-websocket clients sync through a relay that only broadcasts bytes?",
+  "scripts": {
+    "spike": "node spike.js"
+  },
+  "dependencies": {
+    "lib0": "^0.2.117",
+    "ws": "^8.21.3",
+    "y-websocket": "^3.1.0",
+    "yjs": "^13.6.32"
+  }
+}
