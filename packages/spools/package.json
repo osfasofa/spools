@@ -15,18 +15,18 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsup",
+    "build": "tsup && tsc -p tsconfig.build.json",
     "test": "vitest run"
   },
   "dependencies": {
     "y-indexeddb": "^9.0.12",
     "y-webrtc": "^10.3.0",
-    "y-websocket": "^2.1.0",
-    "yjs": "^13.6.27"
+    "y-websocket": "^3.1.0",
+    "yjs": "^13.6.32"
   },
   "devDependencies": {
-    "tsup": "^8.5.0",
-    "typescript": "^5.9.2",
-    "vitest": "^3.2.4"
+    "tsup": "^8.5.1",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.10"
   }
 }
