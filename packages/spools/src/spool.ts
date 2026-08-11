@@ -69,7 +69,7 @@ export class Spool {
   #engine: SpoolEngine
   #store: EntryStore
   #relay: string
-  /** carried from the link / generated fresh; cryptographically live in M5 */
+  /** carried from the link / generated fresh; seals storage (T-050) and both transports (T-051) */
   #key: Uint8Array | undefined
 
   /** @internal use newSpool/openSpool */
@@ -93,6 +93,15 @@ export class Spool {
     return this.#key ? keyFingerprint(this.#key) : null
   }
 
+  /**
+   * Relay frames dropped because they weren't sealed with this spool's key —
+   * nonzero means someone in the room is on the wrong key or no key (T-051).
+   * Always 0 for keyless spools.
+   */
+  get undecryptableFrames(): number {
+    return this.#engine.undecryptableFrames
+  }
+
   /** live truth: sorted by createdAt (id tie-break), soft-deleted excluded */
   get entries(): Entry[] {
     return this.#store.list()
@@ -110,12 +119,14 @@ export class Spool {
 
   on(event: 'entry', cb: (change: EntryChange) => void): () => void
   on(event: 'status', cb: (status: SpoolStatus) => void): () => void
+  on(event: 'undecryptable', cb: (total: number) => void): () => void
   on(
-    event: 'entry' | 'status',
-    cb: ((change: EntryChange) => void) | ((status: SpoolStatus) => void)
+    event: 'entry' | 'status' | 'undecryptable',
+    cb: ((change: EntryChange) => void) | ((status: SpoolStatus) => void) | ((total: number) => void)
   ): () => void {
     if (event === 'entry') return this.#store.onEntry(cb as (change: EntryChange) => void)
     if (event === 'status') return this.#engine.onStatus(cb as (status: SpoolStatus) => void)
+    if (event === 'undecryptable') return this.#engine.onUndecryptable(cb as (total: number) => void)
     throw new Error(`unknown event: ${String(event)}`)
   }
 

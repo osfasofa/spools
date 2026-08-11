@@ -14778,7 +14778,9 @@ ${err.toString()}`);
     SpoolEngine: () => SpoolEngine,
     SpoolKeyError: () => SpoolKeyError,
     SpoolLinkError: () => SpoolLinkError,
+    TRANSPORT_MAGIC: () => TRANSPORT_MAGIC,
     buildSpoolLink: () => buildSpoolLink,
+    createEncryptedWebSocketClass: () => createEncryptedWebSocketClass,
     deriveSignaling: () => deriveSignaling,
     generateCode: () => generateCode,
     isValidCode: () => isValidCode,
@@ -15747,10 +15749,64 @@ ${reason}`);
     __privateSet(this, _dbsize, 1);
   };
 
+  // src/encrypted-ws.ts
+  var TRANSPORT_MAGIC = [226, 225];
+  var hasMagic = (bytes) => bytes.length >= 2 && bytes[0] === TRANSPORT_MAGIC[0] && bytes[1] === TRANSPORT_MAGIC[1];
+  var seal2 = (plain, key) => {
+    const ciphertext = encrypt(plain, key);
+    const framed = new Uint8Array(2 + ciphertext.length);
+    framed[0] = TRANSPORT_MAGIC[0];
+    framed[1] = TRANSPORT_MAGIC[1];
+    framed.set(ciphertext, 2);
+    return framed;
+  };
+  var toArrayBuffer = (bytes) => {
+    if (bytes.buffer instanceof ArrayBuffer && bytes.byteOffset === 0 && bytes.byteLength === bytes.buffer.byteLength) {
+      return bytes.buffer;
+    }
+    const copy2 = new Uint8Array(bytes.byteLength);
+    copy2.set(bytes);
+    return copy2.buffer;
+  };
+  var createEncryptedWebSocketClass = (key, Base, onUndecryptable) => {
+    var _userOnMessage, _a;
+    return _a = class extends Base {
+      constructor(url, protocols) {
+        super(url, protocols);
+        __privateAdd(this, _userOnMessage, null);
+        this.binaryType = "arraybuffer";
+        super.addEventListener("message", (event) => {
+          if (!__privateGet(this, _userOnMessage)) return;
+          const data = event.data;
+          const bytes = data instanceof ArrayBuffer ? new Uint8Array(data) : null;
+          const plain = bytes && hasMagic(bytes) ? decrypt(bytes.subarray(2), key) : null;
+          if (!plain) {
+            onUndecryptable?.();
+            return;
+          }
+          __privateGet(this, _userOnMessage).call(this, { data: toArrayBuffer(plain) });
+        });
+      }
+      send(data) {
+        const bytes = data instanceof ArrayBuffer ? new Uint8Array(data) : ArrayBuffer.isView(data) ? new Uint8Array(data.buffer, data.byteOffset, data.byteLength) : null;
+        if (!bytes) throw new Error("encrypted spool transport sends only binary frames");
+        super.send(toArrayBuffer(seal2(bytes, key)));
+      }
+      // y-websocket assigns onmessage directly; capture it so decryption sits
+      // between the wire and the provider
+      set onmessage(handler) {
+        __privateSet(this, _userOnMessage, handler);
+      }
+      get onmessage() {
+        return __privateGet(this, _userOnMessage);
+      }
+    }, _userOnMessage = new WeakMap(), _a;
+  };
+
   // src/engine.ts
   var inBrowser = typeof indexedDB !== "undefined";
   var hasWebRTC = typeof RTCPeerConnection !== "undefined";
-  var _idb, _websocket, _webrtc, _webrtcPending, _wsStatus, _rtcConnected, _status, _statusListeners, _left, _SpoolEngine_instances, deriveStatus_fn;
+  var _idb, _websocket, _webrtc, _webrtcPending, _wsStatus, _rtcConnected, _status, _statusListeners, _undecryptable, _undecryptableListeners, _left, _SpoolEngine_instances, countUndecryptable_fn, deriveStatus_fn;
   var SpoolEngine = class {
     constructor(opts) {
       __privateAdd(this, _SpoolEngine_instances);
@@ -15765,6 +15821,8 @@ ${reason}`);
       __privateAdd(this, _rtcConnected, false);
       __privateAdd(this, _status, "offline");
       __privateAdd(this, _statusListeners, /* @__PURE__ */ new Set());
+      __privateAdd(this, _undecryptable, 0);
+      __privateAdd(this, _undecryptableListeners, /* @__PURE__ */ new Set());
       __privateAdd(this, _left, false);
       this.code = opts.code;
       this.doc = new Doc();
@@ -15777,10 +15835,12 @@ ${reason}`);
         this.whenReady = Promise.resolve();
       }
       if (opts.relay) {
+        const Base = opts.WebSocketPolyfill ?? (typeof WebSocket !== "undefined" ? WebSocket : void 0);
+        const Transport = opts.key && Base ? createEncryptedWebSocketClass(opts.key, Base, () => __privateMethod(this, _SpoolEngine_instances, countUndecryptable_fn).call(this)) : Base;
         __privateSet(this, _websocket, new WebsocketProvider(opts.relay, opts.code, this.doc, {
           resyncInterval: opts.resyncIntervalMs ?? 2e4,
           disableBc: opts.disableBc ?? false,
-          ...opts.WebSocketPolyfill ? { WebSocketPolyfill: opts.WebSocketPolyfill } : {}
+          ...Transport ? { WebSocketPolyfill: Transport } : {}
         }));
         __privateGet(this, _websocket).on("status", ({ status }) => {
           __privateSet(this, _wsStatus, status === "connected" ? "connected" : status === "connecting" ? "connecting" : "disconnected");
@@ -15793,6 +15853,9 @@ ${reason}`);
           if (__privateGet(this, _left)) return;
           __privateSet(this, _webrtc, new WebrtcProvider2(opts.code, this.doc, {
             signaling: opts.signaling,
+            // rtc crypto is y-webrtc's own scheme, keyed on the same k= string
+            // as the link carries (§5 two-transport decision, T-051)
+            ...opts.key ? { password: encodeKey(opts.key) } : {},
             // one awareness across both transports (fosho sync.ts:1032)
             ...__privateGet(this, _websocket) ? { awareness: __privateGet(this, _websocket).awareness } : {}
           }));
@@ -15813,6 +15876,14 @@ ${reason}`);
       __privateGet(this, _statusListeners).add(cb);
       return () => __privateGet(this, _statusListeners).delete(cb);
     }
+    /** ws frames dropped because they weren't sealed with this spool's key — a wrong-key or keyless peer is in the room */
+    get undecryptableFrames() {
+      return __privateGet(this, _undecryptable);
+    }
+    onUndecryptable(cb) {
+      __privateGet(this, _undecryptableListeners).add(cb);
+      return () => __privateGet(this, _undecryptableListeners).delete(cb);
+    }
     /**
      * Disconnect and release resources. Local IndexedDB data is retained — a
      * spool is a keepsake. Teardown order per fosho disconnectFromNote:
@@ -15827,6 +15898,7 @@ ${reason}`);
       await __privateGet(this, _idb)?.destroy();
       this.doc.destroy();
       __privateGet(this, _statusListeners).clear();
+      __privateGet(this, _undecryptableListeners).clear();
       if (__privateGet(this, _status) !== "offline") {
         __privateSet(this, _status, "offline");
       }
@@ -15840,8 +15912,14 @@ ${reason}`);
   _rtcConnected = new WeakMap();
   _status = new WeakMap();
   _statusListeners = new WeakMap();
+  _undecryptable = new WeakMap();
+  _undecryptableListeners = new WeakMap();
   _left = new WeakMap();
   _SpoolEngine_instances = new WeakSet();
+  countUndecryptable_fn = function() {
+    __privateWrapper(this, _undecryptable)._++;
+    for (const cb of __privateGet(this, _undecryptableListeners)) cb(__privateGet(this, _undecryptable));
+  };
   deriveStatus_fn = function() {
     const next = __privateGet(this, _wsStatus) === "connected" || __privateGet(this, _rtcConnected) ? "connected" : __privateGet(this, _wsStatus) === "connecting" ? "connecting" : "offline";
     if (next !== __privateGet(this, _status)) {
@@ -16074,7 +16152,7 @@ ${reason}`);
       __privateAdd(this, _engine);
       __privateAdd(this, _store2);
       __privateAdd(this, _relay);
-      /** carried from the link / generated fresh; cryptographically live in M5 */
+      /** carried from the link / generated fresh; seals storage (T-050) and both transports (T-051) */
       __privateAdd(this, _key2);
       __privateSet(this, _engine, engine);
       __privateSet(this, _relay, relay);
@@ -16092,6 +16170,14 @@ ${reason}`);
     get keyFingerprint() {
       return __privateGet(this, _key2) ? keyFingerprint(__privateGet(this, _key2)) : null;
     }
+    /**
+     * Relay frames dropped because they weren't sealed with this spool's key —
+     * nonzero means someone in the room is on the wrong key or no key (T-051).
+     * Always 0 for keyless spools.
+     */
+    get undecryptableFrames() {
+      return __privateGet(this, _engine).undecryptableFrames;
+    }
     /** live truth: sorted by createdAt (id tie-break), soft-deleted excluded */
     get entries() {
       return __privateGet(this, _store2).list();
@@ -16107,6 +16193,7 @@ ${reason}`);
     on(event, cb) {
       if (event === "entry") return __privateGet(this, _store2).onEntry(cb);
       if (event === "status") return __privateGet(this, _engine).onStatus(cb);
+      if (event === "undecryptable") return __privateGet(this, _engine).onUndecryptable(cb);
       throw new Error(`unknown event: ${String(event)}`);
     }
     /** view history at an earlier point in time — M6 */

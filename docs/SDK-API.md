@@ -48,11 +48,13 @@ interface Spool {
   readonly whenReady: Promise<void>  // local persistence loaded (same signal open/new await)
   readonly status: 'offline' | 'connecting' | 'connected'
   readonly keyFingerprint: string | null  // 8 chars for "same key?" UX; null for keyless spools
+  readonly undecryptableFrames: number    // relay frames dropped: someone in the room is on the wrong key / no key (T-051); always 0 for keyless spools
   readonly doc: Y.Doc                // escape hatch for power users binding editors
 
   wind(input: WindInput): Entry
   on(event: 'entry', cb: (change: EntryChange) => void): () => void   // returns unsubscribe
   on(event: 'status', cb: (status: Spool['status']) => void): () => void
+  on(event: 'undecryptable', cb: (total: number) => void): () => void // fires per dropped frame with the running total — "someone here isn't on your key" UX
 
   share(): string                    // the shareable link
   rewind(ts: number): EntrySnapshot[]  // M6; see notes below
@@ -131,7 +133,11 @@ https://anyhost.example/#spool=<code>&relay=<wss-url>&k=<key>
 - Fragment only — browsers never transmit it to servers, including the host serving the client files.
 - `code`: `adjective-noun-NNN` (readable) — generator/validator adapted from fosho `note.ts`.
 - `relay`: URL-encoded wss URL; the link says where to rendezvous, no hardcoded servers.
-- `k`: 32-byte key, URL-safe unpadded base64. Absent = unencrypted spool. Live for **storage** since M5 (XSalsa20-Poly1305 seals every IndexedDB row; no KDF — the 32 random bytes are the key); live for **transport** in T-051. Until then the ws provider still sends plaintext frames.
+- `k`: 32-byte key, URL-safe unpadded base64. Absent = unencrypted spool. What `k=` guarantees, per layer (T-050/T-051, §5):
+  - **Storage**: XSalsa20-Poly1305 seals every IndexedDB row (no KDF — the 32 random bytes are the key). Wrong key fails loud at open (`SpoolKeyError`).
+  - **Websocket transport**: every frame leaves as `0xE2E1‖nonce‖ciphertext` (same secretbox, same key) — the dumb relay forwards bytes it cannot read. Inbound frames that don't carry the magic and decrypt are dropped + counted (`undecryptableFrames` / `on('undecryptable')`), never handed to Yjs — a wrong-key or keyless peer on the same room code cannot corrupt the doc.
+  - **WebRTC transport**: y-webrtc's own `password` scheme (PBKDF2 → AES), fed the literal `k=` string. Peers without the key can't join the mesh or read signaling payloads. This is a *second* crypto scheme, kept stock on purpose (§5 two-transport decision).
+  - Same link = same key — that's the contract. There is no key exchange; the social act of sharing the link *is* the key exchange.
 
 ## Under the hood (M1 shape)
 

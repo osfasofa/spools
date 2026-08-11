@@ -34,6 +34,11 @@ against the current code.
 headlessly (three origins, killable relay child, CDP) and prints a ✔/✘ table.
 The manual steps below are the same scenarios for human hands.
 
+`node scratch/torture-t051/torture.mjs` is the **encrypted** variant (T-051):
+the same checklist with `k=` in every link, plus S7 — rtc-only sync with the
+websocket path dead from birth. Rebuild the vendor bundle first if the SDK
+changed. Run both when touching sync or crypto.
+
 ## Scenarios
 
 ### 1. Refresh — entries come from IndexedDB, not the network
