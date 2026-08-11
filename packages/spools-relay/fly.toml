@@ -1,0 +1,15 @@
+# Fly.io config for spools-relay. `fly launch --copy-config` from this
+# directory, pick an app name, done. The relay is stateless: scale-to-zero is
+# safe (no connections = nobody waiting; Fly wakes it on the next one).
+primary_region = "iad"
+
+[http_service]
+  internal_port = 4444
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"

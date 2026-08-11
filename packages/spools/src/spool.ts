@@ -11,10 +11,11 @@ export class NotImplementedError extends Error {
 }
 
 /**
- * fosho's deployed relay — zero new infrastructure for M1. Flips to our own
- * deployed spools-relay after T-041.
+ * The canonical spools-relay (deployed T-041). A true dumb byte relay — it
+ * never parses a frame and holds no documents. fosho's relay carried M1–M3;
+ * the fosho dependency ended here.
  */
-export const DEFAULT_RELAY = 'wss://foshoio-production.up.railway.app/yjs'
+export const DEFAULT_RELAY = 'wss://spools-relay-production.up.railway.app/yjs'
 
 /**
  * The one-URL convention (T-040): a relay URL ending in /yjs implies

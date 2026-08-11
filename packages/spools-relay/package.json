@@ -1,6 +1,6 @@
 {
   "name": "spools-relay",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Dumb byte relay + WebRTC signaling for spools. Never sees your content.",
   "license": "MIT",
   "repository": {
@@ -9,18 +9,20 @@
     "directory": "packages/spools-relay"
   },
   "files": [
-    "server.js"
+    "server.js",
+    "railway.json",
+    "fly.toml"
   ],
   "type": "module",
   "main": "./server.js",
   "bin": {
-    "spools-relay": "./server.js"
+    "spools-relay": "server.js"
   },
   "scripts": {
     "start": "node server.js"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=18"
   },
   "dependencies": {
     "lib0": "^0.2.117",

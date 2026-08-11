@@ -18,8 +18,14 @@ import http from 'node:http'
 import { WebSocketServer } from 'ws'
 import * as map from 'lib0/map'
 
-const port = Number(process.env.PORT ?? 4444)
-const host = process.env.HOST ?? '0.0.0.0'
+// npx spools-relay [--port N] [--host H]; env PORT/HOST also respected
+const argv = process.argv.slice(2)
+const argValue = (flag) => {
+  const i = argv.indexOf(flag)
+  return i !== -1 ? argv[i + 1] : undefined
+}
+const port = Number(argValue('--port') ?? process.env.PORT ?? 4444)
+const host = argValue('--host') ?? process.env.HOST ?? '0.0.0.0'
 
 const PING_TIMEOUT_MS = 30_000
 // Crude abuse guards, not hardening (T-040): a Yjs state frame for a big doc

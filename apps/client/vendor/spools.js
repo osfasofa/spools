@@ -13643,7 +13643,7 @@ ${reason}`);
       this.name = "NotImplementedError";
     }
   };
-  var DEFAULT_RELAY = "wss://foshoio-production.up.railway.app/yjs";
+  var DEFAULT_RELAY = "wss://spools-relay-production.up.railway.app/yjs";
   var deriveSignaling = (relay) => {
     try {
       const url = new URL(relay);

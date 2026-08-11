@@ -32,4 +32,4 @@ DESIGN_DOC §2: `spools` verified available on npm as of Aug 2026; bare `spool` 
   - Domains (RDAP): `spools.dev` **taken**, `spools.app` **taken**, `spool.link` **available**, `spools.io` unknown (.io has no public RDAP — check at a registrar).
 - Both packages prepped for publish at 0.0.1: claim READMEs, `license: MIT` *(flagged for user confirmation before publish)*, repository fields pointing at `github.com/osfasofa/spools` (update if an org is claimed).
 - **Deprioritized by user (Aug 2026):** "underground, obfuscated thing anyway" — claiming would be nice but is explicitly not urgent; don't treat the squatting clock as pressure. Publish prep stays committed and ready whenever the mood strikes. Back to `todo`, unblocking nothing.
-- (record publish outcomes + GitHub-org and domain decisions here, if/when)
+- **`spools-relay` published (2026-08-11, via T-041):** `spools-relay@0.1.0` live on npm under the user's account (2FA security key enabled in the process — npm now requires it to publish). The `spools` SDK name remains unclaimed/unpublished; GitHub-org and domain decisions still open.

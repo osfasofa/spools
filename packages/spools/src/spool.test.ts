@@ -74,7 +74,7 @@ it('openSpool(share()) lands in the same room: two handles converge', async () =
 it('openSpool with a bare code uses the default relay (constructed, not connected)', async () => {
   const spool = track(await openSpool('quiet-harbor-042', { persist: false }))
   expect(spool.code).toBe('quiet-harbor-042')
-  expect(spool.share('')).toContain('relay=wss%3A%2F%2Ffoshoio-production')
+  expect(spool.share('')).toContain('relay=wss%3A%2F%2Fspools-relay-production')
 })
 
 it('resolves offline: whenReady does not wait for the network', async () => {
@@ -95,8 +95,8 @@ it('one-URL convention: /yjs relay implies signaling at the host root (T-040)', 
   const { deriveSignaling } = await import('./spool')
   expect(deriveSignaling('wss://relay.example/yjs')).toEqual(['wss://relay.example/'])
   expect(deriveSignaling('ws://localhost:9401/yjs')).toEqual(['ws://localhost:9401/'])
-  expect(deriveSignaling('wss://foshoio-production.up.railway.app/yjs')).toEqual([
-    'wss://foshoio-production.up.railway.app/',
+  expect(deriveSignaling('wss://spools-relay-production.up.railway.app/yjs')).toEqual([
+    'wss://spools-relay-production.up.railway.app/',
   ]) // the default relay needs no special case
   expect(deriveSignaling('wss://relay.example/other')).toBeUndefined()
   expect(deriveSignaling('wss://relay.example/')).toBeUndefined()

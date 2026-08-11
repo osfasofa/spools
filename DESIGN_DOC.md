@@ -164,7 +164,7 @@ Sequenced to always have something working, never to design in the abstract. The
 - [x] **1. SDK core** — strip fosho `sync.ts` → engine (~150 lines); Entry helpers (`wind`, `on('entry')`, soft delete); `openSpool`/`newSpool` parsing links. **Use fosho's already-deployed relay** — zero new infrastructure between here and a working demo. *(done Aug 2026, T-010–T-013)*
 - [x] **2. Reference client v0** — ugliest possible list/chat on the SDK. Success = two browser tabs winding entries onto the same spool, surviving refresh (IndexedDB) and offline/reconnect. *(done Aug 2026, T-020–T-021; torture checklist lives in `apps/client/TESTING.md`)*
 - [x] **3. Mixtape renderer** — second `kind` set (`track`, `reaction`), same engine, proves views-are-skins. *(done Aug 2026, T-030)*
-- [ ] **4. Relay packaging** — extract fosho `server.js` → `spools-relay`, `npx` + deploy button.
+- [x] **4. Relay packaging** — extract fosho `server.js` → `spools-relay`, `npx` + deploy button. *(done Aug 2026, T-040–T-041; canonical relay deployed, fosho dependency ended)*
 - [ ] **5. `rewind()`** — Yjs snapshot history + a scrubber in the reference client. The memory feature; the demo that sells the vision.
 - [ ] **6. Spec doc** — written from the working system.
 - [ ] **7. Export / stash** — spool as portable file; local archive management.
