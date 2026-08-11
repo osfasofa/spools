@@ -1,0 +1,20 @@
+{
+  "name": "spools-relay",
+  "version": "0.0.0",
+  "description": "Dumb byte relay + WebRTC signaling for spools. Never sees your content.",
+  "type": "module",
+  "main": "./server.js",
+  "bin": {
+    "spools-relay": "./server.js"
+  },
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "lib0": "^0.2.99",
+    "ws": "^8.18.0"
+  }
+}
