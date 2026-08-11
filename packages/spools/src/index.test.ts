@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest'
-import { version } from './index'
+import { SpoolEngine } from './index'
 
-it('exports a version', () => {
-  expect(version).toBe('0.0.0')
+it('module imports cleanly in Node and exposes the engine', () => {
+  expect(typeof SpoolEngine).toBe('function')
 })

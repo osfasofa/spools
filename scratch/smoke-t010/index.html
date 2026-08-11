@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>T-010 smoke</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 30rem; margin: 2rem auto; }
+    #status { font-weight: bold; }
+    pre { background: #f4f4f4; padding: 0.5rem; min-height: 4rem; }
+  </style>
+</head>
+<body>
+  <h1>T-010 smoke</h1>
+  <p>status: <span id="status">–</span> · ready: <span id="ready">no</span></p>
+  <input id="key" placeholder="key"> <input id="val" placeholder="value">
+  <button id="setBtn">set</button> <button id="leaveBtn">leave</button>
+  <pre id="out">(map empty)</pre>
+  <script type="module">
+    import { SpoolEngine } from './engine.js'
+    const engine = new SpoolEngine({
+      code: 'smoke-t010-742',
+      relay: 'wss://foshoio-production.up.railway.app/yjs',
+      signaling: ['wss://foshoio-production.up.railway.app/'],
+      webrtc: false,      // isolate the websocket relay path
+      disableBc: true,    // force cross-tab traffic through the relay, not BroadcastChannel
+    })
+    const m = engine.doc.getMap('m')
+    const render = () => {
+      out.textContent = JSON.stringify(m.toJSON(), null, 2)
+    }
+    m.observe(render)
+    engine.whenReady.then(() => { ready.textContent = 'yes'; render() })
+    engine.onStatus((s) => { status.textContent = s })
+    status.textContent = engine.status
+    setBtn.onclick = () => m.set(key.value || 'k', val.value)
+    leaveBtn.onclick = () => engine.leave().then(() => { status.textContent = 'left' })
+    window.engine = engine
+  </script>
+</body>
+</html>

@@ -1,3 +1,5 @@
-// Placeholder (T-001). The real surface — openSpool, newSpool, wind, rewind —
-// lands in T-010..T-012; see docs/SDK-API.md.
-export const version = '0.0.0'
+// SDK surface grows here: openSpool/newSpool land in T-011, the entry layer
+// in T-012 (docs/SDK-API.md). SpoolEngine is exported for now; it becomes
+// internal once the Spool handle wraps it.
+export { SpoolEngine } from './engine'
+export type { SpoolEngineOptions, SpoolStatus } from './engine'
