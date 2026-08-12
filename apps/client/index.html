@@ -26,6 +26,12 @@
     form.stack input { display: block; margin: 0.2rem 0; width: 100%; box-sizing: border-box; }
     .row input { width: 60%; }
     .deleted { text-decoration: line-through; }
+    /* rewind mode (T-061): you're in memory, not the present — sepia view,
+       every way of writing hidden. The scrubber bar is the only live control. */
+    #rewindBar { border: 1px solid #b8860b; background: #fdf1d2; border-radius: 6px; padding: 0.4rem 0.6rem; margin: 0.5rem 0; }
+    #rewindBar input[type="range"] { width: 100%; }
+    body.rewinding #view { filter: sepia(0.55); }
+    body.rewinding #view form, body.rewinding #view button, body.rewinding #view input { display: none; }
   </style>
 </head>
 <body>
@@ -40,7 +46,14 @@
     <button data-view="mixtape">mixtape</button>
     <button data-view="chat">chat</button>
     <button data-view="list">list</button>
+    · <button id="rewindBtn">⏪ rewind</button>
   </nav>
+  <div id="rewindBar" hidden>
+    <input type="range" id="scrub" step="any">
+    <div class="meta">🕰 <span id="rewindLabel"></span> — memory is read-only
+      <button id="backToLive">⏵ back to live</button>
+    </div>
+  </div>
   <div id="view"></div>
   <!-- classic scripts, not modules: modules don't load over file:// and this
        page must work from a USB stick. vendor/spools.js defines `spools`. -->

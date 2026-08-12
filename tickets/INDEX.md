@@ -53,7 +53,7 @@ Session-sized chunks of the build order (DESIGN_DOC §4). Each ticket is one fil
 | Ticket | Title | Depends | Status |
 |---|---|---|---|
 | [T-060](T-060-rewind-api.md) | `rewind(ts)` via Yjs snapshots (+ `gc:false` investigation) | T-013 | done |
-| [T-061](T-061-history-scrubber.md) | History scrubber in the reference client | T-060 | todo |
+| [T-061](T-061-history-scrubber.md) | History scrubber in the reference client | T-060 | done |
 
 ## M7 — Spec
 

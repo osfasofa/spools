@@ -166,7 +166,7 @@ Sequenced to always have something working, never to design in the abstract. The
 - [x] **3. Mixtape renderer** — second `kind` set (`track`, `reaction`), same engine, proves views-are-skins. *(done Aug 2026, T-030)*
 - [x] **4. Relay packaging** — extract fosho `server.js` → `spools-relay`, `npx` + deploy button. *(done Aug 2026, T-040–T-041; canonical relay deployed, fosho dependency ended)*
 - [x] **4.5 Encryption (M5)** — sealed at rest and on both wires; relay-blindness automated, not asserted. *(done Aug 2026, T-050–T-051; two-transport decision in §5)*
-- [ ] **5. `rewind()`** — Yjs snapshot history + a scrubber in the reference client. The memory feature; the demo that sells the vision.
+- [x] **5. `rewind()`** — Yjs snapshot history + a scrubber in the reference client. The memory feature; the demo that sells the vision. *(done Aug 2026, T-060–T-061; pitch asset at `docs/assets/rewind-demo.gif`)*
 - [ ] **6. Spec doc** — written from the working system.
 - [ ] **7. Export / stash** — spool as portable file; local archive management.
 - [ ] Later: encryption hardening pass, optional relay persistence, `splice`, more renderers (board, blog).
