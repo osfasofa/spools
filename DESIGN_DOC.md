@@ -3,7 +3,9 @@
 > **An artifact that can change, that's passed around.**
 > Ad hoc side channels between people — not a place you go, a thing you hold.
 
-This is the founding reference document for Spool: a small protocol, SDK, relay, and reference client for intimate, local-first, peer-to-peer shared spaces. It captures the philosophy, architecture, vocabulary, and build order agreed during the initial design sessions. Treat it as the source of truth until the working code earns the right to revise it.
+This is the founding reference document for Spool: a small protocol, SDK, relay, and reference client for intimate, local-first, peer-to-peer shared spaces. It captures the philosophy, architecture, vocabulary, and build order agreed during the initial design sessions.
+
+**The protocol's source of truth is now [SPEC.md](SPEC.md)** (written from the working system, M7): the spec is the *what*, this document remains the *why* — philosophy, architecture rationale, and the decisions log (§5). Where a §3 sketch below and SPEC.md disagree, SPEC.md wins.
 
 ---
 
@@ -167,7 +169,7 @@ Sequenced to always have something working, never to design in the abstract. The
 - [x] **4. Relay packaging** — extract fosho `server.js` → `spools-relay`, `npx` + deploy button. *(done Aug 2026, T-040–T-041; canonical relay deployed, fosho dependency ended)*
 - [x] **4.5 Encryption (M5)** — sealed at rest and on both wires; relay-blindness automated, not asserted. *(done Aug 2026, T-050–T-051; two-transport decision in §5)*
 - [x] **5. `rewind()`** — Yjs snapshot history + a scrubber in the reference client. The memory feature; the demo that sells the vision. *(done Aug 2026, T-060–T-061; pitch asset at `docs/assets/rewind-demo.gif`)*
-- [ ] **6. Spec doc** — written from the working system.
+- [x] **6. Spec doc** — written from the working system. *(done Aug 2026, T-070: SPEC.md, three clean-room adversarial reads, zero blocking ambiguities on the final pass)*
 - [ ] **7. Export / stash** — spool as portable file; local archive management.
 - [ ] Later: encryption hardening pass, optional relay persistence, `splice`, more renderers (board, blog).
 

@@ -1,7 +1,7 @@
 ---
 id: T-070
 title: Write SPEC.md from the working system
-status: todo
+status: done
 milestone: M7
 depends: [T-041, T-051]
 ---
@@ -19,11 +19,11 @@ The constitution, written after the country exists: `SPEC.md` describing exactly
 
 ## Tasks
 
-- [ ] Draft the four sections from the working system; every claim cross-checked against running code/tests (cite the test where one exists).
-- [ ] Conformance checklist: "you are a compliant client if…" / "…a compliant relay if…" — short, testable statements.
-- [ ] Versioning stance: spec is `v1`, what compatibility promise (if any) it makes. Keep humble — one paragraph.
-- [ ] Adversarial read: have a session play stranger-implementing-from-scratch and log every ambiguity found; fix them.
-- [ ] Update DESIGN_DOC to point at SPEC.md as the protocol source of truth (DESIGN_DOC stays the *why*, spec becomes the *what*).
+- [x] Draft the four sections from the working system; every claim cross-checked against running code/tests (cite the test where one exists).
+- [x] Conformance checklist: "you are a compliant client if…" / "…a compliant relay if…" — short, testable statements.
+- [x] Versioning stance: spec is `v1`, what compatibility promise (if any) it makes. Keep humble — one paragraph.
+- [x] Adversarial read: have a session play stranger-implementing-from-scratch and log every ambiguity found; fix them.
+- [x] Update DESIGN_DOC to point at SPEC.md as the protocol source of truth (DESIGN_DOC stays the *why*, spec becomes the *what*).
 
 ## Acceptance criteria
 
@@ -32,4 +32,15 @@ The constitution, written after the country exists: `SPEC.md` describing exactly
 
 ## Notes / open questions
 
-- (ambiguities found + resolved during the adversarial read)
+- **Adversarial-read protocol**: three independent clean-room agents (each knowing Yjs/y-websocket/y-webrtc/tweetnacl, none allowed to read anything but SPEC.md) mentally implemented a client + relay and logged ambiguities. Pass 1: 4 blocking, 13 minor. Pass 2 (after fixes): 1 blocking, 13 minor. Pass 3 (after fixes): **0 blocking**, 6 half-sentence minors — acceptance met; all minors fixed too.
+- **Blocking ambiguities found and fixed** (each was a real spec bug):
+  1. Conformance rule 7 as drafted outlawed plaintext spools entirely ("never transmit plaintext content to any server") — scoped to keyed spools; honesty clause now states plainly that a plaintext spool's frames are readable by a relay that chooses to look.
+  2. Relay rooming was only defined for `/yjs/` paths while links may name any broadcast URL — non-`/yjs` endpoints are now explicitly outside relay conformance, and clients always connect to `<relay>/<code>`.
+  3. The moment `snap` said just "base64" — two clients could write history the other can't decode. Pinned: standard base64 with padding (RFC 4648 §4), matching the reference's `btoa`.
+  4. "Percent-encoded relay URL" invited double-encoding — clarified: one encoding layer, the form-urlencoding itself.
+  5. The §4 sealing MUST, read literally, covered the y-webrtc *signaling* socket, whose JSON envelope must stay parseable — a conformance-minded keyed client would never form a mesh. Scoped to the broadcast connection.
+  6. The spec never said clients must *answer* SyncStep1 — on a dumb relay peers are each other's server, and an ask-only client would never sync. Now normative (client conformance rule 4).
+- **The read audited the reference too, and won twice**: (a) the draft said the rtc password is "the literal `k=` string" but the engine actually re-encodes the key *bytes* canonically (`encodeKey(key)`) — the spec now specifies bytes-derived canonical encoding, which is what makes lenient link parsing safe; (b) the draft's moment-dedupe description ("skipping if equal to the newest snapshot") described dead code — the reference's real loop-guard is that history writes never count as content changes, and the spec now says exactly that.
+- **Library-reality checks all came back clean** across three agents (peers answering SyncStep1, `resyncInterval`, `WebSocketPolyfill`, y-webrtc PBKDF2-salted-by-room, gc'ing peers gutting others' pasts, magic-byte non-collision with Yjs varint message types). Two stock-provider footguns are now non-normative warnings in §3: `messageReconnectTimeout` cycles connections in empty rooms, and `synced` never fires while alone.
+- **Word count: ~3,100** — call it six printed pages, two of which are conformance lists and restated y-webrtc signaling shapes so the document stands alone. Nothing upstream demanded simplification, which was the point of the discipline check.
+- The spec has one deliberate scope hole, inherited from §5: relay persistence is "MUST NOT persist **(v1)**" — the v2 sealed-envelope option stays parked in DESIGN_DOC §6.

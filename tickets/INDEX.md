@@ -59,7 +59,7 @@ Session-sized chunks of the build order (DESIGN_DOC §4). Each ticket is one fil
 
 | Ticket | Title | Depends | Status |
 |---|---|---|---|
-| [T-070](T-070-spec.md) | Write SPEC.md from the working system | T-041, T-051 | todo |
+| [T-070](T-070-spec.md) | Write SPEC.md from the working system | T-041, T-051 | done |
 
 ## M8 — Export / stash
 
