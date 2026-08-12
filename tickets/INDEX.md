@@ -65,7 +65,7 @@ Session-sized chunks of the build order (DESIGN_DOC §4). Each ticket is one fil
 
 | Ticket | Title | Depends | Status |
 |---|---|---|---|
-| [T-080](T-080-export-stash.md) | `export()` portable file + stash | T-013 | todo |
+| [T-080](T-080-export-stash.md) | `export()` portable file + stash | T-013 | done |
 
 ## Parked (no ticket until evidence demands one)
 

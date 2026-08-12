@@ -309,6 +309,25 @@ For a **plaintext** spool the relay merely promises not to look: its frames
 are ordinary Yjs messages any server could parse. The key is what upgrades
 the promise. Do not claim more than this.
 
+## 5. The export file (optional surface)
+
+Clients SHOULD let a person carry a spool out as a file. The format is one
+JSON document:
+
+```
+{ "format": "spool-export", "version": 1, "code": <code>,
+  "exportedAt": <ms>, "entries": [<entry records, §2 fields + body,
+  soft-deleted included>], "doc": <standard base64 of
+  Y.encodeStateAsUpdate(doc)> }
+```
+
+The `entries` half is for humans (readable with no software, forever); the
+`doc` half is the whole spool — importing means applying it to a doc for
+that code (a CRDT merge; restoring into nothing and reunifying with
+existing state are the same operation). Keyed spools export **decrypted**,
+and the key MUST NOT be written into the file — the link is the only key
+carrier. Readers MUST reject a `version` newer than they understand.
+
 ---
 
 ## Conformance

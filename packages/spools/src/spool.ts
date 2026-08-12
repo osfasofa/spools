@@ -1,16 +1,11 @@
-import type * as Y from 'yjs'
+import * as Y from 'yjs'
 import { SpoolEngine, type SpoolStatus } from './engine'
 import { EntryStore, type Entry, type EntryChange, type WindInput } from './entry'
 import { HistoryLog, type EntrySnapshot, type HistoryTuning } from './history'
+import { buildExport, parseExport } from './export'
+import { touch } from './stash'
 import { buildSpoolLink, generateCode, generateKey, parseSpoolLink } from './link'
 import { keyFingerprint } from './crypto'
-
-export class NotImplementedError extends Error {
-  constructor(what: string, milestone: string) {
-    super(`${what} is not implemented yet (lands in ${milestone})`)
-    this.name = 'NotImplementedError'
-  }
-}
 
 /**
  * The canonical spools-relay (deployed T-041). A true dumb byte relay — it
@@ -158,9 +153,29 @@ export class Spool {
     return this.#history.rewind(ts)
   }
 
-  /** portable file, yours forever — M8 */
-  export(): never {
-    throw new NotImplementedError('export()', 'M8')
+  /**
+   * The portable file, yours forever (M8): pretty-printed JSON with a
+   * readable `entries` half and the full doc as a base64 `doc` half —
+   * re-importable via importSpool(), still syncable, rewind moments
+   * included. Encrypted spools export decrypted; the key is never in the
+   * file. Synchronous — it's all local.
+   */
+  export(): string {
+    const snapshot = (e: Entry): EntrySnapshot =>
+      Object.freeze({
+        id: e.id,
+        author: e.author,
+        kind: e.kind,
+        ...(e.parent !== undefined ? { parent: e.parent } : {}),
+        createdAt: e.createdAt,
+        ...(e.deletedAt != null ? { deletedAt: e.deletedAt } : {}),
+        ...(e.data !== undefined ? { data: e.data } : {}),
+        body: e.body,
+      })
+    const all = [...this.entries, ...this.deleted]
+      .sort((a, b) => a.createdAt - b.createdAt || (a.id < b.id ? -1 : 1))
+      .map(snapshot)
+    return buildExport(this.code, all, this.doc)
   }
 
   /** the shareable link — hand it to someone */
@@ -190,7 +205,12 @@ const connect = (
     persist: opts.persist,
     key,
   })
-  return new Spool(engine, relay, key, opts.author ?? 'anonymous')
+  const spool = new Spool(engine, relay, key, opts.author ?? 'anonymous')
+  // a persisted spool is a keepsake — stamp it into the stash registry.
+  // Only record a link that carries something (relay and/or key): a bare
+  // import must never overwrite a stored sealed link with '#spool=code'
+  if (opts.persist !== false) touch(code, relay || key ? spool.share('') : undefined)
+  return spool
 }
 
 /** Start a fresh spool: new code, new key (unless `encrypted: false`), connected, resolved when local persistence is ready. */
@@ -210,5 +230,34 @@ export const openSpool = async (link: string, opts: OpenSpoolOptions = {}): Prom
   const parsed = parseSpoolLink(link)
   const spool = connect(parsed.code, parsed.relay ?? DEFAULT_RELAY, parsed.key, opts)
   await spool.whenReady
+  return spool
+}
+
+export interface ImportSpoolOptions {
+  /** reconnect the imported spool to a relay; default: none — an import works offline-forever */
+  relay?: string
+  /** the spool's key, if you still have the link: seals storage + transport again */
+  key?: Uint8Array
+  author?: string
+  /** default true in browsers — an import is a keepsake by definition */
+  persist?: boolean
+}
+
+/**
+ * Bring an exported file back to life. The embedded doc is APPLIED, not
+ * copied — Yjs merge semantics — so importing into an empty browser restores
+ * the spool, and importing over existing local state for the same code
+ * reunifies histories; there is no clobber path. No relay is contacted
+ * unless you pass one: an export must open even when the relay is long gone.
+ * Throws SpoolExportError on files that aren't spool exports.
+ */
+export const importSpool = async (
+  file: string | unknown,
+  opts: ImportSpoolOptions = {}
+): Promise<Spool> => {
+  const { code, update } = parseExport(file)
+  const spool = connect(code, opts.relay ?? '', opts.key, opts)
+  await spool.whenReady
+  Y.applyUpdate(spool.doc, update)
   return spool
 }

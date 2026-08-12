@@ -60,7 +60,7 @@ interface Spool {
 
   share(): string                    // the shareable link
   rewind(ts: number): EntrySnapshot[]  // the spool as it was at the latest recorded moment ≤ ts; see "rewind()" below
-  export(): Promise<Blob>            // M8; portable file, yours forever
+  export(): string                   // the portable file (JSON text), yours forever; see "export() and the stash" below
   leave(): Promise<void>             // teardown: webrtc → websocket → idb → doc.destroy()
 }
 
@@ -164,11 +164,41 @@ interface EntrySnapshot {
 - **Errors**: `rewind(ts)` earlier than the first recorded moment throws `SpoolHistoryError` — loud, not an empty array pretending the spool didn't exist. A moment referencing peer changes this device hasn't synced yet is skipped (falls back to the nearest earlier satisfiable one); if none qualifies, `SpoolHistoryError`.
 - **Price** (§5, measured in `scratch/spike-rewind`): every doc runs `gc: false` — +34% on a realistic 200-entry spool (94 vs 70 KB). The honest asterisk: wholesale body rewrites keep ~90 B each forever; heavy editor churn on one body grows linearly. History begins the day a spool first runs post-T-060 code — content gc'd before that is unrecoverable (silently empty bodies, verified).
 
+## export() and the stash (M8, T-080)
+
+**`spool.export(): string`** — synchronous (it's all local), returning pretty-printed JSON in format (c) per §5: one file, two halves of the same spool.
+
+```ts
+interface SpoolExport {
+  format: 'spool-export'
+  version: 1
+  code: string
+  exportedAt: number
+  entries: EntrySnapshot[]  // the human half: every entry, soft-deleted included (marked), display order — readable in 2040 with no software
+  doc: string               // the machine half: base64 (RFC 4648 §4) of Y.encodeStateAsUpdate — full CRDT history, rewind moments included
+}
+```
+
+Encrypted spools export **decrypted** (the holder has the key; a keepsake you can't read isn't one) and the key is **never in the file** — an export is content; the link stays the only key carrier. Say so in UI.
+
+**`importSpool(file, opts?): Promise<Spool>`** — brings a file back to life. The embedded doc is *applied*, not copied — Yjs merge semantics — so importing into an empty browser restores the spool and importing over existing local state reunifies histories; no clobber path exists. **No relay is contacted unless `opts.relay` is passed**: an export must open even when the relay is long gone (offline-forever). `opts.key` re-seals storage/transport if you still have the link. Throws `SpoolExportError` on anything unreadable — loud, never a silent empty spool.
+
+**The stash** — local archive management; `stash` graduates from reserved word (§2) to shipped surface:
+
+```ts
+stash.list(): Promise<StashedSpool[]>   // union of kept IndexedDB databases + registry rows, most recent first
+stash.label(code, label): void          // name a keepsake
+stash.archive(code, archived): void     // shelf flag — kept but set aside; nothing disconnects
+stash.forget(code): Promise<void>       // THE one hard delete in the system: removes the local database + registry row.
+                                        // Rejects while the spool is open (leave() first). Clients owe it confirm-twice ceremony.
+```
+
+`StashedSpool`: `{ code, stored, link?, label?, archived?, lastOpened? }`. The registry lives in localStorage and **stores the full link, `k=` included** — deliberately: same device, same trust boundary as the browser history that already carries the link, and without it a sealed spool in the stash could never be reopened or exported. Persisted spools are stamped into the registry automatically on open; a link is only recorded when it carries something (relay/key), so an import never downgrades a stored sealed link.
+
 ## Under the hood (M1 shape)
 
 Per-spool instance bundles: `Y.Doc` + `IndexeddbPersistence` (db name = spool code) + `WebsocketProvider` (room = spool code) + `WebrtcProvider` (same room, **sharing the websocket provider's awareness**, per fosho `sync.ts:1032`). Websocket is the reliable path; WebRTC the low-latency bonus — redundant, not competing. Extraction source: the distilled `connectToNote` / `disconnectFromNote` (fosho `sync.ts:950–1143`) minus identity, permissions, subdocs, addressing, singletons.
 
 ## Deferred surface (designed later, listed so names stay reserved)
 
-- `export()` / stash (M8).
 - `splice` — reserved verb, no design.

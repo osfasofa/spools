@@ -32,6 +32,11 @@
     #rewindBar input[type="range"] { width: 100%; }
     body.rewinding #view { filter: sepia(0.55); }
     body.rewinding #view form, body.rewinding #view button, body.rewinding #view input { display: none; }
+    #stashPanel { border: 1px solid #999; border-radius: 6px; padding: 0.4rem 0.6rem; margin: 0.5rem 0; }
+    #stashPanel ul { list-style: none; padding: 0; }
+    #stashPanel li { border-bottom: 1px dashed #ccc; padding: 0.3rem 0; }
+    #stashPanel input.label { width: 11rem; }
+    #stashPanel .danger { color: #a00; }
   </style>
 </head>
 <body>
@@ -47,7 +52,15 @@
     <button data-view="chat">chat</button>
     <button data-view="list">list</button>
     · <button id="rewindBtn">⏪ rewind</button>
+    · <button id="exportBtn">⬇ export</button>
+    <button id="stashBtn">🗃 stash</button>
   </nav>
+  <div id="stashPanel" hidden>
+    <p class="meta"><strong>the stash</strong> — spools this device keeps. Deleting here is the one hard delete in the system.
+      <label style="float:right">import a .spool.json: <input type="file" id="importFile" accept=".json,application/json"></label>
+    </p>
+    <ul id="stashList"></ul>
+  </div>
   <div id="rewindBar" hidden>
     <input type="range" id="scrub" step="any">
     <div class="meta">🕰 <span id="rewindLabel"></span> — memory is read-only

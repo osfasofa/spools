@@ -15,6 +15,7 @@
  * Y.createDocFromSnapshot dies unhelpfully on missing structs.
  */
 import * as Y from 'yjs'
+import { b64decode, b64encode } from './bytes'
 
 const HISTORY = 'history'
 
@@ -51,14 +52,6 @@ export interface HistoryTuning {
   /** minimum spacing between logged moments (bounds log growth during activity) */
   minGapMs?: number
 }
-
-const b64encode = (bytes: Uint8Array): string => {
-  let s = ''
-  for (const b of bytes) s += String.fromCharCode(b)
-  return btoa(s)
-}
-
-const b64decode = (s: string): Uint8Array => Uint8Array.from(atob(s), (c) => c.charCodeAt(0))
 
 const byCreation = (a: EntrySnapshot, b: EntrySnapshot) =>
   a.createdAt - b.createdAt || (a.id < b.id ? -1 : 1)

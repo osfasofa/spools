@@ -125,6 +125,104 @@ async function main() {
   })
   mount()
 
+  // ---- export + stash (T-080) ----
+  const download = (name, text) => {
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(new Blob([text], { type: 'application/json' }))
+    a.download = name
+    a.click()
+    URL.revokeObjectURL(a.href)
+  }
+  $('exportBtn').onclick = () => download(`${spool.code}.spool.json`, spool.export())
+
+  const panel = $('stashPanel')
+  const renderStash = async () => {
+    const rows = await spools.stash.list()
+    const ul = $('stashList')
+    ul.textContent = ''
+    for (const row of rows) {
+      const li = document.createElement('li')
+      const isCurrent = row.code === spool.code
+
+      const label = document.createElement('input')
+      label.className = 'label'
+      label.placeholder = 'label this keepsake'
+      label.value = row.label ?? ''
+      label.onchange = () => spools.stash.label(row.code, label.value.trim())
+      li.appendChild(label)
+
+      const meta = document.createElement('span')
+      meta.className = 'meta'
+      meta.textContent = ` ${row.code}${isCurrent ? ' (open now)' : ''}${row.archived ? ' · archived' : ''}` +
+        (row.lastOpened ? ` · last ${new Date(row.lastOpened).toLocaleDateString()}` : '')
+      li.appendChild(meta)
+
+      const btn = (text, onClick, cls) => {
+        const b = document.createElement('button')
+        b.textContent = text
+        if (cls) b.className = cls
+        b.onclick = onClick
+        li.appendChild(b)
+        return b
+      }
+      if (!isCurrent) btn('open', () => { location.href = row.link ?? `#spool=${row.code}` })
+      btn('export', async () => {
+        if (isCurrent) return download(`${row.code}.spool.json`, spool.export())
+        try {
+          // open it quietly off to the side, export, put it back
+          const temp = await spools.openSpool(row.link ?? row.code, { author })
+          download(`${row.code}.spool.json`, temp.export())
+          await temp.leave()
+        } catch (err) {
+          alert(`couldn't open ${row.code} to export it — if it was sealed, open it once via its link first (${err.message})`)
+        }
+      })
+      btn(row.archived ? 'unarchive' : 'archive', () => {
+        spools.stash.archive(row.code, !row.archived)
+        renderStash()
+      })
+      // the one hard delete gets ceremony: two clicks, the second explicit
+      const forget = btn('forget', async () => {
+        if (forget.dataset.armed !== '1') {
+          forget.dataset.armed = '1'
+          forget.textContent = 'really forget forever?'
+          setTimeout(() => { forget.dataset.armed = ''; forget.textContent = 'forget' }, 4000)
+          return
+        }
+        try {
+          if (isCurrent) await spool.leave() // release the database before deleting it
+          await spools.stash.forget(row.code)
+          if (isCurrent) {
+            location.hash = '' // reload lands on a fresh spool
+            location.reload()
+          } else {
+            renderStash()
+          }
+        } catch (err) {
+          alert(`couldn't forget ${row.code}: ${err.message}`)
+        }
+      }, 'danger')
+      ul.appendChild(li)
+    }
+  }
+  $('stashBtn').onclick = () => {
+    panel.hidden = !panel.hidden
+    if (!panel.hidden) renderStash()
+  }
+  $('importFile').onchange = async (ev) => {
+    const file = ev.target.files[0]
+    if (!file) return
+    try {
+      const imported = await spools.importSpool(await file.text(), { author })
+      const link = (await spools.stash.list()).find((s) => s.code === imported.code)?.link
+      await imported.leave()
+      if (imported.code === spool.code) return location.reload() // merged into the open spool
+      location.href = link ?? `#spool=${imported.code}`
+    } catch (err) {
+      alert(`import failed: ${err.message}`)
+    }
+  }
+
   window.spool = spool // console escape hatch
 }
 

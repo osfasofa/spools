@@ -14845,11 +14845,13 @@ ${err.toString()}`);
   var src_exports = {};
   __export(src_exports, {
     DEFAULT_RELAY: () => DEFAULT_RELAY,
+    EXPORT_FORMAT: () => EXPORT_FORMAT,
+    EXPORT_VERSION: () => EXPORT_VERSION,
     EncryptedIndexeddbPersistence: () => EncryptedIndexeddbPersistence,
     Entry: () => Entry,
-    NotImplementedError: () => NotImplementedError,
     Spool: () => Spool,
     SpoolEngine: () => SpoolEngine,
+    SpoolExportError: () => SpoolExportError,
     SpoolHistoryError: () => SpoolHistoryError,
     SpoolKeyError: () => SpoolKeyError,
     SpoolLinkError: () => SpoolLinkError,
@@ -14858,12 +14860,17 @@ ${err.toString()}`);
     createEncryptedWebSocketClass: () => createEncryptedWebSocketClass,
     deriveSignaling: () => deriveSignaling,
     generateCode: () => generateCode,
+    importSpool: () => importSpool,
     isValidCode: () => isValidCode,
     keyFingerprint: () => keyFingerprint,
     newSpool: () => newSpool,
     openSpool: () => openSpool,
-    parseSpoolLink: () => parseSpoolLink
+    parseSpoolLink: () => parseSpoolLink,
+    stash: () => stash
   });
+
+  // src/spool.ts
+  init_yjs();
 
   // src/engine.ts
   init_yjs();
@@ -16198,6 +16205,16 @@ ${reason}`);
 
   // src/history.ts
   init_yjs();
+
+  // src/bytes.ts
+  var b64encode = (bytes) => {
+    let s = "";
+    for (const b of bytes) s += String.fromCharCode(b);
+    return btoa(s);
+  };
+  var b64decode = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+
+  // src/history.ts
   var HISTORY = "history";
   var SpoolHistoryError = class extends Error {
     constructor(message) {
@@ -16205,12 +16222,6 @@ ${reason}`);
       this.name = "SpoolHistoryError";
     }
   };
-  var b64encode = (bytes) => {
-    let s = "";
-    for (const b of bytes) s += String.fromCharCode(b);
-    return btoa(s);
-  };
-  var b64decode = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
   var byCreation2 = (a, b) => a.createdAt - b.createdAt || (a.id < b.id ? -1 : 1);
   var readEntries = (doc2) => {
     const out = [];
@@ -16357,13 +16368,134 @@ ${reason}`);
     __privateGet(this, _arr).push([{ ts: __privateGet(this, _lastAppendAt), snap: b64encode(encodeSnapshot(snap)) }]);
   };
 
-  // src/spool.ts
-  var NotImplementedError = class extends Error {
-    constructor(what, milestone) {
-      super(`${what} is not implemented yet (lands in ${milestone})`);
-      this.name = "NotImplementedError";
+  // src/export.ts
+  init_yjs();
+  var EXPORT_FORMAT = "spool-export";
+  var EXPORT_VERSION = 1;
+  var SpoolExportError = class extends Error {
+    constructor(message) {
+      super(message);
+      this.name = "SpoolExportError";
     }
   };
+  var buildExport = (code, entries, doc2) => JSON.stringify(
+    {
+      format: EXPORT_FORMAT,
+      version: EXPORT_VERSION,
+      code,
+      exportedAt: Date.now(),
+      entries,
+      doc: b64encode(encodeStateAsUpdate(doc2))
+    },
+    null,
+    2
+  );
+  var parseExport = (input) => {
+    let raw = input;
+    if (typeof input === "string") {
+      try {
+        raw = JSON.parse(input);
+      } catch {
+        throw new SpoolExportError("not JSON \u2014 is this really a spool export file?");
+      }
+    }
+    const file = raw;
+    if (!file || typeof file !== "object" || file.format !== EXPORT_FORMAT) {
+      throw new SpoolExportError(`missing "format": "${EXPORT_FORMAT}" \u2014 not a spool export`);
+    }
+    if (typeof file.version !== "number" || file.version > EXPORT_VERSION) {
+      throw new SpoolExportError(
+        `export version ${String(file.version)} is newer than this SDK understands (${EXPORT_VERSION})`
+      );
+    }
+    if (typeof file.code !== "string" || !isValidCode(file.code)) {
+      throw new SpoolExportError(`bad spool code in export: ${String(file.code)}`);
+    }
+    if (typeof file.doc !== "string") {
+      throw new SpoolExportError("export has no doc field \u2014 the machine half is missing");
+    }
+    let update;
+    try {
+      update = b64decode(file.doc);
+    } catch {
+      throw new SpoolExportError("the doc field is not valid base64");
+    }
+    return { code: file.code, update };
+  };
+
+  // src/stash.ts
+  var REGISTRY_KEY = "spools:stash";
+  var hasLocalStorage = () => typeof localStorage !== "undefined";
+  var hasIndexedDB = () => typeof indexedDB !== "undefined";
+  var readRegistry = () => {
+    if (!hasLocalStorage()) return {};
+    try {
+      const raw = localStorage.getItem(REGISTRY_KEY);
+      const parsed = raw ? JSON.parse(raw) : {};
+      return parsed && typeof parsed === "object" ? parsed : {};
+    } catch {
+      return {};
+    }
+  };
+  var writeRegistry = (registry) => {
+    if (!hasLocalStorage()) return;
+    localStorage.setItem(REGISTRY_KEY, JSON.stringify(registry));
+  };
+  var patch = (code, fields) => {
+    const registry = readRegistry();
+    registry[code] = { ...registry[code], ...fields };
+    writeRegistry(registry);
+  };
+  var touch = (code, link) => {
+    if (!hasLocalStorage()) return;
+    patch(code, { lastOpened: Date.now(), ...link ? { link } : {} });
+  };
+  var storedCodes = async () => {
+    if (!hasIndexedDB() || typeof indexedDB.databases !== "function") return /* @__PURE__ */ new Set();
+    try {
+      const dbs = await indexedDB.databases();
+      return new Set(dbs.map((db) => db.name ?? "").filter(isValidCode));
+    } catch {
+      return /* @__PURE__ */ new Set();
+    }
+  };
+  var stash = {
+    /** every spool this device knows: union of kept databases and registry rows, most recent first */
+    async list() {
+      const registry = readRegistry();
+      const stored = await storedCodes();
+      const codes = /* @__PURE__ */ new Set([...stored, ...Object.keys(registry).filter(isValidCode)]);
+      return [...codes].map((code) => ({ code, stored: stored.has(code), ...registry[code] })).sort((a, b) => (b.lastOpened ?? 0) - (a.lastOpened ?? 0));
+    },
+    /** name a keepsake */
+    label(code, label) {
+      patch(code, { label });
+    },
+    /** archived = kept but set aside; purely a shelf flag, nothing disconnects */
+    archive(code, archived) {
+      patch(code, { archived });
+    },
+    /**
+     * The one hard delete: removes the spool's local database and registry row.
+     * Gone from this device forever (peers' copies are their own). Rejects if
+     * the database is still open — leave() the spool first.
+     */
+    async forget(code) {
+      if (hasIndexedDB()) {
+        await new Promise((resolve2, reject2) => {
+          const request = indexedDB.deleteDatabase(code);
+          request.onsuccess = () => resolve2();
+          request.onerror = () => reject2(request.error ?? new Error(`could not delete ${code}`));
+          request.onblocked = () => reject2(new Error(`${code} is still open \u2014 leave() it before forgetting`));
+        });
+      }
+      const registry = readRegistry();
+      delete registry[code];
+      writeRegistry(registry);
+    }
+  };
+
+  // src/spool.ts
   var DEFAULT_RELAY = "wss://spools-relay-production.up.railway.app/yjs";
   var deriveSignaling = (relay) => {
     try {
@@ -16451,9 +16583,26 @@ ${reason}`);
     rewind(ts) {
       return __privateGet(this, _history).rewind(ts);
     }
-    /** portable file, yours forever — M8 */
+    /**
+     * The portable file, yours forever (M8): pretty-printed JSON with a
+     * readable `entries` half and the full doc as a base64 `doc` half —
+     * re-importable via importSpool(), still syncable, rewind moments
+     * included. Encrypted spools export decrypted; the key is never in the
+     * file. Synchronous — it's all local.
+     */
     export() {
-      throw new NotImplementedError("export()", "M8");
+      const snapshot2 = (e) => Object.freeze({
+        id: e.id,
+        author: e.author,
+        kind: e.kind,
+        ...e.parent !== void 0 ? { parent: e.parent } : {},
+        createdAt: e.createdAt,
+        ...e.deletedAt != null ? { deletedAt: e.deletedAt } : {},
+        ...e.data !== void 0 ? { data: e.data } : {},
+        body: e.body
+      });
+      const all2 = [...this.entries, ...this.deleted].sort((a, b) => a.createdAt - b.createdAt || (a.id < b.id ? -1 : 1)).map(snapshot2);
+      return buildExport(this.code, all2, this.doc);
     }
     /** the shareable link — hand it to someone */
     share(base) {
@@ -16480,7 +16629,9 @@ ${reason}`);
       persist: opts.persist,
       key
     });
-    return new Spool(engine, relay, key, opts.author ?? "anonymous");
+    const spool = new Spool(engine, relay, key, opts.author ?? "anonymous");
+    if (opts.persist !== false) touch(code, relay || key ? spool.share("") : void 0);
+    return spool;
   };
   var newSpool = async (opts = {}) => {
     const key = opts.encrypted === false ? void 0 : generateKey();
@@ -16492,6 +16643,13 @@ ${reason}`);
     const parsed = parseSpoolLink(link);
     const spool = connect(parsed.code, parsed.relay ?? DEFAULT_RELAY, parsed.key, opts);
     await spool.whenReady;
+    return spool;
+  };
+  var importSpool = async (file, opts = {}) => {
+    const { code, update } = parseExport(file);
+    const spool = connect(code, opts.relay ?? "", opts.key, opts);
+    await spool.whenReady;
+    applyUpdate(spool.doc, update);
     return spool;
   };
   return __toCommonJS(src_exports);
