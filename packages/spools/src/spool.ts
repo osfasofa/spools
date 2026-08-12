@@ -1,6 +1,7 @@
 import type * as Y from 'yjs'
 import { SpoolEngine, type SpoolStatus } from './engine'
 import { EntryStore, type Entry, type EntryChange, type WindInput } from './entry'
+import { HistoryLog, type EntrySnapshot, type HistoryTuning } from './history'
 import { buildSpoolLink, generateCode, generateKey, parseSpoolLink } from './link'
 import { keyFingerprint } from './crypto'
 
@@ -68,12 +69,19 @@ export class Spool {
 
   #engine: SpoolEngine
   #store: EntryStore
+  #history: HistoryLog
   #relay: string
   /** carried from the link / generated fresh; seals storage (T-050) and both transports (T-051) */
   #key: Uint8Array | undefined
 
-  /** @internal use newSpool/openSpool */
-  constructor(engine: SpoolEngine, relay: string, key: Uint8Array | undefined, author: string) {
+  /** @internal use newSpool/openSpool; historyTuning is for tests only */
+  constructor(
+    engine: SpoolEngine,
+    relay: string,
+    key: Uint8Array | undefined,
+    author: string,
+    historyTuning?: HistoryTuning
+  ) {
     this.#engine = engine
     this.#relay = relay
     this.#key = key
@@ -82,6 +90,7 @@ export class Spool {
     this.doc = engine.doc
     this.whenReady = engine.whenReady
     this.#store = new EntryStore(engine.doc, author, engine.whenReady)
+    this.#history = new HistoryLog(engine.doc, engine.whenReady, historyTuning)
   }
 
   get status(): SpoolStatus {
@@ -130,9 +139,23 @@ export class Spool {
     throw new Error(`unknown event: ${String(event)}`)
   }
 
-  /** view history at an earlier point in time — M6 */
-  rewind(_ts: number): never {
-    throw new NotImplementedError('rewind()', 'M6')
+  /**
+   * Recorded moment timestamps (ms), ascending — what rewind() can target;
+   * the history scrubber's tick marks. Moments are logged debounced-on-idle
+   * by whichever peer wrote, and merge like everything else.
+   */
+  get history(): number[] {
+    return this.#history.moments
+  }
+
+  /**
+   * The spool as it was at the latest recorded moment ≤ ts: plain frozen
+   * EntrySnapshots (soft-deleted-then entries included, with deletedAt set).
+   * Read-only time travel — the present is never touched. Throws
+   * SpoolHistoryError before the first recorded moment.
+   */
+  rewind(ts: number): EntrySnapshot[] {
+    return this.#history.rewind(ts)
   }
 
   /** portable file, yours forever — M8 */
@@ -147,6 +170,8 @@ export class Spool {
 
   /** disconnect and release resources; local data is retained (a spool is a keepsake) */
   leave(): Promise<void> {
+    this.#history.flush() // stamp the final moment before closing the notebook
+    this.#history.destroy()
     this.#store.destroy()
     return this.#engine.leave()
   }

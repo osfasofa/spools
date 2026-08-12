@@ -66,7 +66,10 @@ export class SpoolEngine {
 
   constructor(opts: SpoolEngineOptions) {
     this.code = opts.code
-    this.doc = new Y.Doc()
+    // gc:false universally (§5, T-060): rewind() needs deleted content to
+    // survive as tombstones, and mixed-gc rooms would give peers different
+    // recoverable pasts. Cost measured at +34% doc size on a realistic spool.
+    this.doc = new Y.Doc({ gc: false })
 
     const persist = opts.persist ?? inBrowser
     if (persist) {

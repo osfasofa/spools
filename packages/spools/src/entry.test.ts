@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import * as Y from 'yjs'
 import { SpoolEngine } from './engine'
 import { NotImplementedError, Spool } from './spool'
+import { SpoolHistoryError } from './history'
 import type { EntryChange } from './entry'
 
 // entry-layer tests need no network: spools are built directly on in-memory
@@ -33,7 +34,8 @@ describe('SDK-API examples run as written', () => {
 
     expect(spool.entries).toHaveLength(1)
     expect(spool.share('')).toContain('spool=quiet-harbor-042')
-    expect(() => spool.rewind(0)).toThrow(NotImplementedError)
+    // rewind() is live since T-060 — with no recorded history it throws its own error
+    expect(() => spool.rewind(0)).toThrow(SpoolHistoryError)
     expect(() => spool.export()).toThrow(NotImplementedError)
   })
 

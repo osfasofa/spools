@@ -51,13 +51,15 @@ interface Spool {
   readonly undecryptableFrames: number    // relay frames dropped: someone in the room is on the wrong key / no key (T-051); always 0 for keyless spools
   readonly doc: Y.Doc                // escape hatch for power users binding editors
 
+  readonly history: number[]         // recorded moment timestamps (ms), ascending — what rewind() can target; the scrubber's tick marks
+
   wind(input: WindInput): Entry
   on(event: 'entry', cb: (change: EntryChange) => void): () => void   // returns unsubscribe
   on(event: 'status', cb: (status: Spool['status']) => void): () => void
   on(event: 'undecryptable', cb: (total: number) => void): () => void // fires per dropped frame with the running total — "someone here isn't on your key" UX
 
   share(): string                    // the shareable link
-  rewind(ts: number): EntrySnapshot[]  // M6; see notes below
+  rewind(ts: number): EntrySnapshot[]  // the spool as it was at the latest recorded moment ≤ ts; see "rewind()" below
   export(): Promise<Blob>            // M8; portable file, yours forever
   leave(): Promise<void>             // teardown: webrtc → websocket → idb → doc.destroy()
 }
@@ -122,6 +124,7 @@ Setting `entry.body` on an entry with no body creates the `Y.Text` at that momen
 
 - `Y.Map` named `entries` — one nested `Y.Map` per entry id, holding `{ id, author, parent, kind, createdAt, deletedAt, data? }`. Plain values, last-write-wins per field — acceptable because metadata fields are write-once or tombstones. `data` is a plain-JSON object of machine fields (a track's url/title/artist), written once at wind time (T-030 verdict, §5); the human text lives in the body.
 - Per-entry `Y.Text` at doc root, keyed `entry:<id>` — created lazily, only when a body exists. Absence of the key = no body.
+- `Y.Array` named `history` — append-only `{ ts, snap }` moments for `rewind()` (T-060): wall-clock ms + base64 `Y.Snapshot`. Elements are plain JSON, written once, never edited.
 - Clients ignore `kind`s **and metadata fields** they don't understand — the forward-compatibility rule. (This is what makes a future `data` or `sig` field additive.)
 
 ## Link format
@@ -139,12 +142,33 @@ https://anyhost.example/#spool=<code>&relay=<wss-url>&k=<key>
   - **WebRTC transport**: y-webrtc's own `password` scheme (PBKDF2 → AES), fed the literal `k=` string. Peers without the key can't join the mesh or read signaling payloads. This is a *second* crypto scheme, kept stock on purpose (§5 two-transport decision).
   - Same link = same key — that's the contract. There is no key exchange; the social act of sharing the link *is* the key exchange.
 
+## rewind() — the memory feature (M6, T-060)
+
+Read-only time travel. `rewind(ts)` rebuilds the doc as of the **latest recorded moment ≤ ts** and returns plain frozen records — never live handles, and the present is never mutated:
+
+```ts
+interface EntrySnapshot {
+  readonly id: string
+  readonly author: string
+  readonly kind: string
+  readonly parent?: string
+  readonly createdAt: number
+  readonly deletedAt?: number   // present if the entry was soft-deleted at that moment — memory includes the deleted
+  readonly data?: Record<string, unknown>
+  readonly body: string         // body text as it read at that moment; '' if none existed
+}
+```
+
+- Entries soft-deleted *as of that moment* **appear**, with `deletedAt` set — remembering is the point; the caller filters if it wants the then-visible view. Same sort as `spool.entries` (createdAt, id tie-break).
+- **Moments**: whichever peer writes also logs, debounced on idle (2 s after a local change, ≥ 10 s apart), into a `history` root `Y.Array` of `{ ts, snap }` — wall-clock ms plus a base64 `Y.Snapshot` (~0.5 KB, measured). The log syncs and merges like everything else, so every peer scrubs through everyone's moments. `spool.history` lists them.
+- **Errors**: `rewind(ts)` earlier than the first recorded moment throws `SpoolHistoryError` — loud, not an empty array pretending the spool didn't exist. A moment referencing peer changes this device hasn't synced yet is skipped (falls back to the nearest earlier satisfiable one); if none qualifies, `SpoolHistoryError`.
+- **Price** (§5, measured in `scratch/spike-rewind`): every doc runs `gc: false` — +34% on a realistic 200-entry spool (94 vs 70 KB). The honest asterisk: wholesale body rewrites keep ~90 B each forever; heavy editor churn on one body grows linearly. History begins the day a spool first runs post-T-060 code — content gc'd before that is unrecoverable (silently empty bodies, verified).
+
 ## Under the hood (M1 shape)
 
 Per-spool instance bundles: `Y.Doc` + `IndexeddbPersistence` (db name = spool code) + `WebsocketProvider` (room = spool code) + `WebrtcProvider` (same room, **sharing the websocket provider's awareness**, per fosho `sync.ts:1032`). Websocket is the reliable path; WebRTC the low-latency bonus — redundant, not competing. Extraction source: the distilled `connectToNote` / `disconnectFromNote` (fosho `sync.ts:950–1143`) minus identity, permissions, subdocs, addressing, singletons.
 
 ## Deferred surface (designed later, listed so names stay reserved)
 
-- `rewind(ts)` — Yjs snapshot history (M6). Known constraint to investigate: snapshots need `gc: false` on the doc; measure the size cost before committing.
 - `export()` / stash (M8).
 - `splice` — reserved verb, no design.

@@ -2409,7 +2409,7 @@ ${err.toString()}`);
       }
     }
   }
-  var DeleteItem, DeleteSet, iterateDeletedStructs, findIndexDS, isDeleted, sortAndMergeDeleteSet, mergeDeleteSets, addToDeleteSet, createDeleteSet, createDeleteSetFromStructStore, writeDeleteSet, readDeleteSet, readAndApplyDeleteSet, generateNewClientId, Doc, DSDecoderV1, UpdateDecoderV1, DSDecoderV2, UpdateDecoderV2, DSEncoderV1, UpdateEncoderV1, DSEncoderV2, UpdateEncoderV2, writeStructs, writeClientsStructs, readClientsStructRefs, integrateStructs, writeStructsFromTransaction, readUpdateV2, applyUpdateV2, applyUpdate, writeStateAsUpdate, encodeStateAsUpdateV2, encodeStateAsUpdate, readStateVector, decodeStateVector, writeStateVector, writeDocumentStateVector, encodeStateVectorV2, encodeStateVector, EventHandler, createEventHandler, addEventHandlerListener, removeEventHandlerListener, callEventHandlerListeners, ID, compareIDs, createID, findRootTypeKey, Snapshot, createSnapshot, emptySnapshot, isVisible, splitSnapshotAffectedStructs, StructStore, getStateVector, getState, addStruct, findIndexSS, find, getItem, findIndexCleanStart, getItemCleanStart, getItemCleanEnd, replaceStruct, iterateStructs, Transaction, writeUpdateMessageFromTransaction, addChangedTypeToTransaction, tryToMergeWithLefts, tryGcDeleteSet, tryMergeDeleteSet, cleanupTransactions, transact, LazyStructReader, LazyStructWriter, mergeUpdates, sliceStruct, mergeUpdatesV2, diffUpdateV2, flushLazyStructWriter, writeStructToLazyStructWriter, finishLazyStructWriting, convertUpdateFormat, convertUpdateFormatV2ToV1, errorComputeChanges, YEvent, getPathTo, warnPrematureAccess, maxSearchMarker, globalSearchMarkerTimestamp, ArraySearchMarker, refreshMarkerTimestamp, overwriteMarker, markPosition, findMarker, updateMarkerChanges, callTypeObservers, AbstractType, typeListSlice, typeListToArray, typeListForEach, typeListMap, typeListCreateIterator, typeListGet, typeListInsertGenericsAfter, lengthExceeded, typeListInsertGenerics, typeListPushGenerics, typeListDelete, typeMapDelete, typeMapSet, typeMapGet, typeMapGetAll, typeMapHas, typeMapGetAllSnapshot, createMapIterator, YArrayEvent, YArray, readYArray, YMapEvent, YMap, readYMap, equalAttrs, ItemTextListPosition, findNextPosition, findPosition, insertNegatedAttributes, updateCurrentAttributes, minimizeAttributeChanges, insertAttributes, insertText, formatText, cleanupFormattingGap, cleanupContextlessFormattingGap, cleanupYTextFormatting, cleanupYTextAfterTransaction, deleteText, YTextEvent, YText, readYText, YXmlTreeWalker, YXmlFragment, readYXmlFragment, YXmlElement, readYXmlElement, YXmlEvent, YXmlHook, readYXmlHook, YXmlText, readYXmlText, AbstractStruct, structGCRefNumber, GC, ContentBinary, readContentBinary, ContentDeleted, readContentDeleted, createDocFromOpts, ContentDoc, readContentDoc, ContentEmbed, readContentEmbed, ContentFormat, readContentFormat, ContentJSON, readContentJSON, isDevMode, ContentAny, readContentAny, ContentString, readContentString, typeRefs, YArrayRefID, YMapRefID, YTextRefID, YXmlElementRefID, YXmlFragmentRefID, YXmlHookRefID, YXmlTextRefID, ContentType, readContentType, splitItem, Item, readItemContent, contentRefs, structSkipRefNumber, Skip, glo, importIdentifier;
+  var DeleteItem, DeleteSet, iterateDeletedStructs, findIndexDS, isDeleted, sortAndMergeDeleteSet, mergeDeleteSets, addToDeleteSet, createDeleteSet, createDeleteSetFromStructStore, writeDeleteSet, readDeleteSet, readAndApplyDeleteSet, generateNewClientId, Doc, DSDecoderV1, UpdateDecoderV1, DSDecoderV2, UpdateDecoderV2, DSEncoderV1, UpdateEncoderV1, DSEncoderV2, UpdateEncoderV2, writeStructs, writeClientsStructs, readClientsStructRefs, integrateStructs, writeStructsFromTransaction, readUpdateV2, applyUpdateV2, applyUpdate, writeStateAsUpdate, encodeStateAsUpdateV2, encodeStateAsUpdate, readStateVector, decodeStateVector, writeStateVector, writeDocumentStateVector, encodeStateVectorV2, encodeStateVector, EventHandler, createEventHandler, addEventHandlerListener, removeEventHandlerListener, callEventHandlerListeners, ID, compareIDs, createID, findRootTypeKey, Snapshot, equalSnapshots, encodeSnapshotV2, encodeSnapshot, decodeSnapshotV2, decodeSnapshot, createSnapshot, emptySnapshot, snapshot, isVisible, splitSnapshotAffectedStructs, createDocFromSnapshot, StructStore, getStateVector, getState, addStruct, findIndexSS, find, getItem, findIndexCleanStart, getItemCleanStart, getItemCleanEnd, replaceStruct, iterateStructs, Transaction, writeUpdateMessageFromTransaction, addChangedTypeToTransaction, tryToMergeWithLefts, tryGcDeleteSet, tryMergeDeleteSet, cleanupTransactions, transact, LazyStructReader, LazyStructWriter, mergeUpdates, sliceStruct, mergeUpdatesV2, diffUpdateV2, flushLazyStructWriter, writeStructToLazyStructWriter, finishLazyStructWriting, convertUpdateFormat, convertUpdateFormatV2ToV1, errorComputeChanges, YEvent, getPathTo, warnPrematureAccess, maxSearchMarker, globalSearchMarkerTimestamp, ArraySearchMarker, refreshMarkerTimestamp, overwriteMarker, markPosition, findMarker, updateMarkerChanges, callTypeObservers, AbstractType, typeListSlice, typeListToArray, typeListForEach, typeListMap, typeListCreateIterator, typeListGet, typeListInsertGenericsAfter, lengthExceeded, typeListInsertGenerics, typeListPushGenerics, typeListDelete, typeMapDelete, typeMapSet, typeMapGet, typeMapGetAll, typeMapHas, typeMapGetAllSnapshot, createMapIterator, YArrayEvent, YArray, readYArray, YMapEvent, YMap, readYMap, equalAttrs, ItemTextListPosition, findNextPosition, findPosition, insertNegatedAttributes, updateCurrentAttributes, minimizeAttributeChanges, insertAttributes, insertText, formatText, cleanupFormattingGap, cleanupContextlessFormattingGap, cleanupYTextFormatting, cleanupYTextAfterTransaction, deleteText, YTextEvent, YText, readYText, YXmlTreeWalker, YXmlFragment, readYXmlFragment, YXmlElement, readYXmlElement, YXmlEvent, YXmlHook, readYXmlHook, YXmlText, readYXmlText, AbstractStruct, structGCRefNumber, GC, ContentBinary, readContentBinary, ContentDeleted, readContentDeleted, createDocFromOpts, ContentDoc, readContentDoc, ContentEmbed, readContentEmbed, ContentFormat, readContentFormat, ContentJSON, readContentJSON, isDevMode, ContentAny, readContentAny, ContentString, readContentString, typeRefs, YArrayRefID, YMapRefID, YTextRefID, YXmlElementRefID, YXmlFragmentRefID, YXmlHookRefID, YXmlTextRefID, ContentType, readContentType, splitItem, Item, readItemContent, contentRefs, structSkipRefNumber, Skip, glo, importIdentifier;
   var init_yjs = __esm({
     "../../node_modules/.pnpm/yjs@13.6.32/node_modules/yjs/dist/yjs.mjs"() {
       "use strict";
@@ -3743,22 +3743,96 @@ ${err.toString()}`);
           this.sv = sv;
         }
       };
+      equalSnapshots = (snap1, snap2) => {
+        const ds1 = snap1.ds.clients;
+        const ds2 = snap2.ds.clients;
+        const sv1 = snap1.sv;
+        const sv2 = snap2.sv;
+        if (sv1.size !== sv2.size || ds1.size !== ds2.size) {
+          return false;
+        }
+        for (const [key, value] of sv1.entries()) {
+          if (sv2.get(key) !== value) {
+            return false;
+          }
+        }
+        for (const [client, dsitems1] of ds1.entries()) {
+          const dsitems2 = ds2.get(client) || [];
+          if (dsitems1.length !== dsitems2.length) {
+            return false;
+          }
+          for (let i = 0; i < dsitems1.length; i++) {
+            const dsitem1 = dsitems1[i];
+            const dsitem2 = dsitems2[i];
+            if (dsitem1.clock !== dsitem2.clock || dsitem1.len !== dsitem2.len) {
+              return false;
+            }
+          }
+        }
+        return true;
+      };
+      encodeSnapshotV2 = (snapshot2, encoder = new DSEncoderV2()) => {
+        writeDeleteSet(encoder, snapshot2.ds);
+        writeStateVector(encoder, snapshot2.sv);
+        return encoder.toUint8Array();
+      };
+      encodeSnapshot = (snapshot2) => encodeSnapshotV2(snapshot2, new DSEncoderV1());
+      decodeSnapshotV2 = (buf, decoder = new DSDecoderV2(createDecoder(buf))) => {
+        return new Snapshot(readDeleteSet(decoder), readStateVector(decoder));
+      };
+      decodeSnapshot = (buf) => decodeSnapshotV2(buf, new DSDecoderV1(createDecoder(buf)));
       createSnapshot = (ds, sm) => new Snapshot(ds, sm);
       emptySnapshot = createSnapshot(createDeleteSet(), /* @__PURE__ */ new Map());
-      isVisible = (item, snapshot) => snapshot === void 0 ? !item.deleted : snapshot.sv.has(item.id.client) && (snapshot.sv.get(item.id.client) || 0) > item.id.clock && !isDeleted(snapshot.ds, item.id);
-      splitSnapshotAffectedStructs = (transaction, snapshot) => {
+      snapshot = (doc2) => createSnapshot(createDeleteSetFromStructStore(doc2.store), getStateVector(doc2.store));
+      isVisible = (item, snapshot2) => snapshot2 === void 0 ? !item.deleted : snapshot2.sv.has(item.id.client) && (snapshot2.sv.get(item.id.client) || 0) > item.id.clock && !isDeleted(snapshot2.ds, item.id);
+      splitSnapshotAffectedStructs = (transaction, snapshot2) => {
         const meta = setIfUndefined(transaction.meta, splitSnapshotAffectedStructs, create2);
         const store = transaction.doc.store;
-        if (!meta.has(snapshot)) {
-          snapshot.sv.forEach((clock, client) => {
+        if (!meta.has(snapshot2)) {
+          snapshot2.sv.forEach((clock, client) => {
             if (clock < getState(store, client)) {
               getItemCleanStart(transaction, createID(client, clock));
             }
           });
-          iterateDeletedStructs(transaction, snapshot.ds, (_item) => {
+          iterateDeletedStructs(transaction, snapshot2.ds, (_item) => {
           });
-          meta.add(snapshot);
+          meta.add(snapshot2);
         }
+      };
+      createDocFromSnapshot = (originDoc, snapshot2, newDoc = new Doc()) => {
+        if (originDoc.gc) {
+          throw new Error("Garbage-collection must be disabled in `originDoc`!");
+        }
+        const { sv, ds } = snapshot2;
+        const encoder = new UpdateEncoderV2();
+        originDoc.transact((transaction) => {
+          let size2 = 0;
+          sv.forEach((clock) => {
+            if (clock > 0) {
+              size2++;
+            }
+          });
+          writeVarUint(encoder.restEncoder, size2);
+          for (const [client, clock] of sv) {
+            if (clock === 0) {
+              continue;
+            }
+            if (clock < getState(originDoc.store, client)) {
+              getItemCleanStart(transaction, createID(client, clock));
+            }
+            const structs = originDoc.store.clients.get(client) || [];
+            const lastStructIndex = findIndexSS(structs, clock - 1);
+            writeVarUint(encoder.restEncoder, lastStructIndex + 1);
+            encoder.writeClient(client);
+            writeVarUint(encoder.restEncoder, 0);
+            for (let i = 0; i <= lastStructIndex; i++) {
+              structs[i].write(encoder, 0);
+            }
+          }
+          writeDeleteSet(encoder, ds);
+        });
+        applyUpdateV2(newDoc, encoder.toUint8Array(), "snapshot");
+        return newDoc;
       };
       StructStore = class {
         constructor() {
@@ -5139,14 +5213,14 @@ ${err.toString()}`);
         const val = parent._map.get(key);
         return val !== void 0 && !val.deleted;
       };
-      typeMapGetAllSnapshot = (parent, snapshot) => {
+      typeMapGetAllSnapshot = (parent, snapshot2) => {
         const res = {};
         parent._map.forEach((value, key) => {
           let v = value;
-          while (v !== null && (!snapshot.sv.has(v.id.client) || v.id.clock >= (snapshot.sv.get(v.id.client) || 0))) {
+          while (v !== null && (!snapshot2.sv.has(v.id.client) || v.id.clock >= (snapshot2.sv.get(v.id.client) || 0))) {
             v = v.left;
           }
-          if (v !== null && isVisible(v, snapshot)) {
+          if (v !== null && isVisible(v, snapshot2)) {
             res[key] = v.content.getContent()[v.length - 1];
           }
         });
@@ -6399,7 +6473,7 @@ ${err.toString()}`);
          *
          * @public
          */
-        toDelta(snapshot, prevSnapshot, computeYChange) {
+        toDelta(snapshot2, prevSnapshot, computeYChange) {
           this.doc ?? warnPrematureAccess();
           const ops = [];
           const currentAttributes = /* @__PURE__ */ new Map();
@@ -6427,11 +6501,11 @@ ${err.toString()}`);
           }
           const computeDelta = () => {
             while (n !== null) {
-              if (isVisible(n, snapshot) || prevSnapshot !== void 0 && isVisible(n, prevSnapshot)) {
+              if (isVisible(n, snapshot2) || prevSnapshot !== void 0 && isVisible(n, prevSnapshot)) {
                 switch (n.content.constructor) {
                   case ContentString: {
                     const cur = currentAttributes.get("ychange");
-                    if (snapshot !== void 0 && !isVisible(n, snapshot)) {
+                    if (snapshot2 !== void 0 && !isVisible(n, snapshot2)) {
                       if (cur === void 0 || cur.user !== n.id.client || cur.type !== "removed") {
                         packStr();
                         currentAttributes.set("ychange", computeYChange ? computeYChange("removed", n.id) : { type: "removed" });
@@ -6469,7 +6543,7 @@ ${err.toString()}`);
                     break;
                   }
                   case ContentFormat:
-                    if (isVisible(n, snapshot)) {
+                    if (isVisible(n, snapshot2)) {
                       packStr();
                       updateCurrentAttributes(
                         currentAttributes,
@@ -6484,10 +6558,10 @@ ${err.toString()}`);
             }
             packStr();
           };
-          if (snapshot || prevSnapshot) {
+          if (snapshot2 || prevSnapshot) {
             transact(doc2, (transaction) => {
-              if (snapshot) {
-                splitSnapshotAffectedStructs(transaction, snapshot);
+              if (snapshot2) {
+                splitSnapshotAffectedStructs(transaction, snapshot2);
               }
               if (prevSnapshot) {
                 splitSnapshotAffectedStructs(transaction, prevSnapshot);
@@ -7194,10 +7268,10 @@ ${err.toString()}`);
          *
          * @public
          */
-        getAttributes(snapshot) {
+        getAttributes(snapshot2) {
           return (
             /** @type {any} */
-            snapshot ? typeMapGetAllSnapshot(this, snapshot) : typeMapGetAll(this)
+            snapshot2 ? typeMapGetAllSnapshot(this, snapshot2) : typeMapGetAll(this)
           );
         }
         /**
@@ -14776,6 +14850,7 @@ ${err.toString()}`);
     NotImplementedError: () => NotImplementedError,
     Spool: () => Spool,
     SpoolEngine: () => SpoolEngine,
+    SpoolHistoryError: () => SpoolHistoryError,
     SpoolKeyError: () => SpoolKeyError,
     SpoolLinkError: () => SpoolLinkError,
     TRANSPORT_MAGIC: () => TRANSPORT_MAGIC,
@@ -15825,7 +15900,7 @@ ${reason}`);
       __privateAdd(this, _undecryptableListeners, /* @__PURE__ */ new Set());
       __privateAdd(this, _left, false);
       this.code = opts.code;
-      this.doc = new Doc();
+      this.doc = new Doc({ gc: false });
       const persist = opts.persist ?? inBrowser;
       if (persist) {
         if (!inBrowser) throw new Error("persist requires IndexedDB; pass persist: false outside browsers");
@@ -16121,6 +16196,167 @@ ${reason}`);
   };
   _onTransaction = new WeakMap();
 
+  // src/history.ts
+  init_yjs();
+  var HISTORY = "history";
+  var SpoolHistoryError = class extends Error {
+    constructor(message) {
+      super(message);
+      this.name = "SpoolHistoryError";
+    }
+  };
+  var b64encode = (bytes) => {
+    let s = "";
+    for (const b of bytes) s += String.fromCharCode(b);
+    return btoa(s);
+  };
+  var b64decode = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+  var byCreation2 = (a, b) => a.createdAt - b.createdAt || (a.id < b.id ? -1 : 1);
+  var readEntries = (doc2) => {
+    const out = [];
+    const entries = doc2.getMap("entries");
+    for (const id2 of entries.keys()) {
+      const meta = entries.get(id2);
+      if (!meta) continue;
+      const parent = meta.get("parent");
+      const deletedAt = meta.get("deletedAt");
+      const data = meta.get("data");
+      out.push(
+        Object.freeze({
+          id: id2,
+          author: meta.get("author"),
+          kind: meta.get("kind"),
+          ...parent !== void 0 ? { parent } : {},
+          createdAt: meta.get("createdAt"),
+          ...deletedAt != null ? { deletedAt } : {},
+          ...data !== void 0 ? { data: Object.freeze(data) } : {},
+          body: doc2.share.has(`entry:${id2}`) ? doc2.getText(`entry:${id2}`).toString() : ""
+        })
+      );
+    }
+    return Object.freeze(out.sort(byCreation2));
+  };
+  var _doc, _arr, _debounceMs, _minGapMs, _timer, _armed2, _lastAppendAt, _destroyed2, _HistoryLog_instances, satisfiable_fn, _onTransaction2, schedule_fn, append_fn;
+  var HistoryLog = class {
+    constructor(doc2, whenReady, tuning) {
+      __privateAdd(this, _HistoryLog_instances);
+      __privateAdd(this, _doc);
+      __privateAdd(this, _arr);
+      __privateAdd(this, _debounceMs);
+      __privateAdd(this, _minGapMs);
+      __privateAdd(this, _timer, null);
+      __privateAdd(this, _armed2, false);
+      __privateAdd(this, _lastAppendAt, 0);
+      __privateAdd(this, _destroyed2, false);
+      __privateAdd(this, _onTransaction2, (tr) => {
+        if (!__privateGet(this, _armed2) || __privateGet(this, _destroyed2) || !tr.local) return;
+        for (const type of tr.changed.keys()) {
+          if (type !== __privateGet(this, _arr)) {
+            __privateMethod(this, _HistoryLog_instances, schedule_fn).call(this);
+            return;
+          }
+        }
+      });
+      __privateSet(this, _doc, doc2);
+      __privateSet(this, _arr, doc2.getArray(HISTORY));
+      __privateSet(this, _debounceMs, tuning?.debounceMs ?? 2e3);
+      __privateSet(this, _minGapMs, tuning?.minGapMs ?? 1e4);
+      doc2.on("afterTransaction", __privateGet(this, _onTransaction2));
+      whenReady.then(() => {
+        __privateSet(this, _armed2, true);
+      });
+    }
+    /** recorded moment timestamps, ascending — the scrubber's tick marks */
+    get moments() {
+      const ts = /* @__PURE__ */ new Set();
+      for (const m of __privateGet(this, _arr).toArray()) {
+        if (m && typeof m.ts === "number") ts.add(m.ts);
+      }
+      return [...ts].sort((a, b) => a - b);
+    }
+    rewind(ts) {
+      const candidates = __privateGet(this, _arr).toArray().filter((m) => m != null && typeof m.ts === "number" && m.ts <= ts).sort((a, b) => b.ts - a.ts);
+      if (candidates.length === 0) {
+        throw new SpoolHistoryError(
+          __privateGet(this, _arr).length === 0 ? "this spool has no recorded history yet" : `no moment recorded at or before ${ts} \u2014 history starts at ${this.moments[0]}`
+        );
+      }
+      const localSv = decodeStateVector(encodeStateVector(__privateGet(this, _doc)));
+      for (const moment of candidates) {
+        let snap;
+        try {
+          snap = decodeSnapshot(b64decode(moment.snap));
+        } catch {
+          continue;
+        }
+        if (!__privateMethod(this, _HistoryLog_instances, satisfiable_fn).call(this, snap, localSv)) continue;
+        const past = createDocFromSnapshot(__privateGet(this, _doc), snap);
+        try {
+          return readEntries(past);
+        } finally {
+          past.destroy();
+        }
+      }
+      throw new SpoolHistoryError(
+        "recorded moments reference peer changes this device has not synced yet \u2014 try again after syncing"
+      );
+    }
+    /** capture a pending moment right now instead of waiting out the debounce */
+    flush() {
+      if (__privateGet(this, _timer)) {
+        clearTimeout(__privateGet(this, _timer));
+        __privateSet(this, _timer, null);
+        __privateMethod(this, _HistoryLog_instances, append_fn).call(this);
+      }
+    }
+    destroy() {
+      __privateSet(this, _destroyed2, true);
+      if (__privateGet(this, _timer)) clearTimeout(__privateGet(this, _timer));
+      __privateSet(this, _timer, null);
+      __privateGet(this, _doc).off("afterTransaction", __privateGet(this, _onTransaction2));
+    }
+  };
+  _doc = new WeakMap();
+  _arr = new WeakMap();
+  _debounceMs = new WeakMap();
+  _minGapMs = new WeakMap();
+  _timer = new WeakMap();
+  _armed2 = new WeakMap();
+  _lastAppendAt = new WeakMap();
+  _destroyed2 = new WeakMap();
+  _HistoryLog_instances = new WeakSet();
+  /** every sv clock the snapshot needs must exist locally, or reconstruction dies mid-yjs */
+  satisfiable_fn = function(snap, localSv) {
+    for (const [client, clock] of snap.sv) {
+      if ((localSv.get(client) ?? 0) < clock) return false;
+    }
+    return true;
+  };
+  _onTransaction2 = new WeakMap();
+  schedule_fn = function() {
+    if (__privateGet(this, _timer)) clearTimeout(__privateGet(this, _timer));
+    const wait = Math.max(__privateGet(this, _debounceMs), __privateGet(this, _lastAppendAt) + __privateGet(this, _minGapMs) - Date.now());
+    __privateSet(this, _timer, setTimeout(() => {
+      __privateSet(this, _timer, null);
+      __privateMethod(this, _HistoryLog_instances, append_fn).call(this);
+    }, wait));
+  };
+  append_fn = function() {
+    if (__privateGet(this, _destroyed2)) return;
+    const snap = snapshot(__privateGet(this, _doc));
+    const newest = __privateGet(this, _arr).toArray().reduce((best, m) => {
+      return m && typeof m.ts === "number" && (!best || m.ts > best.ts) ? m : best;
+    }, null);
+    if (newest) {
+      try {
+        if (equalSnapshots(decodeSnapshot(b64decode(newest.snap)), snap)) return;
+      } catch {
+      }
+    }
+    __privateSet(this, _lastAppendAt, Date.now());
+    __privateGet(this, _arr).push([{ ts: __privateGet(this, _lastAppendAt), snap: b64encode(encodeSnapshot(snap)) }]);
+  };
+
   // src/spool.ts
   var NotImplementedError = class extends Error {
     constructor(what, milestone) {
@@ -16139,10 +16375,10 @@ ${reason}`);
     }
     return void 0;
   };
-  var _engine, _store2, _relay, _key2;
+  var _engine, _store2, _history, _relay, _key2;
   var Spool = class {
-    /** @internal use newSpool/openSpool */
-    constructor(engine, relay, key, author) {
+    /** @internal use newSpool/openSpool; historyTuning is for tests only */
+    constructor(engine, relay, key, author, historyTuning) {
       __publicField(this, "code");
       __publicField(this, "whenReady");
       /** escape hatch for power users binding editors */
@@ -16151,6 +16387,7 @@ ${reason}`);
       __publicField(this, "author");
       __privateAdd(this, _engine);
       __privateAdd(this, _store2);
+      __privateAdd(this, _history);
       __privateAdd(this, _relay);
       /** carried from the link / generated fresh; seals storage (T-050) and both transports (T-051) */
       __privateAdd(this, _key2);
@@ -16162,6 +16399,7 @@ ${reason}`);
       this.doc = engine.doc;
       this.whenReady = engine.whenReady;
       __privateSet(this, _store2, new EntryStore(engine.doc, author, engine.whenReady));
+      __privateSet(this, _history, new HistoryLog(engine.doc, engine.whenReady, historyTuning));
     }
     get status() {
       return __privateGet(this, _engine).status;
@@ -16196,9 +16434,22 @@ ${reason}`);
       if (event === "undecryptable") return __privateGet(this, _engine).onUndecryptable(cb);
       throw new Error(`unknown event: ${String(event)}`);
     }
-    /** view history at an earlier point in time — M6 */
-    rewind(_ts) {
-      throw new NotImplementedError("rewind()", "M6");
+    /**
+     * Recorded moment timestamps (ms), ascending — what rewind() can target;
+     * the history scrubber's tick marks. Moments are logged debounced-on-idle
+     * by whichever peer wrote, and merge like everything else.
+     */
+    get history() {
+      return __privateGet(this, _history).moments;
+    }
+    /**
+     * The spool as it was at the latest recorded moment ≤ ts: plain frozen
+     * EntrySnapshots (soft-deleted-then entries included, with deletedAt set).
+     * Read-only time travel — the present is never touched. Throws
+     * SpoolHistoryError before the first recorded moment.
+     */
+    rewind(ts) {
+      return __privateGet(this, _history).rewind(ts);
     }
     /** portable file, yours forever — M8 */
     export() {
@@ -16210,12 +16461,15 @@ ${reason}`);
     }
     /** disconnect and release resources; local data is retained (a spool is a keepsake) */
     leave() {
+      __privateGet(this, _history).flush();
+      __privateGet(this, _history).destroy();
       __privateGet(this, _store2).destroy();
       return __privateGet(this, _engine).leave();
     }
   };
   _engine = new WeakMap();
   _store2 = new WeakMap();
+  _history = new WeakMap();
   _relay = new WeakMap();
   _key2 = new WeakMap();
   var connect = (code, relay, key, opts) => {

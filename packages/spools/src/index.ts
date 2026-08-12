@@ -8,6 +8,8 @@ export { parseSpoolLink, buildSpoolLink, generateCode, isValidCode, SpoolLinkErr
 export type { ParsedLink, BuildLinkInput } from './link'
 export { SpoolEngine } from './engine'
 export type { SpoolEngineOptions, SpoolStatus } from './engine'
+export { SpoolHistoryError } from './history'
+export type { EntrySnapshot } from './history'
 export { SpoolKeyError, keyFingerprint } from './crypto'
 export { EncryptedIndexeddbPersistence } from './encrypted-idb'
 export { createEncryptedWebSocketClass, TRANSPORT_MAGIC } from './encrypted-ws'
