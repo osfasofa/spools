@@ -1,7 +1,7 @@
 ---
 id: T-002
 title: Claim the name (npm, GitHub, domains)
-status: todo
+status: done
 milestone: M0
 depends: []
 ---
@@ -16,9 +16,9 @@ DESIGN_DOC §2: `spools` verified available on npm as of Aug 2026; bare `spool` 
 
 ## Tasks
 
-- [ ] Publish `spools@0.0.1` stub to npm: README pointing at the repo, `"private": false`, no real API. Also consider `spools-relay` — check availability and claim if free.
-- [ ] Check/claim GitHub org (candidates: `spools`, `spoolsdev`, or keep under personal — record the call).
-- [ ] Domain check: `spools.dev`, `spool.link` or similar for the hosted reference client. Record findings + any purchase decision; buying is optional, knowing isn't.
+- [x] Publish `spools@0.0.1` stub to npm: README pointing at the repo, `"private": false`, no real API. Also consider `spools-relay` — check availability and claim if free. *(both claimed; `spools` shipped as the real SDK, not a stub — see Notes)*
+- [x] Check/claim GitHub org (candidates: `spools`, `spoolsdev`, or keep under personal — record the call).
+- [x] Domain check: `spools.dev`, `spool.link` or similar for the hosted reference client. Record findings + any purchase decision; buying is optional, knowing isn't.
 
 ## Acceptance criteria
 
@@ -33,3 +33,7 @@ DESIGN_DOC §2: `spools` verified available on npm as of Aug 2026; bare `spool` 
 - Both packages prepped for publish at 0.0.1: claim READMEs, `license: MIT` *(flagged for user confirmation before publish)*, repository fields pointing at `github.com/osfasofa/spools` (update if an org is claimed).
 - **Deprioritized by user (Aug 2026):** "underground, obfuscated thing anyway" — claiming would be nice but is explicitly not urgent; don't treat the squatting clock as pressure. Publish prep stays committed and ready whenever the mood strikes. Back to `todo`, unblocking nothing.
 - **`spools-relay` published (2026-08-11, via T-041):** `spools-relay@0.1.0` live on npm under the user's account (2FA security key enabled in the process — npm now requires it to publish). The `spools` SDK name remains unclaimed/unpublished; GitHub-org and domain decisions still open.
+- **Domain decision (2026-08-11, user):** no dedicated domain — the user has existing URLs to host the reference client on, and the link format is host-agnostic by design (any base URL; the client is static files), so a branded domain buys nothing the protocol needs. Availability recorded for the record: `spool.link` available, `spools.dev` taken, `spools.io` likely available (RDAP 404, registrar-confirm if ever wanted). Task closed as "knowing, not buying."
+- **Availability re-check (2026-08-11):** npm `spools` still free; GitHub orgs `spools` and `spoolsdev` both 404 (likely claimable). `github.com/osfasofa/spools` 404s publicly — private or never pushed; resolve when the GitHub call is made.
+- **`spools` published (2026-08-12, user at the keyboard):** `spools@0.0.1` live, maintainer `osfasofa`, verified via `npm view`. Because the whole build order had landed by publish time, the "stub" became the real SDK — README rewritten from name-claim language to an honest 0.0.x quick-start, and MIT LICENSE files added (repo root + both packages; copyright holder is the `osfasofa` handle, not a legal name, matching the project's public identity). Both npm names now claimed; the ticket's squatting clock is stopped.
+- **GitHub decision (2026-08-12, user):** stay under the personal `osfasofa` account — no org. Both org names were available; the call was simplicity over branding for an underground project. `github.com/osfasofa/spools` is pushed and public (verified 200); the packages' `repository` fields already point there.

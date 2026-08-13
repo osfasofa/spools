@@ -173,7 +173,7 @@ Sequenced to always have something working, never to design in the abstract. The
 - [x] **7. Export / stash** — spool as portable file; local archive management. *(done Aug 2026, T-080: format (c) — readable + lossless in one JSON file; stash shipped in SDK + client)*
 - [ ] Later: encryption hardening pass, optional relay persistence, `splice`, more renderers (board, blog).
 
-**Immediate errands:** publish `spools@0.0.1` stub on npm to claim the name; check domains.
+**Immediate errands:** ~~publish `spools@0.0.1` stub on npm to claim the name; check domains~~ *done Aug 2026 (T-002): `spools@0.0.1` published as the real SDK, `spools-relay@0.1.0` live, repo public under `osfasofa`, domains recorded-not-bought (existing URLs suffice — the link format is host-agnostic by design).*
 
 > **Working roadmap:** this list is the milestone summary; the session-sized breakdown lives in [`tickets/INDEX.md`](tickets/INDEX.md). The SDK surface is designed in [`docs/SDK-API.md`](docs/SDK-API.md) (a design note, not the spec — the spec still comes last).
 
