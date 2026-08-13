@@ -67,6 +67,12 @@ Session-sized chunks of the build order (DESIGN_DOC §4). Each ticket is one fil
 |---|---|---|---|
 | [T-080](T-080-export-stash.md) | `export()` portable file + stash | T-013 | done |
 
+## M9 — Clients (post-v1)
+
+| Ticket | Title | Depends | Status |
+|---|---|---|---|
+| [T-090](T-090-mixtape-client.md) | Mixtape client — the nice one (Vite + React) | T-080 | done |
+
 ## Parked (no ticket until evidence demands one)
 
 - Structured `data` field for immutable kinds — T-030 records the verdict.
