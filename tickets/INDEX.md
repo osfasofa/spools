@@ -90,6 +90,32 @@ Signed off Aug 2026 (all four decisions + two review-round hardenings); design r
 | [T-106](T-106-spec-amendment.md) | SPEC v1.1: optional pocket capability + honesty clause; SDK-API; docs | T-101, T-103 | done |
 | [T-107](T-107-keeper.md) | `spools-keeper`: headless always-on peer (optional) | T-100 | done |
 
+## M11 — the room (group chat)
+
+Signed off Aug 2026 (decisions D1–D5); design record: [docs/M11-room-brief.md](../docs/M11-room-brief.md). A Messenger-class group chat as the next SDK testbed — the first client demanding mutable shared state, ephemeral presence, and stable pseudonymous identity, all as **app conventions with zero protocol change** (that SPEC doesn't move is the thesis; if it must, that evidence goes to the owner). T-110 gates the read-receipt design (the D4 pricing question) and the growth story; T-127 (docs/SPEC) goes last, per the constitution. Tickets below the *MVP line* are follow-on, not launch-blocking.
+
+| Ticket | Title | Depends | Status |
+|---|---|---|---|
+| [T-110](T-110-spike-chat-budget.md) | **Spike:** the chat-hour budget (doc growth, cursor cost, ring at group scale) | — | todo |
+| [T-111](T-111-spike-awareness.md) | **Spike:** awareness at group scale (ghosts, traffic, 64-conn wall, sealing proof) | — | todo |
+| [T-112](T-112-sdk-awareness-passthrough.md) | SDK: `get awareness()` passthrough (the one SDK change) | — | todo |
+| [T-113](T-113-room-scaffold.md) | `apps/room` scaffold + message feed (mobile constraints in AC) | — | todo |
+| [T-114](T-114-seats-profiles.md) | Seats + the profile table (nicknames anyone can edit) | T-113 | todo |
+| [T-115](T-115-deploy-early.md) | Deploy early to gh-pages (every later ticket becomes multi-device) | T-113 | todo |
+| [T-116](T-116-scroll-ordering.md) | Scroll, windowing, ordering (clock skew, reply-before-parent) | T-113 | todo |
+| [T-117](T-117-arrival.md) | Arrival: first run + the empty-room trap | T-113, T-114 | todo |
+| [T-118](T-118-reactions-replies.md) | Reactions (any emoji, toggle, normalize) + inline replies | T-114 | todo |
+| [T-119](T-119-presence.md) | Presence: online dots (+ typing, gated on T-111's numbers) | T-111, T-112, T-114 | todo |
+| — | *— MVP line — below is follow-on —* | | |
+| [T-120](T-120-edit-delete.md) | Edit, delete, and the honest write contract | T-113, T-114 | todo |
+| [T-121](T-121-read-receipts.md) | Read receipts: the throttled cursor (design set by T-110's numbers) | T-110, T-114 | todo |
+| [T-122](T-122-room-name-theme.md) | Room name (shared) + themes (per-device) | T-114 | todo |
+| [T-123](T-123-unread-notifications.md) | Unread divider + in-tab notifications (and the honest closed-tab sentence) | T-119 or T-121 | todo |
+| [T-124](T-124-relay-group-knobs.md) | Relay knobs at group scale (`POCKET_K` — **sign-off required**) | T-110, T-111 | todo |
+| [T-125](T-125-phone-a11y.md) | Phone + accessibility polish pass | T-116…T-119 | todo |
+| [T-126](T-126-room-torture.md) | Room torture checklist (3+ devices, races, midnight, scale) | MVP set | todo |
+| [T-127](T-127-m11-docs.md) | Brief/§5/SPEC amendment — **last**, from working code | everything | todo |
+
 ## Parked (no ticket until evidence demands one)
 
 - Structured `data` field for immutable kinds — T-030 records the verdict.
