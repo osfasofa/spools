@@ -112,7 +112,7 @@ Signed off Aug 2026 (decisions D1–D5); design record: [docs/M11-room-brief.md]
 | [T-122](T-122-room-name-theme.md) | Room name (shared) + themes (per-device) | T-114 | done |
 | [T-123](T-123-unread-notifications.md) | Unread divider + in-tab notifications (and the honest closed-tab sentence) | T-119 or T-121 | done |
 | [T-124](T-124-relay-group-knobs.md) | Relay knobs at group scale (`POCKET_K` — **sign-off required**) | T-110, T-111 | done |
-| [T-125](T-125-phone-a11y.md) | Phone + accessibility polish pass | T-116…T-119 | todo |
+| [T-125](T-125-phone-a11y.md) | Phone + accessibility polish pass | T-116…T-119 | doing |
 | [T-126](T-126-room-torture.md) | Room torture checklist (3+ devices, races, midnight, scale) | MVP set | todo |
 | [T-127](T-127-m11-docs.md) | Brief/§5/SPEC amendment — **last**, from working code | everything | todo |
 

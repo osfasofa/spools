@@ -399,6 +399,36 @@ export const App = () => {
     drawFavicon(unread)
   }, [roomName, unread])
 
+  // T-125: batched screen-reader announcements — one polite line per burst,
+  // never a narration of every peer keystroke
+  const [announcement, setAnnouncement] = useState('')
+  const announceCount = useRef<number | null>(null)
+  const announcePending = useRef<{ n: number; latest: string } | null>(null)
+  const announceTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => {
+    const others = entries.filter((e) => e.kind === 'message' && seatOf(e) !== SEAT)
+    if (announceCount.current === null) {
+      announceCount.current = others.length
+      return
+    }
+    const fresh = others.length - announceCount.current
+    announceCount.current = others.length
+    if (fresh <= 0) return
+    const latest = others[others.length - 1]
+    const cur = announcePending.current ?? { n: 0, latest: '' }
+    announcePending.current = {
+      n: cur.n + fresh,
+      latest: `${resolveName(seatOf(latest))}: ${latest.body.slice(0, 60)}`,
+    }
+    if (announceTimer.current) clearTimeout(announceTimer.current)
+    announceTimer.current = setTimeout(() => {
+      const p = announcePending.current
+      announcePending.current = null
+      if (p) setAnnouncement(p.n === 1 ? p.latest : `${p.n} new messages — latest, ${p.latest}`)
+    }, 1_500)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entries])
+
   // presence (T-119) + ephemeral read receipts (T-121): sealed awareness,
   // zero doc bytes, ghosts expire ≤30 s, "seen" dies with the tab (D3 amended)
   const { presence, onTyping, clearTyping, setRead } = usePresence(spool, SEAT)
@@ -531,6 +561,9 @@ export const App = () => {
         </div>
       ) : null}
 
+      <div className="visuallyHidden" role="status" aria-live="polite" aria-atomic="true">
+        {announcement}
+      </div>
       <MessageList
         records={entries}
         mySeat={SEAT}

@@ -85,7 +85,11 @@ const dayLabel = (ts: number): string => {
 }
 
 const SeatTile = ({ seat, name }: { seat: string; name: string }) => (
-  <span className="seatTile" style={{ borderColor: seatColor(seat), color: seatColor(seat) }}>
+  <span
+    className="seatTile"
+    style={{ borderColor: seatColor(seat), color: seatColor(seat) }}
+    aria-hidden="true"
+  >
     {initialOf(name)}
   </span>
 )
@@ -462,6 +466,7 @@ export const MessageList = ({
                             key={emoji}
                             className={`reactionChip ${seats.has(mySeat) ? 'active' : ''}`}
                             title={[...seats].map(resolveName).join(', ')}
+                            aria-label={`${emoji} — ${[...seats].map(resolveName).join(', ')}${seats.has(mySeat) ? ' (tap to remove yours)' : ' (tap to react too)'}`}
                             onClick={() => onToggleReaction?.(it.rec.id, emoji)}
                           >
                             {emoji}
@@ -482,6 +487,8 @@ export const MessageList = ({
                       className="seenSquare"
                       style={{ background: seatColor(seat) }}
                       title={`seen by ${resolveName(seat)}`}
+                      role="img"
+                      aria-label={`seen by ${resolveName(seat)}`}
                     />
                   ))}
                 </div>

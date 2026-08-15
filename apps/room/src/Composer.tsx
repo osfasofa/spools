@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 
 /**
  * Built once, never rebuilt (T-030's focus lesson): the component identity is
@@ -33,6 +33,7 @@ export const Composer = ({
   onCancelEdit?: () => void
 }) => {
   const [draft, setDraft] = useState('')
+  const inputRef = useRef<HTMLInputElement>(null)
 
   // entering edit mode replaces the draft with the message being edited;
   // leaving it clears. The input element itself is never remounted — focus
@@ -41,6 +42,12 @@ export const Composer = ({
     if (editSeed != null) setDraft(editSeed)
     else setDraft('')
   }, [editSeed])
+
+  // picking reply/edit from the sheet lands focus in the input — the sheet
+  // just closed and focus would otherwise fall to <body> (T-125)
+  useEffect(() => {
+    if (replyLabel || editLabel) inputRef.current?.focus()
+  }, [replyLabel, editLabel])
 
   const submit = (ev: FormEvent) => {
     ev.preventDefault()
@@ -67,6 +74,7 @@ export const Composer = ({
       ) : null}
       <div className="composerRow">
         <input
+          ref={inputRef}
           className="composerInput"
           placeholder="Message"
           value={draft}
