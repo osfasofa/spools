@@ -7,6 +7,7 @@ import { MessageList, seatOf, type ParentRef, type Rec } from './MessageList'
 import { normalizeEmoji, rememberEmoji } from './emoji'
 import { mySeat, seatColor, seatSuffix, initialOf } from './seat'
 import { nameFor, participants, profileTable, type Profile } from './profiles'
+import { usePresence } from './usePresence'
 import { useRoom } from './useRoom'
 
 /**
@@ -228,6 +229,20 @@ export const App = () => {
   const seats = useMemo(() => participants(entries, SEAT), [entries])
   const resolveName = (seat: string) => nameFor(profiles, seat)
 
+  // presence (T-119): sealed awareness, zero doc bytes, ghosts expire ≤30 s
+  const { presence, onTyping, clearTyping } = usePresence(spool, SEAT)
+  const [drawerOpen, setDrawerOpen] = useState(false)
+  const typingSeats = useMemo(
+    () => [...presence].filter(([seat, p]) => p.typing && seat !== SEAT).map(([seat]) => seat),
+    [presence]
+  )
+  /** everyone the room knows of: seats that ever wrote, plus awareness-only arrivals */
+  const drawerSeats = useMemo(() => {
+    const out = [...seats]
+    for (const seat of presence.keys()) if (!out.includes(seat)) out.push(seat)
+    return out
+  }, [seats, presence])
+
   // the pocket beat (T-104 idiom): a breath of "checking…", a brief note when
   // sealed copies land, and a persistent warning when depositing latched off —
   // the 413 latch is silent otherwise and the room degrades to live-only
@@ -266,10 +281,32 @@ export const App = () => {
           ⋯
         </button>
       </header>
-      <div className="statusLine">
+      <button className="presenceLine" onClick={() => setDrawerOpen((o) => !o)}>
         <span className={`statusDot ${status}`} />
-        {status === 'connected' ? 'connected' : status === 'connecting' ? 'connecting…' : 'offline'}
-      </div>
+        {presence.size > 0 ? `${presence.size} here` : status === 'connected' ? 'connected' : status === 'connecting' ? 'connecting…' : 'offline'}
+        {' ▼'}
+      </button>
+      {drawerOpen ? (
+        <div className="peopleDrawer" onClick={() => setDrawerOpen(false)}>
+          {drawerSeats.map((seat) => {
+            const p = presence.get(seat)
+            return (
+              <div key={seat} className={`personTile ${p ? '' : 'offline'}`}>
+                <span className="personTileBox">
+                  <span
+                    className="seatTile big"
+                    style={{ borderColor: seatColor(seat), color: seatColor(seat) }}
+                  >
+                    {initialOf(resolveName(seat))}
+                  </span>
+                  {p ? <span className="onlineDot" /> : null}
+                </span>
+                <span className="personTileName">{p?.typing ? 'typing…' : resolveName(seat)}</span>
+              </div>
+            )
+          })}
+        </div>
+      ) : null}
 
       {undecryptable > 0 ? (
         <div className="notice warn">
@@ -300,6 +337,7 @@ export const App = () => {
         onBubbleTap={(rec) => setSheetFor(rec)}
         onToggleReaction={toggleReaction}
         resolveParent={resolveParent}
+        typingSeats={typingSeats}
       />
       {inviteCopied ? <div className="notice">link copied — hand it to someone you trust</div> : null}
       {!profiles.get(SEAT) && !namePromptDismissed ? (
@@ -321,7 +359,9 @@ export const App = () => {
             ...(replyTo ? { parent: replyTo.id } : {}),
           })
           setReplyTo(null)
+          clearTyping()
         }}
+        onTyping={onTyping}
         replyLabel={
           replyTo ? `↩ ${resolveName(seatOf(replyTo))} — ${replyTo.body.slice(0, 40)}${replyTo.body.length > 40 ? '…' : ''}` : null
         }

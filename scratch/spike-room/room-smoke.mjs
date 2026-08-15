@@ -468,6 +468,55 @@ await scenario('10. replies: quote, jump, and orphan stubs', async () => {
   return 'quote resolves via profiles; jump works; removed + not-synced stubs render; 0 page errors'
 })
 
+// ---------- T-119: presence ----------
+
+await scenario('11. presence: dots for everyone, typing transitions, zero doc bytes, fast drop', async () => {
+  // all three seats should be visible in awareness (heartbeats have long flowed)
+  await a.until(`document.querySelector('.presenceLine')?.textContent.includes('3 here')`, 25_000, 'A counts 3 seats here')
+  await a.eval(`document.querySelector('.presenceLine').click()`)
+  await a.until(`document.querySelectorAll('.peopleDrawer .onlineDot').length >= 3`, 10_000, 'drawer shows 3 online dots')
+  await a.eval(`document.querySelector('.peopleDrawer').click()`) // tap anywhere collapses
+
+  // pure typing (no send) must move ZERO doc bytes. Baseline only once the
+  // doc has settled — earlier scenarios' history moments land debounced and
+  // would otherwise be misread as presence traffic
+  let bytesBefore = await a.eval(`window.spool.export().length`)
+  for (let i = 0; i < 8; i++) {
+    await sleep(4_000)
+    const now = await a.eval(`window.spool.export().length`)
+    if (now === bytesBefore) break
+    bytesBefore = now
+  }
+  await b.eval(`document.querySelector('.composerInput').focus()`)
+  await b.call('Input.insertText', { text: 'thinking about what to say' })
+  await a.until(`!!document.querySelector('.typingBubble')`, 8_000, 'A sees B typing')
+  await a.until(`!document.querySelector('.typingBubble')`, 10_000, 'typing clears on idle (~3 s)')
+  const bytesAfter = await a.eval(`window.spool.export().length`)
+  if (bytesBefore !== bytesAfter) throw new Error(`typing moved the doc: ${bytesBefore} → ${bytesAfter} bytes`)
+  // clear B's leftover draft so it doesn't pollute later sends
+  await b.eval(`(() => {
+    const input = document.querySelector('.composerInput')
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set
+    setter.call(input, '')
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+  })()`)
+
+  // send clears typing immediately (the message says it all)
+  await b.typeAndSend('done thinking')
+  await a.until(
+    `!document.querySelector('.typingBubble') && [...document.querySelectorAll('.bubble')].some(el => el.textContent === 'done thinking')`,
+    8_000,
+    'send clears typing and lands the message'
+  )
+
+  // clean tab close drops the seat fast (pagehide), long before the 30 s timeout
+  await c.close()
+  const t0 = Date.now()
+  await a.until(`document.querySelector('.presenceLine')?.textContent.includes('2 here')`, 8_000, 'closed tab drops from presence')
+  if (a.errors.length || b.errors.length) throw new Error(`page errors: ${[...a.errors, ...b.errors].join(' | ')}`)
+  return `3 dots → typing bubble → idle clear (0 doc bytes moved) → send clears → close dropped in ~${((Date.now() - t0) / 1000).toFixed(1)} s`
+})
+
 // ---------- T-117: arrival ----------
 
 await scenario('7. cold open on a sleeping room: checking beat → content from the pocket', async () => {

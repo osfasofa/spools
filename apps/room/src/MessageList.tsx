@@ -109,6 +109,7 @@ export const MessageList = ({
   onBubbleTap,
   onToggleReaction,
   resolveParent,
+  typingSeats,
 }: {
   records: Rec[]
   mySeat: string
@@ -122,6 +123,8 @@ export const MessageList = ({
   onToggleReaction?: (parentId: string, emoji: string) => void
   /** resolve a reply's parent by id — live, tombstone-aware (T-118) */
   resolveParent?: (id: string) => ParentRef
+  /** seats currently typing (never mine) — ephemeral bubbles at the tail (T-119) */
+  typingSeats?: string[]
 }) => {
   // render counter for the scratch harnesses (T-116/T-126): a runaway
   // render loop is measurable instead of a mystery hang
@@ -270,7 +273,9 @@ export const MessageList = ({
       setPill(true) // new messages while reading history — offer, never yank
     }
     lastTailId.current = tailId
-  }, [items])
+    // typingSeats in the deps: a typing bubble appearing at the tail should
+    // keep a pinned reader pinned
+  }, [items, typingSeats?.length])
 
   // post-paint geometry check: scroll events can be missed (headless frames,
   // programmatic scrolls) — self-heal at-bottom-ness after every paint
@@ -371,6 +376,20 @@ export const MessageList = ({
             </div>
           )
         })}
+        {typingSeats?.map((seat) => (
+          <div key={`typing:${seat}`} className="msgRow them groupStart typingRow">
+            <div className="tileCol">
+              <SeatTile seat={seat} name={resolveName(seat)} />
+            </div>
+            <div className="msgCol">
+              <div className="bubble them typingBubble" aria-label={`${resolveName(seat)} is typing`}>
+                <span className="typingDot" />
+                <span className="typingDot" />
+                <span className="typingDot" />
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
       {pill ? (
         <button className="newMsgPill" onClick={jumpToBottom}>

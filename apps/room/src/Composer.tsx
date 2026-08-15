@@ -15,11 +15,14 @@ export const Composer = ({
   onSend,
   replyLabel,
   onCancelReply,
+  onTyping,
 }: {
   onSend: (body: string) => void
   /** "↩ name — snippet" while replying; null/undefined otherwise */
   replyLabel?: string | null
   onCancelReply?: () => void
+  /** every keystroke — the presence layer debounces the transitions (T-119) */
+  onTyping?: () => void
 }) => {
   const [draft, setDraft] = useState('')
 
@@ -52,6 +55,7 @@ export const Composer = ({
             // dispatch (T-090's second-keystroke crash)
             const value = ev.currentTarget.value
             setDraft(value)
+            onTyping?.()
           }}
           aria-label="Message"
         />
