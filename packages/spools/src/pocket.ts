@@ -39,6 +39,20 @@ export interface PocketState {
   applied?: number
   /** deposits dropped unapplied — bad envelope, bad base64, or failed authentication */
   dropped?: number
+  /**
+   * Set when depositing hit a hard relay limit and stopped: the spool has
+   * degraded, loudly, to live-only sync. 'too-big' = the sealed doc exceeds
+   * the relay's per-deposit cap (413); 'budget' = the relay is full (507).
+   */
+  depositError?: 'too-big' | 'budget'
+}
+
+/** @internal timing knobs, overridable only by tests (mirrors HistoryTuning) */
+export interface PocketTuning {
+  /** idle wait after a local change before depositing */
+  debounceMs?: number
+  /** minimum spacing between deposits (they're heavier than history moments) */
+  minGapMs?: number
 }
 
 /** @internal token = base64url(SHA-512("spool-pocket-v1" ‖ key)[0..12)) — derived by clients only */
@@ -113,6 +127,7 @@ export interface PocketClientOptions {
   key: Uint8Array
   doc: Y.Doc
   whenReady: Promise<void>
+  tuning?: PocketTuning
 }
 
 /**
@@ -133,6 +148,19 @@ export class PocketClient {
   #destroyed = false
   #fetched: FetchedInfo | null = null
 
+  // deposit side (T-103): a scheduler shaped exactly like HistoryLog's —
+  // armed only once the open-time fetch has settled, gated on tr.local so
+  // pocket-applied (remote-origin) state can never schedule a re-deposit
+  #tag = crypto.getRandomValues(new Uint8Array(4))
+  #debounceMs: number
+  #minGapMs: number
+  #armed = false
+  #dirty = false
+  #timer: ReturnType<typeof setTimeout> | null = null
+  #lastDepositAt = 0
+  #inflight: Promise<void> | null = null
+  #onVisibility: (() => void) | null = null
+
   constructor(opts: PocketClientOptions) {
     this.#origin = pocketOrigin(opts.relay)
     this.#code = opts.code
@@ -140,6 +168,17 @@ export class PocketClient {
     this.#doc = opts.doc
     this.#whenReady = opts.whenReady
     this.token = deriveToken(opts.key)
+    this.#debounceMs = opts.tuning?.debounceMs ?? 10_000
+    this.#minGapMs = opts.tuning?.minGapMs ?? 60_000
+    this.#doc.on('afterTransaction', this.#onTransaction)
+    if (typeof document !== 'undefined') {
+      // a hidden tab may never come back — flush what's pending (a real PUT;
+      // beacons can't carry a real doc, see the 64 KiB note in the brief)
+      this.#onVisibility = () => {
+        if (document.visibilityState === 'hidden' && this.#dirty) void this.flush()
+      }
+      document.addEventListener('visibilitychange', this.#onVisibility)
+    }
   }
 
   get state(): PocketState {
@@ -193,6 +232,7 @@ export class PocketClient {
     if (this.#destroyed) return
     let applied = 0
     let dropped = 0
+    const appliedUpdates: Uint8Array[] = []
     for (const d of raw) {
       let update: Uint8Array | null = null
       if (typeof d.blob === 'string') {
@@ -207,6 +247,7 @@ export class PocketClient {
         continue
       }
       Y.applyUpdate(this.#doc, update, POCKET_TX_ORIGIN)
+      appliedUpdates.push(update)
       applied++
     }
     this.#fetched = {
@@ -215,10 +256,105 @@ export class PocketClient {
       count: raw.length,
     }
     this.#set(applied > 0 ? { phase: 'applied', applied, dropped } : { phase: 'empty', applied, dropped })
+
+    // the capability is live — arm the deposit scheduler, then settle the
+    // open-time obligations: deposit-if-ahead (repopulation after TTL or a
+    // relay wipe) and refresh-if-stale (quiet-but-loved spools stay covered)
+    this.#armed = true
+    const ahead = this.#isAheadOf(appliedUpdates)
+    const halfTtl = (this.#fetched.ttlDays * 86_400_000) / 2
+    const stale = this.#fetched.newestAt > 0 && Date.now() - this.#fetched.newestAt > halfTtl
+    if (ahead || (stale && this.#docHasState())) {
+      this.#dirty = true
+      void this.#deposit()
+    }
+  }
+
+  /** does the local doc hold anything beyond what the given updates carry? */
+  #isAheadOf(updates: Uint8Array[]): boolean {
+    if (!this.#docHasState()) return false
+    if (updates.length === 0) return true
+    const probe = new Y.Doc({ gc: false })
+    for (const u of updates) Y.applyUpdate(probe, u)
+    const probeSv = Y.decodeStateVector(Y.encodeStateVector(probe))
+    probe.destroy()
+    const localSv = Y.decodeStateVector(Y.encodeStateVector(this.#doc))
+    for (const [client, clock] of localSv) {
+      if ((probeSv.get(client) ?? 0) < clock) return true
+    }
+    return false
+  }
+
+  #docHasState(): boolean {
+    return Y.decodeStateVector(Y.encodeStateVector(this.#doc)).size > 0
+  }
+
+  #onTransaction = (tr: Y.Transaction): void => {
+    // tr.local alone is the whole self-feed guard: pocket-applied updates
+    // arrive under POCKET_TX_ORIGIN (remote), and depositing itself never
+    // writes the doc — unlike HistoryLog there is no in-doc log to exclude
+    if (!this.#armed || this.#destroyed || !tr.local) return
+    this.#dirty = true
+    this.#schedule()
+  }
+
+  #schedule(): void {
+    if (this.#timer) clearTimeout(this.#timer)
+    const wait = Math.max(this.#debounceMs, this.#lastDepositAt + this.#minGapMs - Date.now())
+    this.#timer = setTimeout(() => {
+      this.#timer = null
+      void this.#deposit()
+    }, wait)
+  }
+
+  async #deposit(): Promise<void> {
+    if (this.#inflight) return this.#inflight
+    if (this.#destroyed || !this.#dirty || !this.#origin || this.#state.depositError) return
+    this.#inflight = (async () => {
+      const blob = sealDeposit(Y.encodeStateAsUpdate(this.#doc), this.#key, this.#tag)
+      this.#dirty = false
+      try {
+        const res = await fetch(`${this.#origin}/pocket/${this.#code}/${this.token}`, {
+          method: 'PUT',
+          body: blob as unknown as BodyInit,
+        })
+        this.#lastDepositAt = Date.now()
+        if (res.status === 413) this.#set({ ...this.#state, depositError: 'too-big' })
+        else if (res.status === 507) this.#set({ ...this.#state, depositError: 'budget' })
+        else if (!res.ok) this.#dirty = true // 429 and friends: keep it pending, min-gap paces the retry
+      } catch {
+        this.#dirty = true // relay unreachable = live-only for now; retry on the next change
+        this.#lastDepositAt = Date.now()
+      }
+    })()
+    try {
+      await this.#inflight
+    } finally {
+      this.#inflight = null
+    }
+  }
+
+  /**
+   * Capture pending changes right now instead of waiting out the debounce —
+   * leave()'s last act before teardown, and the visibilitychange fallback.
+   * Resolves once the PUT settles (or fails; failure is not a reason to
+   * block leaving — the doc stays safe locally either way).
+   */
+  async flush(): Promise<void> {
+    if (this.#timer) {
+      clearTimeout(this.#timer)
+      this.#timer = null
+    }
+    if (this.#inflight) await this.#inflight
+    if (this.#dirty && this.#armed) await this.#deposit()
   }
 
   destroy(): void {
     this.#destroyed = true
+    if (this.#timer) clearTimeout(this.#timer)
+    this.#timer = null
+    this.#doc.off('afterTransaction', this.#onTransaction)
+    if (this.#onVisibility) document.removeEventListener('visibilitychange', this.#onVisibility)
     this.#abort.abort()
     this.#listeners.clear()
   }

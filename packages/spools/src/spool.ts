@@ -6,7 +6,7 @@ import { buildExport, parseExport } from './export'
 import { touch } from './stash'
 import { buildSpoolLink, generateCode, generateKey, parseSpoolLink } from './link'
 import { keyFingerprint } from './crypto'
-import { PocketClient, type PocketState } from './pocket'
+import { PocketClient, type PocketState, type PocketTuning } from './pocket'
 
 /**
  * The canonical spools-relay (deployed T-041). A true dumb byte relay — it
@@ -71,13 +71,14 @@ export class Spool {
   /** carried from the link / generated fresh; seals storage (T-050) and both transports (T-051) */
   #key: Uint8Array | undefined
 
-  /** @internal use newSpool/openSpool; historyTuning is for tests only */
+  /** @internal use newSpool/openSpool; historyTuning/pocketTuning are for tests only */
   constructor(
     engine: SpoolEngine,
     relay: string,
     key: Uint8Array | undefined,
     author: string,
-    historyTuning?: HistoryTuning
+    historyTuning?: HistoryTuning,
+    pocketTuning?: PocketTuning
   ) {
     this.#engine = engine
     this.#relay = relay
@@ -94,7 +95,14 @@ export class Spool {
     // whenReady stays purely local either way.
     this.#pocket =
       key && relay
-        ? new PocketClient({ relay, code: engine.code, key, doc: engine.doc, whenReady: engine.whenReady })
+        ? new PocketClient({
+            relay,
+            code: engine.code,
+            key,
+            doc: engine.doc,
+            whenReady: engine.whenReady,
+            tuning: pocketTuning,
+          })
         : null
     void this.#pocket?.start()
   }
@@ -213,9 +221,10 @@ export class Spool {
   }
 
   /** disconnect and release resources; local data is retained (a spool is a keepsake) */
-  leave(): Promise<void> {
-    this.#pocket?.destroy() // aborts any in-flight fetch
-    this.#history.flush() // stamp the final moment before closing the notebook
+  async leave(): Promise<void> {
+    this.#history.flush() // stamp the final moment first, so the final deposit carries it
+    await this.#pocket?.flush().catch(() => {}) // the last deposit goes out while the doc is still alive
+    this.#pocket?.destroy()
     this.#history.destroy()
     this.#store.destroy()
     return this.#engine.leave()

@@ -106,7 +106,8 @@ it('the midnight loop: writer deposits and leaves; a cold reader renders everyth
   const b = track(await openSpool(link, { persist: false, author: 'b' }))
   const state = await settled(b)
   expect(state.phase).toBe('applied')
-  expect(state.applied).toBe(1)
+  // ≥1: since T-103, a.leave() flushes its own deposit beside the manual one
+  expect(state.applied).toBeGreaterThanOrEqual(1)
   // same-millisecond winds tie on createdAt and break by id, so compare as a set
   expect(b.entries.map((e) => e.body).sort()).toEqual([1, 2, 3, 4, 5, 6, 7, 8].map((i) => `Track ${i}`).sort())
   expect(b.pocket?.phase).toBe('applied')
@@ -159,7 +160,7 @@ it('deposits that fail authentication are dropped, counted, and never touch the 
   const b = track(await openSpool(link, { persist: false }))
   const state = await settled(b)
   expect(state.phase).toBe('applied')
-  expect(state.applied).toBe(1)
+  expect(state.applied).toBeGreaterThanOrEqual(1) // manual deposit (+ the T-103 leave-flush twin)
   expect(state.dropped).toBe(1)
   expect(b.entries.map((e) => e.body)).toEqual(['Real'])
 })
@@ -210,6 +211,6 @@ it('two divergent worldviews in the pocket union on a cold open (the per-tag rin
 
   const c = track(await openSpool(link, { persist: false, author: 'c' }))
   const state = await settled(c)
-  expect(state.applied).toBe(2)
+  expect(state.applied).toBeGreaterThanOrEqual(2) // both worldviews (+ any T-103 leave-flush deposits)
   expect(c.entries.map((e) => e.body).sort()).toEqual(['A-side', 'B-side'])
 })

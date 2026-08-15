@@ -1,7 +1,7 @@
 ---
 id: T-103
 title: "SDK: deposit scheduler"
-status: todo
+status: done
 milestone: M10
 depends: [T-102]
 ---
@@ -31,4 +31,10 @@ Mirror `HistoryLog` (history.ts:96-105, 174-193): armed only post-`whenReady`, `
 
 ## Notes / open questions
 
-(filled during work)
+- The scheduler landed inside `PocketClient` (pocket.ts) rather than as a separate class — fetch and deposit share the token, tag, origin, and settled-state, and arming naturally follows the open-time fetch. Shape mirrors `HistoryLog` exactly: debounce (10 s) + min-gap (60 s), armed post-settle, `tr.local` gate. **Unlike HistoryLog there's no changed-type filter** — depositing never writes the doc, so `tr.local` alone is the entire self-feed guard (test 2 proves a reader who only applies never deposits).
+- `leave()` ordering: `history.flush()` first (the moment lands in the doc), then `await pocket.flush()` (the final deposit carries it), then teardown — the flush test drives a 60 s debounce and still finds the deposit on the relay after `leave()`. Flush failure never blocks leaving; the doc is safe locally regardless.
+- Deposit-if-ahead + refresh-if-stale both run at settle: ahead = any local state-vector clock beyond the union of applied deposits (empty pocket + non-empty doc counts); stale = newest deposit older than half the relay's advertised TTL. The repopulation test kills a memory-mode relay mid-test and watches the reopening device refill the pocket with zero new winds.
+- Hard-limit degradation: 413 → `depositError: 'too-big'`, 507 → `'budget'` on the pocket state — scheduling stops (loud, once), live sync untouched. 429/network errors keep the dirty flag and retry on the next change under min-gap pacing.
+- `visibilitychange → hidden` triggers a best-effort real-PUT flush (guarded `typeof document`); untested here (no DOM in the vitest env) — exercised manually in T-104's torture row.
+- T-102's manual-deposit tests needed count relaxations (`≥`) — `leave()` now adds a twin deposit beside any manual PUT, which is the feature working, not a regression. Entry-level assertions unchanged.
+- Full suite 105/105 (14 files); `tsup` + `tsc` green.
