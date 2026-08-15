@@ -124,5 +124,13 @@ and another's midnight. If the pocket is empty, expired, or the relay is too
 old to have one, you get exactly the sync-when-together baseline: the
 feature only ever adds. That's the deal, and it's the point.
 
+**What the canonical relay promises.** The default relay the SDK ships with
+runs this server volume-backed on the stock knobs: deposits survive restarts,
+untouched namespaces are swept after **60 days**, **4** writer-session tags per
+spool, **8 MiB** per deposit, **1 GiB** relay-wide. Treat the 60 days as a
+courtesy window, not an archive — the pocket is there to bridge the gap between
+one friend's evening and another's midnight, and the thing that actually keeps
+a spool is a copy on somebody's disk (`export()`).
+
 Env: `PORT` (default 4444), `HOST` (default 0.0.0.0), pocket knobs above.
 Node ≥ 18. Tests: `pnpm test` (node:test, spawns real instances).
