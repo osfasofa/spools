@@ -99,6 +99,7 @@ interface Item {
   dayBreak: string | null
   fallback: boolean
   clockAhead: boolean
+  removed: boolean
 }
 
 export const MessageList = ({
@@ -110,6 +111,8 @@ export const MessageList = ({
   onToggleReaction,
   resolveParent,
   typingSeats,
+  deletedRecords,
+  editedBy,
 }: {
   records: Rec[]
   mySeat: string
@@ -125,6 +128,10 @@ export const MessageList = ({
   resolveParent?: (id: string) => ParentRef
   /** seats currently typing (never mine) — ephemeral bubbles at the tail (T-119) */
   typingSeats?: string[]
+  /** soft-deleted messages, rendered as tombstones in their slots (T-120) */
+  deletedRecords?: Rec[]
+  /** resolved editor name for an edited message id, else null (T-120) */
+  editedBy?: (id: string) => string | null
 }) => {
   // render counter for the scratch harnesses (T-116/T-126): a runaway
   // render loop is measurable instead of a mystery hang
@@ -151,10 +158,15 @@ export const MessageList = ({
   // honest v1 contract. Reply relationships must always be looked up by id
   // (structurally), never inferred from position: a reply CAN sort before
   // its parent under skew.
-  const visible = useMemo(
-    () => records.filter((r) => !r.kind.startsWith('room:') && r.kind !== 'reaction'),
-    [records]
-  )
+  const deletedIds = useMemo(() => new Set((deletedRecords ?? []).map((r) => r.id)), [deletedRecords])
+  const visible = useMemo(() => {
+    const live = records.filter((r) => !r.kind.startsWith('room:') && r.kind !== 'reaction')
+    // tombstones keep their slot (T-120): merge deleted messages back into
+    // the timeline under the same deterministic order
+    const dead = (deletedRecords ?? []).filter((r) => r.kind === 'message')
+    if (dead.length === 0) return live
+    return [...live, ...dead].sort((x, y) => x.createdAt - y.createdAt || (x.id < y.id ? -1 : 1))
+  }, [records, deletedRecords])
   // trim during render (the documented render-phase adjustment) so the first
   // big sync never paints thousands of rows before a post-paint trim
   if (atBottom.current && Math.max(0, visible.length - WINDOW_INITIAL) > start) {
@@ -206,11 +218,13 @@ export const MessageList = ({
       const next = windowed[i + 1]
       const seat = seatOf(rec)
       const fallback = rec.kind !== 'message'
+      const removed = deletedIds.has(rec.id)
       const sameDay = (x: Rec, y: Rec) => new Date(x.createdAt).toDateString() === new Date(y.createdAt).toDateString()
       const dayBreak = !prev || !sameDay(prev, rec) ? dayLabel(rec.createdAt) : null
-      const joinsPrev =
-        i > 0 && !!prev && !dayBreak && !fallback && prev.kind === 'message' && seatOf(prev) === seat
-      const joinsNext = !!next && !fallback && next.kind === 'message' && seatOf(next) === seat && sameDay(rec, next)
+      const joins = (other: Rec | undefined) =>
+        !!other && other.kind === 'message' && !deletedIds.has(other.id) && seatOf(other) === seat
+      const joinsPrev = i > 0 && !dayBreak && !fallback && !removed && joins(prev)
+      const joinsNext = !fallback && !removed && joins(next) && !!next && sameDay(rec, next)
       out.push({
         rec,
         mine: seat === mySeat,
@@ -220,10 +234,11 @@ export const MessageList = ({
         dayBreak,
         fallback,
         clockAhead: rec.createdAt - now > CLOCK_AHEAD_MS,
+        removed,
       })
     }
     return out
-  }, [windowed, visible, hiddenCount, mySeat])
+  }, [windowed, visible, hiddenCount, mySeat, deletedIds])
 
   // native listener, not React's onScroll: the synthetic handler missed
   // programmatic scrolls in headless testing, and the contract must hold for
@@ -318,6 +333,18 @@ export const MessageList = ({
                 <div className="systemLine">
                   <span className="kindLabel">{it.rec.kind}</span> {it.rec.body || '(no text)'}
                 </div>
+              ) : it.removed ? (
+                <div className={`msgRow ${it.mine ? 'mine' : 'them'} ${it.groupStart ? 'groupStart' : ''}`}>
+                  {!it.mine ? <div className="tileCol" /> : null}
+                  <div className="msgCol">
+                    <button
+                      className="tombstone"
+                      onClick={onBubbleTap ? () => onBubbleTap(it.rec) : undefined}
+                    >
+                      removed
+                    </button>
+                  </div>
+                </div>
               ) : (
                 <div className={`msgRow ${it.mine ? 'mine' : 'them'} ${it.groupStart ? 'groupStart' : ''}`}>
                   {!it.mine ? (
@@ -353,6 +380,12 @@ export const MessageList = ({
                         </button>
                       ) : null}
                       <Body text={it.rec.body} />
+                      {editedBy?.(it.rec.id) ? (
+                        <span className="editedMark" title={`edited by ${editedBy(it.rec.id)}`}>
+                          {' '}
+                          · edited
+                        </span>
+                      ) : null}
                     </div>
                     {groups && groups.size > 0 ? (
                       <div className="reactionRow">

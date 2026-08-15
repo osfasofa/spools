@@ -517,6 +517,70 @@ await scenario('11. presence: dots for everyone, typing transitions, zero doc by
   return `3 dots → typing bubble → idle clear (0 doc bytes moved) → send clears → close dropped in ~${((Date.now() - t0) / 1000).toFixed(1)} s`
 })
 
+// ---------- T-120: edit, delete, the honest contract ----------
+
+await scenario('12. edit-own, tombstones, restore, cross-writer honesty', async () => {
+  // B edits its own message through the sheet: prefilled draft → rewrite
+  await b.eval(`${bubbleSel('done thinking')}.click()`)
+  await b.until(`[...document.querySelectorAll('.sheetAction')].some(el => el.textContent.includes('edit'))`, 5_000, 'own message offers edit')
+  await b.eval(`[...document.querySelectorAll('.sheetAction')].find(el => el.textContent.includes('edit')).click()`)
+  await b.until(`document.querySelector('.replyBanner')?.textContent.includes('editing')`, 5_000, 'edit banner shows')
+  const prefilled = await b.eval(`document.querySelector('.composerInput').value`)
+  if (prefilled !== 'done thinking') throw new Error(`draft not prefilled: "${prefilled}"`)
+  await b.eval(`(() => {
+    const input = document.querySelector('.composerInput')
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set
+    setter.call(input, 'done thinking twice')
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    input.focus()
+  })()`)
+  await b.call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', text: '\r', windowsVirtualKeyCode: 13 })
+  await b.call('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 })
+  await a.until(
+    `(() => { const bub = ${bubbleSel('done thinking twice')}; return !!bub && bub.querySelector('.editedMark')?.textContent.includes('edited') })()`,
+    10_000,
+    'A sees the edit + marker'
+  )
+
+  // B removes a message → tombstone on A, never a silent vanish
+  await b.eval(`${bubbleSel('reply into the void')}.click()`)
+  await b.until(`[...document.querySelectorAll('.sheetAction')].some(el => el.textContent.includes('remove'))`, 5_000, 'own message offers remove')
+  await b.eval(`[...document.querySelectorAll('.sheetAction')].find(el => el.textContent.includes('remove')).click()`)
+  await a.until(`!!document.querySelector('.tombstone')`, 10_000, 'tombstone renders on A')
+
+  // anyone can restore from the tombstone's sheet (the honest contract cuts both ways)
+  await a.eval(`document.querySelector('.tombstone').click()`)
+  await a.until(`[...document.querySelectorAll('.sheetAction')].some(el => el.textContent.includes('restore'))`, 5_000, 'tombstone offers restore')
+  await a.eval(`[...document.querySelectorAll('.sheetAction')].find(el => el.textContent.includes('restore')).click()`)
+  await b.until(`!!${bubbleSel('reply into the void')}`, 10_000, 'restore round-trips to B')
+
+  // cross-writer reality: A rewrites B's message (the protocol allows it;
+  // the app just doesn't offer it) — rendering stays coherent + attributable
+  await a.eval(`(() => {
+    const target = window.spool.entries.find((e) => e.kind === 'message' && e.body === 'hello back from B')
+    target.body = 'rewritten by someone else'
+    window.spool.wind({ kind: 'room:edit', parent: target.id, data: { seat: localStorage.getItem('spool-seat') } })
+  })()`)
+  await b.until(
+    `(() => { const bub = ${bubbleSel('rewritten by someone else')}; return !!bub?.querySelector('.editedMark') })()`,
+    10_000,
+    "B sees its own message rewritten, marked edited"
+  )
+  const attributed = await b.eval(`${bubbleSel('rewritten by someone else')}.querySelector('.editedMark').title`)
+  if (!attributed.includes('zora')) throw new Error(`edit not attributed to the editor: "${attributed}"`)
+
+  // the honest sentence, findable where members look
+  await a.eval(`document.querySelector('.headerTitle').click()`)
+  await a.until(
+    `document.querySelector('.finePrint')?.textContent.includes('anyone with the link can edit or delete anything')`,
+    5_000,
+    'the honest sentence is in settings'
+  )
+  await a.eval(`document.querySelector('.headerBtn').click()`)
+  if (a.errors.length || b.errors.length) throw new Error(`page errors: ${[...a.errors, ...b.errors].join(' | ')}`)
+  return `edit prefilled+marked; tombstone → restore round-trip; cross-writer edit attributed ("${attributed}"); honest sentence present`
+})
+
 // ---------- T-117: arrival ----------
 
 await scenario('7. cold open on a sleeping room: checking beat → content from the pocket', async () => {

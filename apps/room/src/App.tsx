@@ -180,6 +180,26 @@ export const App = () => {
   // T-118: the two social gestures — both pure parent mechanics
   const [sheetFor, setSheetFor] = useState<Rec | null>(null)
   const [replyTo, setReplyTo] = useState<Rec | null>(null)
+  // T-120: edit rewrites the entry BODY (bodies are mutable, metadata
+  // write-once); delete is soft; the honest contract lives in settings
+  const [editTarget, setEditTarget] = useState<Rec | null>(null)
+
+  const deletedRecords = useMemo(() => (spool ? (spool.deleted as Rec[]) : []), [spool, entries])
+
+  // "· edited" comes from room:edit marker entries (parent = the message) —
+  // nothing else in the model can say a body changed, and the marker's seat
+  // is the free audit trail ("edited by —")
+  const editedIndex = useMemo(() => {
+    const m = new Map<string, string>()
+    for (const e of entries) {
+      if (e.kind === 'room:edit' && typeof e.parent === 'string') m.set(e.parent, seatOf(e))
+    }
+    return m
+  }, [entries])
+  const editedBy = (id: string): string | null => {
+    const seat = editedIndex.get(id)
+    return seat ? resolveName(seat) : null
+  }
 
   const toggleReaction = (parentId: string, emojiRaw: string) => {
     if (!spool) return
@@ -338,6 +358,8 @@ export const App = () => {
         onToggleReaction={toggleReaction}
         resolveParent={resolveParent}
         typingSeats={typingSeats}
+        deletedRecords={deletedRecords}
+        editedBy={editedBy}
       />
       {inviteCopied ? <div className="notice">link copied — hand it to someone you trust</div> : null}
       {!profiles.get(SEAT) && !namePromptDismissed ? (
@@ -352,13 +374,23 @@ export const App = () => {
       ) : null}
       <Composer
         onSend={(body) => {
-          void spool.wind({
-            kind: 'message',
-            body,
-            data: { seat: SEAT },
-            ...(replyTo ? { parent: replyTo.id } : {}),
-          })
-          setReplyTo(null)
+          if (editTarget) {
+            // rewrite the body in place; the marker entry says it happened
+            const live = entries.find((e) => e.id === editTarget.id)
+            if (live && live.body !== body) {
+              ;(live as { body: string }).body = body
+              void spool.wind({ kind: 'room:edit', parent: editTarget.id, data: { seat: SEAT } })
+            }
+            setEditTarget(null)
+          } else {
+            void spool.wind({
+              kind: 'message',
+              body,
+              data: { seat: SEAT },
+              ...(replyTo ? { parent: replyTo.id } : {}),
+            })
+            setReplyTo(null)
+          }
           clearTyping()
         }}
         onTyping={onTyping}
@@ -366,15 +398,58 @@ export const App = () => {
           replyTo ? `↩ ${resolveName(seatOf(replyTo))} — ${replyTo.body.slice(0, 40)}${replyTo.body.length > 40 ? '…' : ''}` : null
         }
         onCancelReply={() => setReplyTo(null)}
+        editLabel={editTarget ? `✎ editing — ${editTarget.body.slice(0, 40)}${editTarget.body.length > 40 ? '…' : ''}` : null}
+        editSeed={editTarget ? editTarget.body : null}
+        onCancelEdit={() => setEditTarget(null)}
       />
       {sheetFor ? (
-        <ActionSheet
-          preview={`${resolveName(seatOf(sheetFor))} — ${sheetFor.body.slice(0, 48)}${sheetFor.body.length > 48 ? '…' : ''}`}
-          myReactions={myReactionsOn(sheetFor)}
-          onReact={(emoji) => toggleReaction(sheetFor.id, emoji)}
-          onReply={() => setReplyTo(sheetFor)}
-          onClose={() => setSheetFor(null)}
-        />
+        (() => {
+          const isTombstone = deletedRecords.some((r) => r.id === sheetFor.id)
+          const isMine = seatOf(sheetFor) === SEAT
+          return (
+            <ActionSheet
+              preview={`${resolveName(seatOf(sheetFor))} — ${isTombstone ? 'removed' : `${sheetFor.body.slice(0, 48)}${sheetFor.body.length > 48 ? '…' : ''}`}`}
+              myReactions={isTombstone ? undefined : myReactionsOn(sheetFor)}
+              onReact={isTombstone ? undefined : (emoji) => toggleReaction(sheetFor.id, emoji)}
+              actions={
+                isTombstone
+                  ? [
+                      {
+                        label: '↺ restore',
+                        run: () => spool.deleted.find((e) => e.id === sheetFor.id)?.restore(),
+                      },
+                    ]
+                  : [
+                      {
+                        label: '↩ reply',
+                        run: () => {
+                          setEditTarget(null)
+                          setReplyTo(sheetFor)
+                        },
+                      },
+                      // affordance is own-only; the protocol can't enforce it
+                      // and settings says so out loud — that's the contract
+                      ...(isMine
+                        ? [
+                            {
+                              label: '✎ edit',
+                              run: () => {
+                                setReplyTo(null)
+                                setEditTarget(sheetFor)
+                              },
+                            },
+                            {
+                              label: '✕ remove',
+                              run: () => entries.find((e) => e.id === sheetFor.id)?.delete(),
+                            },
+                          ]
+                        : []),
+                    ]
+              }
+              onClose={() => setSheetFor(null)}
+            />
+          )
+        })()
       ) : null}
       {arrival === 'active' || (arrival === 'unknown' && entries.length === 0) ? (
         // 'unknown' + empty covers the one commit before the deciding effect

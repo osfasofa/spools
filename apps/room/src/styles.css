@@ -435,6 +435,30 @@ body {
   color: var(--dim);
 }
 
+/* tombstones + edited marker (T-120) */
+.tombstone {
+  background: none;
+  border: 1px dashed var(--ln);
+  border-radius: var(--radius);
+  color: var(--tx);
+  opacity: 0.6;
+  font-style: italic;
+  font-size: 12px;
+  font-family: var(--bodyfont);
+  padding: 8px 13px;
+  cursor: pointer;
+  width: fit-content;
+}
+
+.msgRow.mine .tombstone {
+  align-self: flex-end;
+}
+
+.editedMark {
+  font-size: 9px;
+  opacity: 0.55;
+}
+
 /* typing indicator (design §1): left bubble, three bouncing dots */
 .typingBubble {
   display: inline-flex;

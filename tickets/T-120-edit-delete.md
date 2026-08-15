@@ -1,7 +1,7 @@
 ---
 id: T-120
 title: "Edit, delete, and the honest write contract"
-status: todo
+status: done
 milestone: M11
 depends: [T-113, T-114]
 ---
@@ -23,13 +23,13 @@ edit one; and wholesale rewrites cost ~90 B each forever under `gc:false`.
 
 ## Tasks
 
-- [ ] Edit-own: inline edit for messages with your seat; an "edited" marker.
-- [ ] Delete-own: soft delete rendered as a tombstone row ("message deleted"),
+- [x] Edit-own: inline edit for messages with your seat; an "edited" marker.
+- [x] Delete-own: soft delete rendered as a tombstone row ("message deleted"),
       never a silent vanish; restore reachable (long-press/menu on tombstone).
-- [ ] The honest sentence, once, where members will see it (room info panel):
+- [x] The honest sentence, once, where members will see it (room info panel):
       anyone with the link can edit or delete anyone's messages — this room
       runs on trust, not permissions.
-- [ ] Cross-writer reality check in Notes: what does it look like when another
+- [x] Cross-writer reality check in Notes: what does it look like when another
       seat edits/deletes your message? Don't build UI to prevent it (can't);
       make sure the rendering stays coherent and attributable where possible.
 
@@ -41,4 +41,30 @@ edit one; and wholesale rewrites cost ~90 B each forever under `gc:false`.
 
 ## Notes / open questions
 
--
+- Landed: sheet gains ✎ edit / ✕ remove on your own messages (ActionSheet
+  refactored to a caller-supplied action list); edit prefills the composer
+  (same input element — focus survives the mode switch), rewrites the entry
+  **body**, and winds a **`room:edit` marker** (`parent` = the message,
+  `data.seat` = the editor); tombstones render in-slot ("removed", dashed,
+  never a silent vanish) with ↺ restore in their sheet; the honest sentence
+  has lived in settings' fine print since T-113 and is now asserted.
+- **The "· edited" marker needed a new reserved kind.** Nothing in the model
+  records that a body changed (bodies are mutable, metadata write-once, and
+  `data` mutations don't sync), so `room:edit` is the sanctioned D2 answer:
+  append-only (no delete-set growth), rewind-visible, and its seat is the
+  free audit trail — the marker's title reads "edited by <resolved name>".
+  ~180 B per edit, plus ~90 B of body tombstone per rewrite (T-060's number);
+  T-127 folds both into the growth story.
+- **Restore is offered to anyone** (not just the deleter) — deliberately: the
+  tombstone's sheet shows ↺ restore, matching the protocol's actual contract
+  instead of pantomiming a permission the system can't enforce.
+- **Cross-writer reality (checked in vivo)**: A rewrote B's message directly
+  through the SDK — B's device renders the new body with the edited marker
+  attributed to A ("edited by zora") because the marker carries the editor's
+  seat. *Deletions* are NOT attributable: `deletedAt` is a bare metadata set
+  with no author — a tombstone says "removed", never by whom. Recorded as the
+  v1 truth (a `room:delete` marker could fix it the same way if a real room
+  ever asks).
+- Verified (smoke 12): edit prefilled + marker round-trips; remove →
+  tombstone on the other device → restore round-trips back; cross-writer
+  edit coherent + attributed; honest sentence findable. Zero page errors.

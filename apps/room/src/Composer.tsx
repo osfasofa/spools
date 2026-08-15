@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 
 /**
  * Built once, never rebuilt (T-030's focus lesson): the component identity is
@@ -16,6 +16,9 @@ export const Composer = ({
   replyLabel,
   onCancelReply,
   onTyping,
+  editLabel,
+  editSeed,
+  onCancelEdit,
 }: {
   onSend: (body: string) => void
   /** "↩ name — snippet" while replying; null/undefined otherwise */
@@ -23,8 +26,21 @@ export const Composer = ({
   onCancelReply?: () => void
   /** every keystroke — the presence layer debounces the transitions (T-119) */
   onTyping?: () => void
+  /** "✎ editing…" while editing a message (T-120); mutually exclusive with reply */
+  editLabel?: string | null
+  /** the message's current body, loaded into the draft when editing starts */
+  editSeed?: string | null
+  onCancelEdit?: () => void
 }) => {
   const [draft, setDraft] = useState('')
+
+  // entering edit mode replaces the draft with the message being edited;
+  // leaving it clears. The input element itself is never remounted — focus
+  // stays put (T-030's lesson holds through mode changes).
+  useEffect(() => {
+    if (editSeed != null) setDraft(editSeed)
+    else setDraft('')
+  }, [editSeed])
 
   const submit = (ev: FormEvent) => {
     ev.preventDefault()
@@ -36,10 +52,15 @@ export const Composer = ({
 
   return (
     <form className="composer" onSubmit={submit}>
-      {replyLabel ? (
+      {replyLabel || editLabel ? (
         <div className="replyBanner">
-          <span className="replyBannerText">{replyLabel}</span>
-          <button type="button" className="replyBannerClose" onClick={onCancelReply} aria-label="Cancel reply">
+          <span className="replyBannerText">{editLabel ?? replyLabel}</span>
+          <button
+            type="button"
+            className="replyBannerClose"
+            onClick={editLabel ? onCancelEdit : onCancelReply}
+            aria-label={editLabel ? 'Cancel edit' : 'Cancel reply'}
+          >
             ✕
           </button>
         </div>
