@@ -225,6 +225,7 @@ body {
   color: var(--dim);
 }
 
+.senderSuffix,
 .senderTime {
   font-family: var(--mono);
   font-size: 9px;
@@ -334,6 +335,50 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.14em;
   color: var(--dim);
+}
+
+.personRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+}
+
+.personMain {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.personName {
+  background: none;
+  border: none;
+  border-bottom: 1px solid transparent;
+  color: var(--tx);
+  font-family: var(--sans);
+  font-weight: 700;
+  font-size: 14px;
+  padding: 4px 0;
+  outline: none;
+  min-width: 0;
+}
+
+.personName:focus {
+  border-bottom-color: var(--ac);
+}
+
+.personAudit {
+  font-size: 10px;
+  color: var(--dim);
+}
+
+.personSeatId {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--dim);
+  flex: none;
 }
 
 .linkRow {

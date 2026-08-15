@@ -1,17 +1,22 @@
 /**
- * Seat identity, the T-113 placeholder half. T-114 owns the profile table
- * (nicknames anyone can edit); this module is shaped so nothing has to
- * unlearn it: the seat id is an OPAQUE, VARIABLE-LENGTH string (never parse
- * it, never assume a length — D1's forward-compat rule; it may become an
- * Ed25519 public key later), one per device, stored beside `spool-author`.
+ * Seat identity (D1). The seat id is an OPAQUE, VARIABLE-LENGTH string —
+ * never parse it, never assume a length (it may become an Ed25519 public key
+ * later, with zero migration). One per device, stored beside `spool-author`.
+ * A seat is a device, not a person. Display names live in the shared profile
+ * table (profiles.ts), resolved at render — never written into messages.
  */
 
 const KEY = 'spool-seat'
 
+const generate = (): string => {
+  const bytes = crypto.getRandomValues(new Uint8Array(16))
+  return btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+
 export const mySeat = (): string => {
   let seat = localStorage.getItem(KEY)
   if (!seat) {
-    seat = crypto.randomUUID().replace(/-/g, '')
+    seat = generate()
     localStorage.setItem(KEY, seat)
   }
   return seat
@@ -31,19 +36,13 @@ const hash = (s: string): number => {
 
 export const seatColor = (seat: string): string => PALETTE[hash(seat) % PALETTE.length]
 
-/** the mono short id (`#k7f2`) — collision legibility without uniqueness rules */
-export const seatSuffix = (seat: string): string => `#${seat.slice(-4)}`
-
 /**
- * Display name for a seat. T-114 replaces the internals with the shared
- * profile table (newest `room:profile` entry per seat, resolved at render —
- * never denormalized); until then every seat shows as its short id.
+ * The always-rendered short id (`#k7f2`) — collision legibility without
+ * uniqueness rules: two "sam"s stay distinguishable, an unnamed seat is
+ * presentable before its first profile entry exists.
  */
-export const displayName = (seat: string): string => seatSuffix(seat)
+export const seatSuffix = (seat: string): string => `#${seat.slice(-4).toLowerCase()}`
 
 /** tile initial: first letter of the current display name */
-export const seatInitial = (seat: string): string => {
-  const name = displayName(seat)
-  const ch = name.startsWith('#') ? name.slice(1, 2) : name.slice(0, 1)
-  return ch.toUpperCase()
-}
+export const initialOf = (name: string): string =>
+  (name.startsWith('#') ? name.slice(1, 2) : name.slice(0, 1)).toUpperCase()

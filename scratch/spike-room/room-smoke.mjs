@@ -22,7 +22,7 @@ import { join } from 'node:path'
 const CHROME = process.env.CHROME_BIN ?? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
 const CDP_PORT = 9347
 const RELAY_PORT = 9471
-const ORIGINS = [8791, 8792]
+const ORIGINS = [8791, 8792, 8793] // device A, device B, device C (T-114)
 const here = new URL('.', import.meta.url)
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
@@ -269,8 +269,104 @@ await scenario('4. mobile layout: 375×667, alignment, tiles, no sideways scroll
   return 'aligned, tiled, no overflow, composer on-screen, 0 page errors'
 })
 
+// ---------- T-114: seats + the profile table ----------
+
+/** set a React-controlled input: native setter + bubbled input event */
+const SET_INPUT = `(el, value) => {
+  const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set
+  setter.call(el, value)
+  el.dispatchEvent(new Event('input', { bubbles: true }))
+}`
+
+let c
+
+await scenario('5. rename on B applies retroactively on cold-opened C, survives B reload', async () => {
+  const aSeat = await a.eval(`localStorage.getItem('spool-seat')`)
+  const suffix = `#${aSeat.slice(-4).toLowerCase()}`
+
+  // B renames A through the settings UI: people row → input → blur commits
+  await b.eval(`document.querySelector('.headerTitle').click()`)
+  await b.until(`document.querySelectorAll('.personRow').length >= 2`, 10_000, 'people section lists both seats')
+  const renamed = await b.eval(`(() => {
+    const row = [...document.querySelectorAll('.personRow')].find(r =>
+      r.querySelector('.personSeatId').textContent.startsWith('${suffix}'))
+    if (!row) return false
+    const input = row.querySelector('.personName')
+    input.focus()
+    ;(${SET_INPUT})(input, 'zora')
+    input.blur()
+    return true
+  })()`)
+  if (!renamed) throw new Error(`no people row found for ${suffix} on B`)
+  await b.eval(`document.querySelector('.headerBtn').click()`) // back to the room
+
+  // C cold-opens on a third origin: A's OLD messages must show the new name
+  c = await Tab.open(linkFor(ORIGINS[2]))
+  await c.ready()
+  await c.until(
+    `[...document.querySelectorAll('.senderName')].some(el => el.textContent === 'zora')`,
+    15_000,
+    "C sees A's old messages under the new name"
+  )
+  const stale = await c.eval(
+    `[...document.querySelectorAll('.senderName')].some(el => el.textContent.startsWith('#'))
+       && [...document.querySelectorAll('.senderSuffix')].length === 0`
+  )
+  if (stale) throw new Error('C still renders bare seat ids for named seats')
+
+  // no name string ever lands inside a message entry (the fosho anti-pattern)
+  const clean = await c.eval(`window.spool.entries
+    .filter(e => e.kind === 'message')
+    .every(e => { const keys = Object.keys(e.data ?? {}); return keys.length === 1 && keys[0] === 'seat' })`)
+  if (!clean) throw new Error('a message entry carries more than data.seat')
+
+  // B reloads: the rename came back from its own IndexedDB, not the session
+  await b.call('Page.navigate', { url: linkFor(ORIGINS[1]) })
+  await b.ready()
+  await b.until(
+    `[...document.querySelectorAll('.senderName')].some(el => el.textContent === 'zora')`,
+    10_000,
+    'rename survives B reload'
+  )
+  return 'renamed via UI on B; retroactive on cold C; message entries clean; survived reload'
+})
+
+await scenario('6. concurrent renames of the same seat converge newest-wins everywhere', async () => {
+  const bSeat = await b.eval(`localStorage.getItem('spool-seat')`)
+  await Promise.all([
+    a.eval(`window.spool.wind({ kind: 'room:profile', body: 'zig', data: { seat: '${bSeat}' } })`),
+    c.eval(`window.spool.wind({ kind: 'room:profile', body: 'zag', data: { seat: '${bSeat}' } })`),
+  ])
+  const resolver = `(() => {
+    const profs = window.spool.entries.filter(e => e.kind === 'room:profile' && e.data?.seat === '${bSeat}')
+    return profs.length ? profs[profs.length - 1].body : null
+  })()`
+  await a.until(`${resolver} !== null`, 10_000, 'A has profile entries')
+  const settle = Date.now() + 8000
+  let names = []
+  while (Date.now() < settle) {
+    names = await Promise.all([a.eval(resolver), b.eval(resolver), c.eval(resolver)])
+    if (names[0] && names[0] === names[1] && names[1] === names[2]) break
+    await sleep(300)
+  }
+  if (!(names[0] && names[0] === names[1] && names[1] === names[2])) {
+    throw new Error(`did not converge: ${names.join(' / ')}`)
+  }
+  // and the DOM agrees with the resolver on a device that didn't write it
+  await a.until(
+    `[...document.querySelectorAll('.senderName')].some(el => el.textContent === '${names[0]}')`,
+    10_000,
+    'A renders the winning name'
+  )
+  if (a.errors.length || b.errors.length || c.errors.length) {
+    throw new Error(`page errors: ${[...a.errors, ...b.errors, ...c.errors].join(' | ')}`)
+  }
+  return `all three devices agree on "${names[0]}" (newest-wins), DOM matches, 0 page errors`
+})
+
 await a?.close()
 await b?.close()
+await c?.close()
 
 console.log('\n| # | Scenario | Result | Measured |')
 console.log('|---|---|---|---|')

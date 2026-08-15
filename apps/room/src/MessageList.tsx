@@ -1,5 +1,5 @@
 import { useLayoutEffect, useMemo, useRef } from 'react'
-import { seatColor, seatInitial, displayName } from './seat'
+import { seatColor, seatSuffix, initialOf } from './seat'
 
 /**
  * THE BOUNDARY (T-113): every feed pixel renders through this component and
@@ -66,9 +66,9 @@ const dayLabel = (ts: number): string => {
     .toLowerCase()
 }
 
-const SeatTile = ({ seat }: { seat: string }) => (
+const SeatTile = ({ seat, name }: { seat: string; name: string }) => (
   <span className="seatTile" style={{ borderColor: seatColor(seat), color: seatColor(seat) }}>
-    {seatInitial(seat)}
+    {initialOf(name)}
   </span>
 )
 
@@ -82,7 +82,16 @@ interface Item {
   fallback: boolean
 }
 
-export const MessageList = ({ records, mySeat }: { records: Rec[]; mySeat: string }) => {
+export const MessageList = ({
+  records,
+  mySeat,
+  resolveName,
+}: {
+  records: Rec[]
+  mySeat: string
+  /** the profile table, resolved at render — names apply retroactively (T-114) */
+  resolveName: (seat: string) => string
+}) => {
   const items = useMemo<Item[]>(() => {
     // reserved room:* kinds are settings, not conversation (T-114 defines
     // them; the filter exists from day one). Reactions become chips in T-118
@@ -139,12 +148,15 @@ export const MessageList = ({ records, mySeat }: { records: Rec[]; mySeat: strin
           ) : (
             <div className={`msgRow ${it.mine ? 'mine' : 'them'} ${it.groupStart ? 'groupStart' : ''}`}>
               {!it.mine ? (
-                <div className="tileCol">{it.groupEnd ? <SeatTile seat={it.seat} /> : null}</div>
+                <div className="tileCol">
+                  {it.groupEnd ? <SeatTile seat={it.seat} name={resolveName(it.seat)} /> : null}
+                </div>
               ) : null}
               <div className="msgCol">
                 {!it.mine && it.groupStart ? (
                   <div className="senderLine">
-                    <span className="senderName">{displayName(it.seat)}</span>
+                    <span className="senderName">{resolveName(it.seat)}</span>
+                    <span className="senderSuffix">{seatSuffix(it.seat)}</span>
                     <span className="senderTime">{timeLabel(it.rec.createdAt)}</span>
                   </div>
                 ) : null}
