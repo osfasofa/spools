@@ -233,7 +233,11 @@ await scenario('3. reserved kinds invisible, unknown kinds labeled, nothing brea
     15_000,
     'B renders the unknown-kind fallback'
   )
-  const reservedVisible = await b.eval(`document.body.textContent.includes('the lounge')`)
+  // the room NAME renders in the header (that's T-122's job) — the leak we
+  // guard against is a room:* entry showing up as feed content
+  const reservedVisible = await b.eval(
+    `[...document.querySelectorAll('.bubble, .systemLine')].some(el => el.textContent.includes('the lounge'))`
+  )
   if (reservedVisible) throw new Error('reserved room:* entry leaked into the feed')
   const label = await b.eval(
     `[...document.querySelectorAll('.kindLabel')].some(el => el.textContent === 'mixtape-track')`
@@ -322,8 +326,10 @@ await scenario('5. rename on B applies retroactively on cold-opened C, survives 
   if (!clean) throw new Error('a message entry carries more than data.seat')
 
   // B reloads: the rename came back from its own IndexedDB, not the session
-  await b.call('Page.navigate', { url: linkFor(ORIGINS[1]) })
-  await b.ready()
+  // (Page.reload — a same-URL navigate with a fragment is a same-document no-op)
+  await b.eval(`window.__oldPage = true`)
+  await b.call('Page.reload')
+  await b.until(`!window.__oldPage && !!window.spool`, 15_000, 'B truly reloaded')
   await b.until(
     `[...document.querySelectorAll('.senderName')].some(el => el.textContent === 'zora')`,
     10_000,
@@ -612,6 +618,64 @@ await scenario('13. seen markers: ephemeral, positioned, vanish with the tab, ze
   await a.until(`document.querySelectorAll('.seenRow').length === 0`, 8_000, "B's marker vanishes with its tab")
   if (a.errors.length) throw new Error(`page errors: ${a.errors.join(' | ')}`)
   return "markers at the newest message both ways; zero room:read entries in the doc; marker died with B's tab"
+})
+
+// ---------- T-122: room name (shared) + themes (per-device) ----------
+
+await scenario('14. shared name renames live + audited; themes never leave the device', async () => {
+  // scenario 3 wound room:name "the lounge" — the header should show it
+  await a.until(`document.querySelector('.headerTitle')?.textContent === 'the lounge'`, 8_000, 'existing room:name renders in the header')
+
+  // A renames through settings; commit on blur
+  await a.eval(`document.querySelector('.headerTitle').click()`)
+  await a.until(`!!document.querySelector('.roomNameInput')`, 5_000, 'name input in settings')
+  await a.eval(`(() => {
+    const input = document.querySelector('.roomNameInput')
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set
+    input.focus()
+    setter.call(input, 'midnight picnic')
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    input.blur()
+  })()`)
+  await a.eval(`document.querySelector('.headerBtn').click()`)
+  await a.until(`document.querySelector('.headerTitle')?.textContent === 'midnight picnic'`, 8_000, 'A header renamed')
+  const title = await a.eval('document.title')
+  if (title !== 'midnight picnic') throw new Error(`document.title is "${title}"`)
+
+  // B reopens (fresh load ≙ reload): sees the shared name + the audit line
+  b = await Tab.open(linkFor(ORIGINS[1]))
+  await b.ready()
+  await b.until(`document.querySelector('.headerTitle')?.textContent === 'midnight picnic'`, 10_000, 'B sees the shared name')
+  await b.eval(`document.querySelector('.headerTitle').click()`)
+  await b.until(`document.querySelector('.settingsBody')?.textContent.includes('named by zora')`, 5_000, 'audit line names the renamer')
+
+  // theme: B picks terminal — instant, persistent, and never A's problem
+  await b.eval(`[...document.querySelectorAll('.themeCard')].find(el => el.textContent.includes('terminal')).click()`)
+  const bBg = await b.eval(`getComputedStyle(document.body).backgroundColor`)
+  if (bBg !== 'rgb(10, 13, 10)') throw new Error(`B background after terminal pick: ${bBg}`)
+  // same-URL navigate is a same-document no-op when a fragment is involved —
+  // Page.reload forces the real thing; the marker proves it happened
+  await b.eval(`window.__oldPage = true`)
+  await b.call('Page.reload')
+  await b.until(`!window.__oldPage && !!window.spool`, 15_000, 'B truly reloaded')
+  const bBg2 = await b.eval(`getComputedStyle(document.body).backgroundColor`)
+  if (bBg2 !== 'rgb(10, 13, 10)') throw new Error(`B theme did not survive reload: ${bBg2}`)
+  const aBg = await a.eval(`getComputedStyle(document.body).backgroundColor`)
+  if (aBg !== 'rgb(0, 0, 0)') throw new Error(`A's theme moved: ${aBg} — themes must not sync`)
+
+  // concurrent renames converge newest-wins on both devices
+  await Promise.all([
+    a.eval(`window.spool.wind({ kind: 'room:name', body: 'name a', data: { seat: localStorage.getItem('spool-seat') } })`),
+    b.eval(`window.spool.wind({ kind: 'room:name', body: 'name b', data: { seat: localStorage.getItem('spool-seat') } })`),
+  ])
+  await sleep(1500)
+  const names = [
+    await a.eval(`document.querySelector('.headerTitle').textContent`),
+    await b.eval(`document.querySelector('.headerTitle').textContent`),
+  ]
+  if (names[0] !== names[1]) throw new Error(`headers diverged: ${names.join(' vs ')}`)
+  if (a.errors.length || b.errors.length) throw new Error(`page errors: ${[...a.errors, ...b.errors].join(' | ')}`)
+  return `rename live + audited; theme per-device (survived reload, never synced); concurrent renames agree on "${names[0]}"`
 })
 
 // ---------- T-117: arrival ----------

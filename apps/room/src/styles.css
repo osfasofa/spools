@@ -656,6 +656,60 @@ body {
   flex: none;
 }
 
+.roomNameInput {
+  background: var(--sf);
+  border: 1px solid var(--ln);
+  border-radius: var(--radius);
+  color: var(--tx);
+  font-family: var(--sans);
+  font-weight: 800;
+  font-size: 16px;
+  text-transform: lowercase;
+  padding: 10px 14px;
+  min-height: 44px;
+  outline: none;
+}
+
+.roomNameInput:focus {
+  border-color: var(--ac);
+}
+
+.themeGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.themeCard {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  border: 2px solid var(--ln);
+  border-radius: var(--radius);
+  padding: 12px;
+  min-height: 64px;
+  font-family: var(--mono);
+  font-size: 11px;
+  text-transform: lowercase;
+  cursor: pointer;
+}
+
+.themeCard.active {
+  border-color: var(--ac);
+}
+
+.themeDots {
+  display: flex;
+  gap: 4px;
+}
+
+.themeDots span {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
 .linkRow {
   display: flex;
   align-items: center;

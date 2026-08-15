@@ -21,11 +21,16 @@ const SANS = "-apple-system,system-ui,'Helvetica Neue',sans-serif"
 const MONO = "'JetBrains Mono',ui-monospace,monospace"
 const SERIF = "ui-serif,'Iowan Old Style',Georgia,serif"
 
+// daylight/paper `ac` and `dim` are minimally darkened from the handoff
+// README's values — the README also mandates WCAG AA for text (T-122's
+// acceptance criterion) and its literal values measured 4.05–4.44 on the
+// accent-bubble and dim-on-surface pairs; these are the nearest passing
+// values (≥4.5), recorded in T-122's Notes and annotated in the README.
 export const THEMES: Record<string, Theme> = {
   blackout: { bg: '#000000', sf: '#161616', tx: '#F2F2F2', dim: '#9A9A9A', ac: '#D6D6D6', acTx: '#0D0D0D', ln: '#1F1F1F', bodyfont: SANS },
   terminal: { bg: '#0A0D0A', sf: '#141B13', tx: '#D9E7D9', dim: '#7A8C7A', ac: '#00E653', acTx: '#04220E', ln: '#1B231B', bodyfont: MONO },
-  daylight: { bg: '#FAFAF7', sf: '#EFEFEA', tx: '#171717', dim: '#6E6E6A', ac: '#0B8F3C', acTx: '#FFFFFF', ln: '#E3E3DE', bodyfont: SANS },
-  paper: { bg: '#F4EEE1', sf: '#EAE1CD', tx: '#29221A', dim: '#6F6355', ac: '#C9553E', acTx: '#FFF6EC', ln: '#D9CFB8', bodyfont: SERIF },
+  daylight: { bg: '#FAFAF7', sf: '#EFEFEA', tx: '#171717', dim: '#6D6D69', ac: '#0B893A', acTx: '#FFFFFF', ln: '#E3E3DE', bodyfont: SANS },
+  paper: { bg: '#F4EEE1', sf: '#EAE1CD', tx: '#29221A', dim: '#6E6254', ac: '#BB4F3A', acTx: '#FFF6EC', ln: '#D9CFB8', bodyfont: SERIF },
 }
 
 const KEY = 'room-theme'

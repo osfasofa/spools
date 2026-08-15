@@ -7,6 +7,7 @@ import { MessageList, seatOf, type ParentRef, type Rec } from './MessageList'
 import { normalizeEmoji, rememberEmoji } from './emoji'
 import { mySeat, seatColor, seatSuffix, initialOf } from './seat'
 import { nameFor, participants, profileTable, type Profile } from './profiles'
+import { THEMES, applyTheme, currentTheme } from './theme'
 import { usePresence } from './usePresence'
 import { useRoom } from './useRoom'
 
@@ -83,14 +84,28 @@ const Settings = ({
   spool,
   seats,
   profiles,
+  roomName,
+  namedBy,
+  onRenameRoom,
   onBack,
 }: {
   spool: Spool
   seats: string[]
   profiles: Map<string, Profile>
+  roomName: string
+  namedBy: string | null
+  onRenameRoom: (name: string) => void
   onBack: () => void
 }) => {
   const [copied, setCopied] = useState(false)
+  const [nameDraft, setNameDraft] = useState(roomName)
+  const [nameEditing, setNameEditing] = useState(false)
+  useEffect(() => {
+    if (!nameEditing) setNameDraft(roomName)
+  }, [roomName, nameEditing])
+  // per-device theme — the T-090 stash-label precedent: a theme is your
+  // handwriting; it syncs nothing (owner-approved cut)
+  const [theme, setTheme] = useState(currentTheme)
   const link = spool.share()
   const copy = () => {
     void navigator.clipboard.writeText(link).then(() => {
@@ -108,6 +123,54 @@ const Settings = ({
         <span className="headerBtn" />
       </header>
       <div className="settingsBody">
+        <section className="settingsSection">
+          <div className="sectionLabel">name</div>
+          <input
+            className="roomNameInput"
+            value={nameDraft}
+            placeholder="room"
+            onFocus={() => setNameEditing(true)}
+            onInput={(ev) => {
+              const value = ev.currentTarget.value
+              setNameDraft(value)
+            }}
+            onBlur={() => {
+              setNameEditing(false)
+              const name = nameDraft.trim()
+              if (name && name !== roomName) onRenameRoom(name)
+              else setNameDraft(roomName)
+            }}
+            onKeyDown={(ev) => {
+              if (ev.key === 'Enter') ev.currentTarget.blur()
+            }}
+            aria-label="Room name"
+          />
+          <div className="caption">{namedBy ? `named by ${namedBy} · ` : ''}anyone can rename it</div>
+        </section>
+        <section className="settingsSection">
+          <div className="sectionLabel">theme</div>
+          <div className="themeGrid">
+            {Object.entries(THEMES).map(([name, t]) => (
+              <button
+                key={name}
+                className={`themeCard ${theme === name ? 'active' : ''}`}
+                style={{ background: t.bg, color: t.tx }}
+                onClick={() => {
+                  applyTheme(name)
+                  setTheme(name)
+                }}
+              >
+                <span className="themeDots">
+                  <span style={{ background: t.ac }} />
+                  <span style={{ background: t.tx }} />
+                  <span style={{ background: t.dim }} />
+                </span>
+                {name}
+              </button>
+            ))}
+          </div>
+          <div className="caption">yours only — themes don't sync</div>
+        </section>
         <section className="settingsSection">
           <div className="sectionLabel">people</div>
           {seats.map((seat) => (
@@ -249,6 +312,18 @@ export const App = () => {
   const seats = useMemo(() => participants(entries, SEAT), [entries])
   const resolveName = (seat: string) => nameFor(profiles, seat)
 
+  // the shared room name (T-122): newest room:name entry wins; the entry's
+  // seat is the free audit trail
+  const roomNameRec = useMemo(() => {
+    let latest: Rec | null = null
+    for (const e of entries) if (e.kind === 'room:name' && e.body.trim()) latest = e
+    return latest
+  }, [entries])
+  const roomName = roomNameRec?.body.trim() ?? ''
+  useEffect(() => {
+    document.title = roomName || 'a room'
+  }, [roomName])
+
   // presence (T-119) + ephemeral read receipts (T-121): sealed awareness,
   // zero doc bytes, ghosts expire ≤30 s, "seen" dies with the tab (D3 amended)
   const { presence, onTyping, clearTyping, setRead } = usePresence(spool, SEAT)
@@ -299,14 +374,24 @@ export const App = () => {
   if (!spool) return <div className="screen loading">opening the room…</div>
 
   if (view === 'settings')
-    return <Settings spool={spool} seats={seats} profiles={profiles} onBack={() => setView('room')} />
+    return (
+      <Settings
+        spool={spool}
+        seats={seats}
+        profiles={profiles}
+        roomName={roomName}
+        namedBy={roomNameRec ? resolveName(seatOf(roomNameRec)) : null}
+        onRenameRoom={(name) => void spool.wind({ kind: 'room:name', body: name, data: { seat: SEAT } })}
+        onBack={() => setView('room')}
+      />
+    )
 
   return (
     <div className="screen">
       <header className="header">
         <span className="headerBtn" />
         <button className="headerTitle asButton" onClick={() => setView('settings')}>
-          room
+          {roomName || 'room'}
         </button>
         <button className="headerBtn" onClick={() => setView('settings')} aria-label="Settings">
           ⋯

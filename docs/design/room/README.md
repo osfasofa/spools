@@ -24,6 +24,7 @@ The UI must never hard-code a color, font, or radius. Everything reads 8 CSS cus
 | `--bodyfont` (message bodies) | system sans | JetBrains Mono | system sans | Georgia/serif |
 
 - Radius scalar: **6px** default, **1px** "tail" corner (see Bubbles). Skinnable 0–18px.
+- *(T-122 note: as built, four values are minimally darkened to satisfy this document's own WCAG AA rule below, which the literal values missed at 14px body size — daylight `--dim` `#6D6D69`, `--ac` `#0B893A`; paper `--dim` `#6E6254`, `--ac` `#BB4F3A`. Measured 4.05–4.44 before, ≥4.5 after; visually near-identical.)*
 - Font stacks: sans `-apple-system,system-ui,'Helvetica Neue',sans-serif`; mono `'JetBrains Mono',ui-monospace,monospace`; serif `ui-serif,'Iowan Old Style',Georgia,serif`.
 - Every theme must pass **WCAG AA** for text + essential UI (T-122 acceptance criterion).
 - Skins change tokens, never layout.
