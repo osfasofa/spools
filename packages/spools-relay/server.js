@@ -48,9 +48,17 @@ const MAX_CONNS_PER_ROOM = 64
 // files on disk: no database, just <room>/<token>/<tag>.
 const POCKET_TTL_DAYS = Number(process.env.POCKET_TTL_DAYS ?? 60)
 const POCKET_MAX_BYTES = Number(process.env.POCKET_MAX_BYTES ?? MAX_FRAME_BYTES)
-const POCKET_K = Number(process.env.POCKET_K ?? 4) // distinct tags kept per namespace
+// K raised 4 → 8 for M11's group rooms (T-124, owner-approved): T-110 proved
+// 5+ concurrent divergent seats can silently outrun a 4-slot ring, and only
+// the evicted writer's return heals it. 8 covers the 5–8-seat target plus
+// reload churn (a reload takes a fresh tag). The bound moves, it doesn't
+// vanish — 9+ divergent writers can still outrun it; the README says so.
+const POCKET_K = Number(process.env.POCKET_K ?? 8) // distinct tags kept per namespace
 const POCKET_MAX_TOTAL_BYTES = Number(process.env.POCKET_MAX_TOTAL_BYTES ?? 1024 * 1024 * 1024)
-const POCKET_PUTS_PER_MIN = Number(process.env.POCKET_PUTS_PER_MIN ?? 12) // per IP
+// 12 → 24 (T-124): clients pace themselves to one deposit/min each, so this
+// is ~24 sustained same-NAT devices — a household with two active rooms and
+// a flush burst never queues a deposit
+const POCKET_PUTS_PER_MIN = Number(process.env.POCKET_PUTS_PER_MIN ?? 24) // per IP
 const POCKET_SWEEP_MS = Number(process.env.POCKET_SWEEP_MS ?? 3_600_000)
 const POCKET_DIR = process.env.POCKET_DIR || null
 

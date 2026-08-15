@@ -78,10 +78,10 @@ POCKET_DIR=/data/pocket npx spools-relay
 |---|---|---|
 | `POCKET_DIR` | *(unset — memory)* | directory for deposits; set it on anything with a volume |
 | `POCKET_TTL_DAYS` | `60` | namespaces untouched this long are swept; reads refresh the clock |
-| `POCKET_K` | `4` | distinct writer-session tags kept per spool |
+| `POCKET_K` | `8` | distinct writer-session tags kept per spool (raised from 4 for group rooms — T-124) |
 | `POCKET_MAX_BYTES` | `8388608` | per-deposit cap (413 above it) |
 | `POCKET_MAX_TOTAL_BYTES` | `1073741824` | relay-wide budget; stalest spools evicted first, 507 when even that can't fit it |
-| `POCKET_PUTS_PER_MIN` | `12` | per-IP deposit admission |
+| `POCKET_PUTS_PER_MIN` | `24` | per-IP deposit admission (clients self-pace to ~1/min each, so this is ~24 sustained same-NAT devices) |
 
 ## Point your links at it
 
@@ -126,11 +126,23 @@ feature only ever adds. That's the deal, and it's the point.
 
 **What the canonical relay promises.** The default relay the SDK ships with
 runs this server volume-backed on the stock knobs: deposits survive restarts,
-untouched namespaces are swept after **60 days**, **4** writer-session tags per
+untouched namespaces are swept after **60 days**, **8** writer-session tags per
 spool, **8 MiB** per deposit, **1 GiB** relay-wide. Treat the 60 days as a
 courtesy window, not an archive — the pocket is there to bridge the gap between
 one friend's evening and another's midnight, and the thing that actually keeps
 a spool is a copy on somebody's disk (`export()`).
+
+**Group-scale honesty (T-110/T-111, measured).** The tag ring holds the
+newest deposit from each of the last **8** writer sessions. People writing
+*while connected* are always safe — every deposit carries the merged room —
+but **nine or more people writing in isolation** (offline, partitioned) can
+silently outrun the ring: the oldest unmerged worldview is evicted, a cold
+joiner won't see it, and only that writer's own return heals it. The per-IP
+deposit budget (**24/min**) covers a couple of dozen same-NAT devices at the
+clients' own 1/min pacing. And the **64 connections per room** guard counts
+tabs, not people; a 65th connection is closed with code 1013 ("room full"),
+which today's SDK experiences as an endless connect/drop cycle — a full room
+looks like a bad connection.
 
 Env: `PORT` (default 4444), `HOST` (default 0.0.0.0), pocket knobs above.
 Node ≥ 18. Tests: `pnpm test` (node:test, spawns real instances).

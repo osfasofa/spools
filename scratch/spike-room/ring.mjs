@@ -1,15 +1,18 @@
-// T-110 spike, part 3: the pocket ring at group cardinality.
+// T-110/T-124: the pocket ring at group cardinality, against the CURRENT
+// stock knobs (POCKET_K=8 since T-124; the K=4 evidence that drove the
+// change lives in T-110's Notes).
 //
-// Five concurrent seats deposit against a real spools-relay with stock knobs
-// (POCKET_K=4); a cold sixth origin opens from the pocket alone and we diff
-// its entry set against the union written. Then the brief's mitigation claim
-// ("the first merger re-deposits the union") gets checked, not assumed:
-// does a *surviving* seat's return heal the ring? does the *evicted* seat's?
+//  R1: 5 partitioned seats — the M11 target scale — deposit divergent
+//      worldviews; a cold joiner must reconstruct the FULL union (this was
+//      the K=4 failure; K=8 is the fix being verified).
+//  R2: 9 partitioned seats — past the new bound — lose exactly the stalest
+//      unmerged worldview (the bound moved, it didn't vanish; README says so).
+//  R3: the evicted writer returns → deposit-if-ahead re-deposits the union →
+//      the next cold joiner is whole (the only self-heal path, measured).
+//  R4: converged seats (the live-room case) — eviction is harmless at any K.
 //
-// Seats run with a dead WebSocket polyfill: the pocket (HTTP) is reachable
-// but live sync never happens — the partition shape that produces disjoint
-// worldviews (the dangerous case; the converged case is scenario R4).
-// Deposits ride the real client path: wind → leave() → PocketClient flush.
+// Seats run the real Spool/PocketClient path with a dead WebSocket polyfill:
+// pocket reachable over HTTP, live sync never happens — the partition shape.
 //
 // Run (repo root): mise x -- node scratch/spike-room/ring.mjs
 
@@ -17,7 +20,7 @@ import { spawn } from 'node:child_process'
 import * as Y from '../../packages/spools/node_modules/yjs/dist/yjs.mjs'
 import { Spool, SpoolEngine } from '../../packages/spools/dist/index.js'
 
-const RELAY_PORTS = [9451, 9452] // scenario groups get their own relay so the 12 PUTs/min/IP budget never trips
+const RELAY_PORTS = [9451, 9452] // scenario groups get their own relay so the PUTs/min/IP budget never trips
 const here = new URL('.', import.meta.url)
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
@@ -88,83 +91,82 @@ const seatCounts = (spool) => {
   return bySeat
 }
 
-const relays = await Promise.all(RELAY_PORTS.map(startRelay))
-const findings = []
-
-// ---------- R1: five partitioned seats deposit; a cold sixth collects ----------
-
-const code = 'ring-partitioned'
-const key = randomBytes(32)
-const savedStates = {}
-{
-  const seats = Array.from({ length: 5 }, (_, i) => seat(code, key, RELAY_PORTS[0], `s${i + 1}`))
+/** N partitioned seats, 5 msgs each, serial leave() deposits; returns saved states */
+const partitionedDeposit = async (code, key, port, n) => {
+  const seats = Array.from({ length: n }, (_, i) => seat(code, key, port, `s${i + 1}`))
   await Promise.all(seats.map((s) => s.whenReady))
   await Promise.all(seats.map((s, i) => settled(s, `s${i + 1}`))) // all see the pocket empty before anyone writes
   seats.forEach((s, i) => {
-    for (let m = 0; m < 5; m++) s.wind({ kind: 'message', body: `hello from seat ${i + 1}, message ${m + 1}`, data: { seat: `s${i + 1}` } })
+    for (let m = 0; m < 5; m++) s.wind({ kind: 'message', body: `seat ${i + 1} message ${m + 1}`, data: { seat: `s${i + 1}` } })
   })
+  const saved = {}
   for (const [i, s] of seats.entries()) {
-    savedStates[i + 1] = Y.encodeStateAsUpdate(s.doc)
+    saved[i + 1] = Y.encodeStateAsUpdate(s.doc)
     await s.leave() // flushes the deposit — the real client path
-    await sleep(30) // distinct ms timestamps → deterministic stalest-tag eviction (s1 first)
+    await sleep(30) // distinct ms timestamps → deterministic stalest-tag eviction
   }
-  const held = await pocketGet(RELAY_PORTS[0], code, key)
-  const sizes = held.deposits.map((d) => Math.round((d.blob.length * 3) / 4))
-  findings.push(`R1: 5 seats deposited 5 msgs each; relay holds ${held.deposits.length} deposits (K=4), ~${sizes.join('/')} B sealed`)
+  return saved
+}
 
-  const joiner = seat(code, key, RELAY_PORTS[0], 'cold-6')
-  await joiner.whenReady
-  const phase = await settled(joiner, 'cold-6')
-  const counts = seatCounts(joiner)
-  const missing = ['s1', 's2', 's3', 's4', 's5'].filter((s) => !counts.has(s))
-  findings.push(`R1: cold joiner phase=${phase}, sees ${joiner.entries.length}/25 entries; missing worldviews: ${missing.join(',') || 'none'}`)
-  await sleep(400)
-  const after = await pocketGet(RELAY_PORTS[0], code, key)
-  findings.push(`R1: joiner re-deposited union? ${after.deposits.length === held.deposits.length && after.deposits[0].at === held.deposits[0].at ? 'NO (not ahead — nothing local beyond the pocket)' : 'YES'}`)
+const coldJoin = async (code, key, port, label) => {
+  const j = await Promise.resolve(seat(code, key, port, label))
+  await j.whenReady
+  await settled(j, label)
+  return j
+}
+
+const relays = await Promise.all(RELAY_PORTS.map(startRelay))
+const findings = []
+
+// ---------- R1: 5 partitioned seats — the target scale — nothing lost ----------
+
+{
+  const code = 'ring-five'
+  const key = randomBytes(32)
+  await partitionedDeposit(code, key, RELAY_PORTS[0], 5)
+  const held = await pocketGet(RELAY_PORTS[0], code, key)
+  const joiner = await coldJoin(code, key, RELAY_PORTS[0], 'cold-6')
+  const missing = ['s1', 's2', 's3', 's4', 's5'].filter((s) => !seatCounts(joiner).has(s))
+  const ok = held.deposits.length === 5 && joiner.entries.length === 25 && missing.length === 0
+  findings.push(`R1 (K=8, 5 divergent seats): relay holds ${held.deposits.length}/5 deposits; cold joiner ${joiner.entries.length}/25 — ${ok ? 'FULL union, nothing evicted' : `LOSS: missing ${missing.join(',')}`}`)
   await joiner.leave()
 }
 
-// ---------- R2: a SURVIVING seat returns — does the union get re-deposited? ----------
+// ---------- R2: 9 partitioned seats — past the bound — stalest lost ----------
 
+const code9 = 'ring-nine'
+const key9 = randomBytes(32)
+let saved9
 {
-  const before = await pocketGet(RELAY_PORTS[0], code, key)
-  const s3b = seat(code, key, RELAY_PORTS[0], 's3-return')
-  Y.applyUpdate(s3b.doc, savedStates[3]) // its local keepsake state, applied before the fetch settles
-  await s3b.whenReady
-  await settled(s3b, 's3-return')
-  await sleep(400)
-  const after = await pocketGet(RELAY_PORTS[0], code, key)
-  const redeposited = after.deposits[0].at !== before.deposits[0].at
-  findings.push(`R2: surviving seat s3 returned holding ${s3b.entries.length}/25 after merge; re-deposited? ${redeposited ? 'YES' : 'NO (its own state is already in the pocket → not ahead → s1 stays lost)'}`)
-  await s3b.leave()
+  saved9 = await partitionedDeposit(code9, key9, RELAY_PORTS[1], 9)
+  const held = await pocketGet(RELAY_PORTS[1], code9, key9)
+  const joiner = await coldJoin(code9, key9, RELAY_PORTS[1], 'cold-10')
+  const missing = Array.from({ length: 9 }, (_, i) => `s${i + 1}`).filter((s) => !seatCounts(joiner).has(s))
+  findings.push(`R2 (9 divergent seats): relay holds ${held.deposits.length} deposits (K=8); cold joiner ${joiner.entries.length}/45; evicted: ${missing.join(',') || 'none'} — the bound moved, it didn't vanish`)
+  await joiner.leave()
 }
 
-// ---------- R3: the EVICTED seat returns — the only holder of the lost worldview ----------
+// ---------- R3: the evicted writer returns and heals the ring ----------
 
 {
-  const s1b = seat(code, key, RELAY_PORTS[0], 's1-return')
-  Y.applyUpdate(s1b.doc, savedStates[1])
+  const s1b = seat(code9, key9, RELAY_PORTS[1], 's1-return')
+  Y.applyUpdate(s1b.doc, saved9[1]) // its local keepsake, applied before the fetch settles
   await s1b.whenReady
   await settled(s1b, 's1-return')
   await sleep(500) // deposit-if-ahead fires inside start(); give the PUT time
-  findings.push(`R3: evicted seat s1 returned holding ${s1b.entries.length}/25 after merge`)
   await s1b.leave()
-
-  const j7 = seat(code, key, RELAY_PORTS[0], 'cold-7')
-  await j7.whenReady
-  await settled(j7, 'cold-7')
-  const counts = seatCounts(j7)
-  const missing = ['s1', 's2', 's3', 's4', 's5'].filter((s) => !counts.has(s))
-  findings.push(`R3: next cold joiner sees ${j7.entries.length}/25; missing: ${missing.join(',') || 'none'} (evicted writer's return heals the ring)`)
-  await j7.leave()
+  const j = await coldJoin(code9, key9, RELAY_PORTS[1], 'cold-11')
+  const missing = Array.from({ length: 9 }, (_, i) => `s${i + 1}`).filter((s) => !seatCounts(j).has(s))
+  findings.push(`R3: evicted s1 returned → next cold joiner ${j.entries.length}/45; missing: ${missing.join(',') || 'none'} (the writer's own return is the heal path)`)
+  await j.leave()
 }
 
-// ---------- R4: five CONVERGED seats (the live-room case) — eviction is harmless ----------
+// ---------- R4: converged seats (the live-room case) — eviction harmless ----------
 
 {
   const code2 = 'ring-converged'
   const key2 = randomBytes(32)
-  const seats = Array.from({ length: 5 }, (_, i) => seat(code2, key2, RELAY_PORTS[1], `c${i + 1}`))
+  const seats = Array.from({ length: 5 }, (_, i) => seat(code2, key2, RELAY_PORTS[0], `c${i + 1}`))
   await Promise.all(seats.map((s) => s.whenReady))
   await Promise.all(seats.map((s, i) => settled(s, `c${i + 1}`)))
   seats.forEach((s, i) => {
@@ -176,15 +178,12 @@ const savedStates = {}
     await s.leave()
     await sleep(30)
   }
-  const held = await pocketGet(RELAY_PORTS[1], code2, key2)
-  const joiner = seat(code2, key2, RELAY_PORTS[1], 'cold-c6')
-  await joiner.whenReady
-  await settled(joiner, 'cold-c6')
-  findings.push(`R4: converged seats — relay holds ${held.deposits.length} deposits, cold joiner sees ${joiner.entries.length}/25 (every deposit is the union; K=4 eviction loses nothing)`)
+  const joiner = await coldJoin(code2, key2, RELAY_PORTS[0], 'cold-c6')
+  findings.push(`R4: converged seats — cold joiner sees ${joiner.entries.length}/25 (every deposit is the union; eviction loses nothing)`)
   await joiner.leave()
 }
 
-console.log('\n== ring verdicts ==')
+console.log('\n== ring verdicts (stock knobs) ==')
 for (const f of findings) console.log('  ' + f)
 
 for (const r of relays) r.kill('SIGKILL')
