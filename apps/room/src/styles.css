@@ -125,11 +125,59 @@ body {
 
 /* ---------- feed ---------- */
 
+.feedWrap {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
 .feed {
   flex: 1;
   overflow-y: auto;
   padding: 12px 14px;
   -webkit-overflow-scrolling: touch;
+  overflow-anchor: none; /* the component owns anchoring — the browser's guess fights the prepend compensation */
+}
+
+.showEarlier {
+  display: block;
+  margin: 0 auto 10px;
+  background: var(--sf);
+  border: 1px solid var(--ln);
+  border-radius: var(--radius);
+  color: var(--dim);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  padding: 8px 14px;
+  min-height: 32px;
+  cursor: pointer;
+}
+
+.newMsgPill {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--ac);
+  color: var(--acTx);
+  border: none;
+  border-radius: var(--radius);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 8px 14px;
+  min-height: 36px;
+  cursor: pointer;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
+}
+
+.clockAhead {
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--dim);
+  margin-top: 2px;
 }
 
 .feedEmpty {
