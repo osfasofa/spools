@@ -19,8 +19,11 @@ T-090's stash-label precedent — and a shared one is the likeliest small fight
 - [ ] Shared name: `wind({ kind: 'room:name', body })`, newest wins; editable
       by anyone (tap the header); renders in the header and the document title;
       the audit ("named by —") for free from the entry's seat.
-- [ ] Per-device theme: 2–3 themes including a dark one, in a localStorage key
-      following the `spool-view` precedent (app.js:81). Syncs nothing.
+- [ ] Per-device theme: the **four themes from `docs/design/room/README.md`**
+      (blackout default, terminal, daylight, paper — exact token values are
+      final there), in a localStorage key following the `spool-view` precedent
+      (app.js:81). Syncs nothing. Theme picker per the README's settings
+      screen (2×2 self-rendered cards).
 - [ ] **Contrast floor as an acceptance criterion, not a later fix**: every
       theme passes WCAG AA for text and essential UI (T-125 audits; this ticket
       doesn't ship failures for it to find).

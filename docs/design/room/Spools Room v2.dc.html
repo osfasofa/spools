@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#050505}
+a{color:#00E653}a:hover{color:#7CF5A8}
+@keyframes sp-blink{0%,100%{opacity:1}50%{opacity:.15}}
+@keyframes sp-dot{0%,60%,100%{transform:translateY(0);opacity:.35}30%{transform:translateY(-3px);opacity:1}}
+@keyframes sp-in{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+@keyframes sp-fade{from{opacity:0}to{opacity:1}}
+@keyframes sp-up{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:none}}
+</style>
+</helmet>
+<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:28px;background:#050505">
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ frameDark }}" hint-size="390px,844px">
+<div ref="{{ appRef }}" data-screen-label="Spools room client v2" style="height:100%;box-sizing:border-box;padding-top:62px;padding-bottom:20px;display:flex;flex-direction:column;background:var(--bg,#000000);color:var(--tx,#F2F2F2);font-family:-apple-system,system-ui,'Helvetica Neue',sans-serif;position:relative;overflow:hidden">
+
+<sc-if value="{{ isRoom }}" hint-placeholder-val="{{ true }}">
+<div data-screen-label="Room feed" style="display:flex;flex-direction:column;height:100%">
+  <div style="padding:6px 8px 8px 0;display:flex;align-items:center;gap:2px;border-bottom:1px solid var(--ln,#1F1F1F)">
+    <div onClick="{{ goStash }}" style="cursor:pointer;font-size:26px;line-height:1;color:var(--dim,#9A9A9A);min-width:44px;min-height:44px;display:flex;align-items:center;justify-content:center" style-hover="color:var(--tx,#F2F2F2)">‹</div>
+    <div onClick="{{ goSettings }}" style="flex:1;min-width:0;cursor:pointer">
+      <div style="font-weight:800;font-size:16px;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ roomName }}</div>
+      <div onClick="{{ toggleRoster }}" style="font-size:11px;color:var(--dim,#9A9A9A);margin-top:1px;display:inline-flex;align-items:center;gap:5px;padding:2px 0;cursor:pointer" style-hover="color:var(--tx,#F2F2F2)">
+        <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--ac,#00E653)"></span>
+        <span>{{ presenceLine }}</span>
+        <span style="font-size:8px">{{ rosterChevron }}</span>
+      </div>
+    </div>
+    <div onClick="{{ goSettings }}" style="cursor:pointer;color:var(--dim,#9A9A9A);font-size:20px;min-width:44px;min-height:44px;display:flex;align-items:center;justify-content:center" style-hover="color:var(--tx,#F2F2F2)">⋯</div>
+  </div>
+  <sc-if value="{{ rosterOpen }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ toggleRoster }}" style="display:flex;gap:18px;padding:12px 16px 10px;overflow-x:auto;border-bottom:1px solid var(--ln,#1F1F1F);flex:none;cursor:pointer;animation:sp-in .18s ease-out">
+      <sc-for list="{{ roster }}" as="p" hint-placeholder-count="4">
+        <div style="{{ p.chipStyle }}">
+          <div style="position:relative;width:32px;height:32px;display:flex;align-items:center;justify-content:center">
+            <div style="{{ p.glyphStyle }}">{{ p.letter }}</div>
+            <sc-if value="{{ p.online }}" hint-placeholder-val="{{ true }}"><div style="position:absolute;right:-1px;bottom:-1px;width:9px;height:9px;border-radius:50%;background:var(--ac,#00E653);border:2px solid var(--bg,#000000)"></div></sc-if>
+          </div>
+          <div style="font-size:9.5px;color:var(--dim,#9A9A9A);max-width:52px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ p.label }}</div>
+        </div>
+      </sc-for>
+    </div>
+  </sc-if>
+  <div ref="{{ feedRef }}" style="flex:1;overflow-y:auto;padding:12px 14px 8px;display:flex;flex-direction:column">
+    <sc-for list="{{ rows }}" as="r" hint-placeholder-count="7">
+      <sc-if value="{{ r.isDiv }}" hint-placeholder-val="{{ false }}">
+        <div style="text-align:center;font-size:10px;color:var(--dim,#9A9A9A);letter-spacing:.08em;padding:6px 0 10px;font-family:'JetBrains Mono',monospace">{{ r.label }}</div>
+      </sc-if>
+      <sc-if value="{{ r.isSys }}" hint-placeholder-val="{{ false }}">
+        <div style="text-align:center;font-size:10.5px;color:var(--dim,#9A9A9A);padding:8px 0">{{ r.sysText }}</div>
+      </sc-if>
+      <sc-if value="{{ r.isMsg }}" hint-placeholder-val="{{ true }}">
+        <div style="{{ r.wrapStyle }}">
+          <sc-if value="{{ r.showHead }}" hint-placeholder-val="{{ false }}">
+            <div style="font-size:10.5px;color:var(--dim,#9A9A9A);padding:0 0 3px 34px;display:flex;gap:6px;align-items:baseline"><span style="font-weight:600">{{ r.name }}</span><span style="font-family:'JetBrains Mono',monospace;font-size:9px">{{ r.time }}</span></div>
+          </sc-if>
+          <div style="{{ r.lineStyle }}">
+            <sc-if value="{{ r.avatarSlot }}" hint-placeholder-val="{{ false }}">
+              <div style="width:26px;flex:none;display:flex;justify-content:center;align-self:flex-end;padding-bottom:2px">
+                <sc-if value="{{ r.showAvatar }}" hint-placeholder-val="{{ false }}"><div style="{{ r.glyphStyle }}">{{ r.glyphLetter }}</div></sc-if>
+              </div>
+            </sc-if>
+            <div onClick="{{ r.open }}" style="{{ r.bubbleStyle }}" style-active="opacity:.85">
+              <sc-if value="{{ r.deleted }}" hint-placeholder-val="{{ false }}">
+                <span style="font-style:italic;opacity:.6;font-size:12px">removed</span>
+              </sc-if>
+              <sc-if value="{{ r.visible }}" hint-placeholder-val="{{ true }}">
+                <sc-if value="{{ r.isReply }}" hint-placeholder-val="{{ false }}">
+                  <div style="{{ r.quoteStyle }}">{{ r.replyName }}: {{ r.replySnippet }}</div>
+                </sc-if>
+                <span>{{ r.body }}</span><sc-if value="{{ r.edited }}" hint-placeholder-val="{{ false }}"><span style="font-size:9px;opacity:.55"> · edited</span></sc-if>
+              </sc-if>
+            </div>
+          </div>
+          <sc-if value="{{ r.hasReactions }}" hint-placeholder-val="{{ false }}">
+            <div style="{{ r.reactRowStyle }}">
+              <sc-for list="{{ r.reactions }}" as="rc" hint-placeholder-count="1">
+                <div onClick="{{ rc.onTap }}" style="{{ rc.style }}">{{ rc.e }} <span style="font-size:10px">{{ rc.n }}</span></div>
+              </sc-for>
+            </div>
+          </sc-if>
+          <sc-if value="{{ r.hasReaders }}" hint-placeholder-val="{{ false }}">
+            <div style="align-self:flex-end;display:flex;gap:3px;margin-top:3px;align-items:center">
+              <sc-for list="{{ r.readers }}" as="rd" hint-placeholder-count="1"><div style="{{ rd.style }}"></div></sc-for>
+            </div>
+          </sc-if>
+        </div>
+      </sc-if>
+    </sc-for>
+    <sc-if value="{{ typingVisible }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;gap:6px;align-items:flex-end;margin-top:10px">
+        <div style="width:26px;display:flex;justify-content:center"><div style="{{ typingGlyph }}">{{ typingLetter }}</div></div>
+        <div style="background:var(--sf,#161616);border-radius:6px 6px 6px 1px;padding:11px 14px;display:flex;gap:4px;align-items:center">
+          <div style="width:6px;height:6px;border-radius:50%;background:var(--dim,#9A9A9A);animation:sp-dot 1.1s infinite"></div>
+          <div style="width:6px;height:6px;border-radius:50%;background:var(--dim,#9A9A9A);animation:sp-dot 1.1s .15s infinite"></div>
+          <div style="width:6px;height:6px;border-radius:50%;background:var(--dim,#9A9A9A);animation:sp-dot 1.1s .3s infinite"></div>
+        </div>
+      </div>
+    </sc-if>
+  </div>
+  <div style="border-top:1px solid var(--ln,#1F1F1F);padding:8px 12px 10px;flex:none">
+    <sc-if value="{{ replying }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;align-items:center;gap:8px;font-size:11px;color:var(--dim,#9A9A9A);padding:0 4px 8px">
+        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Replying to {{ replyName }} — {{ replySnippet }}</span>
+        <span onClick="{{ cancelReply }}" style="cursor:pointer;padding:2px 6px">✕</span>
+      </div>
+    </sc-if>
+    <sc-if value="{{ editing }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;align-items:center;gap:8px;font-size:11px;color:var(--dim,#9A9A9A);padding:0 4px 8px">
+        <span style="flex:1">Editing message</span>
+        <span onClick="{{ cancelEdit }}" style="cursor:pointer;padding:2px 6px">✕</span>
+      </div>
+    </sc-if>
+    <div style="display:flex;gap:8px;align-items:center">
+      <input value="{{ draft }}" onChange="{{ onDraft }}" onKeyDown="{{ onKey }}" placeholder="Message" style="flex:1;min-width:0;background:var(--sf,#161616);border:1px solid var(--ln,#1F1F1F);border-radius:6px;color:var(--tx,#F2F2F2);font-family:inherit;font-size:14px;padding:12px 16px;outline:none;min-height:44px;box-sizing:border-box">
+      <div onClick="{{ send }}" style="cursor:pointer;background:var(--ac,#00E653);color:var(--acTx,#04220E);font-weight:700;font-size:18px;border-radius:6px;display:flex;align-items:center;justify-content:center;width:44px;height:44px;flex:none" style-hover="filter:brightness(1.12)" style-active="transform:translateY(1px)">↑</div>
+    </div>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isStash }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="Stash" style="display:flex;flex-direction:column;height:100%">
+  <div style="padding:20px 16px 14px;border-bottom:1px solid var(--ln,#1F1F1F)">
+    <div style="font-weight:800;font-size:24px;letter-spacing:-.02em">stash</div>
+  </div>
+  <div style="flex:1;overflow-y:auto">
+    <sc-for list="{{ stashRooms }}" as="s" hint-placeholder-count="3">
+      <div onClick="{{ s.onOpen }}" style="padding:14px 16px;display:flex;gap:12px;cursor:pointer;align-items:center;min-height:44px" style-hover="background:var(--sf,#161616)">
+        <div style="{{ s.glyphStyle }}">{{ s.letter }}</div>
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:baseline;gap:8px">
+            <span style="font-size:14px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ s.name }}</span>
+            <span style="font-size:10px;color:var(--dim,#9A9A9A);margin-left:auto;flex:none;font-family:'JetBrains Mono',monospace">{{ s.meta }}</span>
+          </div>
+          <div style="font-size:12px;color:var(--dim,#9A9A9A);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px">{{ s.snippet }}</div>
+        </div>
+        <sc-if value="{{ s.hasUnread }}" hint-placeholder-val="{{ false }}">
+          <div style="background:var(--ac,#00E653);color:var(--acTx,#04220E);font-size:10px;font-weight:700;border-radius:999px;padding:2px 7px;flex:none">{{ s.unread }}</div>
+        </sc-if>
+      </div>
+    </sc-for>
+    <div style="padding:16px;display:flex;flex-direction:column;gap:10px">
+      <div onClick="{{ newSpool }}" style="cursor:pointer;background:var(--ac,#00E653);color:var(--acTx,#04220E);border-radius:10px;text-align:center;padding:13px;font-size:13px;font-weight:700;min-height:44px;box-sizing:border-box;display:flex;align-items:center;justify-content:center" style-hover="filter:brightness(1.12)">+ new spool</div>
+      <input placeholder="paste a link" style="background:var(--sf,#161616);border:1px solid var(--ln,#1F1F1F);border-radius:10px;color:var(--tx,#F2F2F2);font-family:'JetBrains Mono',monospace;font-size:12px;padding:12px;outline:none;min-height:44px;box-sizing:border-box;text-align:center">
+    </div>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isSettings }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="Room settings" style="display:flex;flex-direction:column;height:100%">
+  <div style="padding:6px 8px 8px 0;display:flex;align-items:center;gap:2px;border-bottom:1px solid var(--ln,#1F1F1F)">
+    <div onClick="{{ goRoomBack }}" style="cursor:pointer;font-size:26px;line-height:1;color:var(--dim,#9A9A9A);min-width:44px;min-height:44px;display:flex;align-items:center;justify-content:center" style-hover="color:var(--tx,#F2F2F2)">‹</div>
+    <div style="font-weight:800;font-size:16px">settings</div>
+  </div>
+  <div style="flex:1;overflow-y:auto;padding:18px 16px 24px;display:flex;flex-direction:column;gap:24px">
+    <div>
+      <div style="font-size:10px;color:var(--dim,#9A9A9A);letter-spacing:.14em;text-transform:uppercase;margin-bottom:8px;font-family:'JetBrains Mono',monospace">name</div>
+      <input value="{{ roomName }}" onChange="{{ onRoomName }}" style="width:100%;box-sizing:border-box;background:var(--sf,#161616);border:1px solid var(--ln,#1F1F1F);border-radius:10px;color:var(--tx,#F2F2F2);font-family:inherit;font-size:14px;font-weight:700;padding:12px;outline:none;min-height:44px">
+      <div style="font-size:10px;color:var(--dim,#9A9A9A);margin-top:6px">{{ namedBy }} · anyone can rename it</div>
+    </div>
+    <div>
+      <div style="font-size:10px;color:var(--dim,#9A9A9A);letter-spacing:.14em;text-transform:uppercase;margin-bottom:8px;font-family:'JetBrains Mono',monospace">people</div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <sc-for list="{{ people }}" as="pe" hint-placeholder-count="4">
+          <div style="display:flex;align-items:center;gap:10px;background:var(--sf,#161616);border:1px solid var(--ln,#1F1F1F);border-radius:10px;padding:8px 12px;min-height:44px;box-sizing:border-box">
+            <div style="{{ pe.glyphStyle }}">{{ pe.letter }}</div>
+            <input value="{{ pe.name }}" onChange="{{ pe.onRename }}" style="flex:1;min-width:0;background:transparent;border:none;color:var(--tx,#F2F2F2);font-family:inherit;font-size:13px;outline:none;padding:2px 0">
+            <span style="font-size:9px;color:var(--dim,#9A9A9A);font-family:'JetBrains Mono',monospace">{{ pe.suffix }}</span>
+          </div>
+        </sc-for>
+      </div>
+      <div style="font-size:10px;color:var(--dim,#9A9A9A);margin-top:6px">anyone can rename anyone — it applies everywhere</div>
+    </div>
+    <div>
+      <div style="font-size:10px;color:var(--dim,#9A9A9A);letter-spacing:.14em;text-transform:uppercase;margin-bottom:8px;font-family:'JetBrains Mono',monospace">theme</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <sc-for list="{{ themes }}" as="t" hint-placeholder-count="4">
+          <div onClick="{{ t.onPick }}" style="{{ t.cardStyle }}">
+            <div style="display:flex;gap:4px;align-items:center;margin-bottom:6px">
+              <div style="{{ t.dotA }}"></div><div style="{{ t.dotB }}"></div><div style="{{ t.dotC }}"></div>
+            </div>
+            <div style="font-size:12px;font-weight:700">{{ t.label }}</div>
+          </div>
+        </sc-for>
+      </div>
+      <div style="font-size:10px;color:var(--dim,#9A9A9A);margin-top:6px">yours only — themes don't sync</div>
+    </div>
+    <div>
+      <div style="font-size:10px;color:var(--dim,#9A9A9A);letter-spacing:.14em;text-transform:uppercase;margin-bottom:8px;font-family:'JetBrains Mono',monospace">link</div>
+      <div style="display:flex;gap:8px">
+        <div style="flex:1;min-width:0;background:var(--sf,#161616);border:1px solid var(--ln,#1F1F1F);border-radius:10px;padding:12px;font-size:10px;color:var(--dim,#9A9A9A);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:'JetBrains Mono',monospace">{{ link }}</div>
+        <div onClick="{{ copyLink }}" style="cursor:pointer;border:1px solid var(--ln,#1F1F1F);color:var(--tx,#F2F2F2);border-radius:10px;font-size:12px;font-weight:700;display:flex;align-items:center;padding:0 14px;min-height:44px" style-hover="border-color:var(--ac,#00E653)">copy</div>
+      </div>
+      <div style="font-size:10px;color:var(--dim,#9A9A9A);margin-top:6px">the link is the key — share it with people you trust</div>
+    </div>
+    <div>
+      <div style="font-size:10px;color:var(--dim,#9A9A9A);letter-spacing:.14em;text-transform:uppercase;margin-bottom:8px;font-family:'JetBrains Mono',monospace">fine print</div>
+      <div style="background:var(--sf,#161616);border:1px solid var(--ln,#1F1F1F);border-radius:10px;padding:14px;font-size:12px;line-height:1.6">anyone with the link can edit or delete anything. no push, no server that knows you. rewind never forgets.</div>
+    </div>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ hasSheet }}" hint-placeholder-val="{{ false }}">
+  <div onClick="{{ closeSheet }}" style="position:absolute;inset:0;background:rgba(0,0,0,.55);z-index:30;display:flex;flex-direction:column;justify-content:flex-end;animation:sp-fade .15s ease-out">
+    <div onClick="{{ stop }}" style="background:var(--sf,#161616);border-top:1px solid var(--ln,#1F1F1F);border-radius:18px 18px 0 0;padding:14px 16px 28px;animation:sp-up .18s ease-out">
+      <div style="font-size:11px;color:var(--dim,#9A9A9A);margin-bottom:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ sheetName }} — {{ sheetSnippet }}</div>
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <sc-for list="{{ quick }}" as="q" hint-placeholder-count="5">
+          <div onClick="{{ q.onTap }}" style="cursor:pointer;font-size:22px;background:var(--bg,#000000);border:1px solid var(--ln,#1F1F1F);border-radius:12px;width:46px;height:46px;display:flex;align-items:center;justify-content:center" style-hover="border-color:var(--ac,#00E653)">{{ q.e }}</div>
+        </sc-for>
+      </div>
+      <div onClick="{{ actReply }}" style="cursor:pointer;padding:13px 4px;font-size:14px;border-top:1px solid var(--ln,#1F1F1F);min-height:44px;box-sizing:border-box;display:flex;align-items:center" style-hover="color:var(--ac,#00E653)">Reply</div>
+      <div onClick="{{ actEdit }}" style="cursor:pointer;padding:13px 4px;font-size:14px;border-top:1px solid var(--ln,#1F1F1F);min-height:44px;box-sizing:border-box;display:flex;align-items:center" style-hover="color:var(--ac,#00E653)">Edit</div>
+      <div onClick="{{ actRemove }}" style="cursor:pointer;padding:13px 4px;font-size:14px;border-top:1px solid var(--ln,#1F1F1F);min-height:44px;box-sizing:border-box;display:flex;align-items:center" style-hover="color:var(--ac,#00E653)">Remove</div>
+    </div>
+  </div>
+</sc-if>
+
+<sc-if value="{{ hasArrival }}" hint-placeholder-val="{{ false }}">
+  <div onClick="{{ skipArrival }}" style="position:absolute;inset:0;background:var(--bg,#000000);z-index:40;display:flex;flex-direction:column;justify-content:center;padding:0 36px;cursor:pointer">
+    <sc-for list="{{ arrivalShown }}" as="al" hint-placeholder-count="1">
+      <div style="font-size:12.5px;color:var(--tx,#F2F2F2);margin-bottom:12px;animation:sp-in .3s ease-out;font-family:'JetBrains Mono',monospace">{{ al.text }}</div>
+    </sc-for>
+    <div style="display:inline-block;width:9px;height:15px;background:var(--ac,#00E653);animation:sp-blink 1s infinite"></div>
+  </div>
+</sc-if>
+
+<sc-if value="{{ hasToast }}" hint-placeholder-val="{{ false }}">
+  <div style="position:absolute;left:50%;transform:translateX(-50%);bottom:96px;z-index:50;background:var(--sf,#161616);border:1px solid var(--ln,#1F1F1F);color:var(--tx,#F2F2F2);font-size:11.5px;padding:9px 14px;border-radius:10px;white-space:nowrap;animation:sp-in .2s ease-out;box-shadow:0 4px 18px rgba(0,0,0,.4)">{{ toast }}</div>
+</sc-if>
+
+</div>
+</x-import>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:470,&quot;height&quot;:960},&quot;accent&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;options&quot;:[&quot;#D6D6D6&quot;,&quot;#00E653&quot;,&quot;#FF4D00&quot;,&quot;#4DC4FF&quot;],&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Skin&quot;},&quot;bubbleRadius&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;min&quot;:0,&quot;max&quot;:18,&quot;step&quot;:1,&quot;unit&quot;:&quot;px&quot;,&quot;default&quot;:6,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Skin&quot;},&quot;fontStyle&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;theme&quot;,&quot;mono&quot;,&quot;sans&quot;,&quot;serif&quot;],&quot;default&quot;:&quot;theme&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Skin&quot;},&quot;startScreen&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;room&quot;,&quot;stash&quot;],&quot;default&quot;:&quot;room&quot;,&quot;tsType&quot;:&quot;\&quot;room\&quot;|\&quot;stash\&quot;&quot;,&quot;section&quot;:&quot;Demo&quot;},&quot;playArrival&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Demo&quot;},&quot;liveDemo&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Demo&quot;},&quot;showReceipts&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Chat&quot;}}">
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.appRef = (el) => { this._appEl = el; if (el) this.applyTheme(); };
+    this.feedRef = (el) => { this._feedEl = el; if (el) el.scrollTop = el.scrollHeight; };
+    this._timers = [];
+    this.ME = 'k7f2';
+    this.PAL = ['#00E653', '#FF6A2B', '#4DC4FF', '#C79BFF', '#FFD43B', '#FF8FB3'];
+    this.THEMES = {
+      dark: { label: 'blackout', bg: '#000000', sf: '#161616', tx: '#F2F2F2', dim: '#9A9A9A', ac: '#D6D6D6', acTx: '#0D0D0D', ln: '#1F1F1F', bodyfont: "-apple-system,system-ui,'Helvetica Neue',sans-serif" },
+      light: { label: 'daylight', bg: '#FAFAF7', sf: '#EFEFEA', tx: '#171717', dim: '#6E6E6A', ac: '#0B8F3C', acTx: '#FFFFFF', ln: '#E3E3DE', bodyfont: "-apple-system,system-ui,'Helvetica Neue',sans-serif" },
+      terminal: { label: 'terminal', bg: '#0A0D0A', sf: '#141B13', tx: '#D9E7D9', dim: '#7A8C7A', ac: '#00E653', acTx: '#04220E', ln: '#1B231B', bodyfont: "'JetBrains Mono',ui-monospace,monospace" },
+      paper: { label: 'paper', bg: '#F4EEE1', sf: '#EAE1CD', tx: '#29221A', dim: '#6F6355', ac: '#C9553E', acTx: '#FFF6EC', ln: '#D9CFB8', bodyfont: "ui-serif,'Iowan Old Style',Georgia,serif" }
+    };
+    let theme = 'dark';
+    try { theme = localStorage.getItem('spools-theme-v2') || 'dark'; } catch (e) {}
+    if (!this.THEMES[theme]) theme = 'dark';
+    const start = props.startScreen === 'stash' ? 'stash' : 'room';
+    this.state = {
+      screen: start, theme,
+      roomName: 'midnight picnic',
+      namedBy: 'named by nadia',
+      profiles: { k7f2: 'wren', m3x9: 'nadia', q8c1: 'petrov', z44d: 'the intern' },
+      online: { k7f2: true, m3x9: true, q8c1: false, z44d: true },
+      messages: [
+        { id: 'm1', seat: 'm3x9', body: 'status check. who is holding the blanket', ts: '20:41' },
+        { id: 'm2', seat: 'k7f2', body: "blanket secured. it's the ugly one", ts: '20:42' },
+        { id: 'm3', seat: 'm3x9', body: 'good. ugly is unmemorable', ts: '20:42', parent: 'm2' },
+        { id: 'm4', seat: 'q8c1', body: 'i have the sandwiches and a bad feeling', ts: '20:47' },
+        { id: 'm5', seat: 'k7f2', body: 'the feeling is the pickles. proceed', ts: '20:48', parent: 'm4', reactions: { '😆': ['m3x9', 'q8c1'] } },
+        { id: 'm6', seat: 'z44d', body: 'new phone who is this', ts: '20:55', reactions: { '💀': ['m3x9'] } },
+        { id: 's1', sys: true, sysText: 'nadia renamed z44d to “the intern”' },
+        { id: 'm7', seat: 'z44d', body: 'ok fair', ts: '20:56' },
+        { id: 'm8', seat: 'm3x9', body: 'rally point unchanged. 21:00. bring nothing traceable', ts: '20:58' },
+        { id: 'm9', seat: 'k7f2', body: "copy. wearing the orange glasses so you can't miss me", ts: '21:00', reactions: { '🔥': ['m3x9', 'z44d'] } }
+      ],
+      cursors: { m3x9: 'm9', q8c1: 'm5', z44d: 'm7' },
+      draft: '', replyTo: null, editing: null, sheetFor: null, rosterOpen: false,
+      typingSeat: null, toast: null,
+      arrival: (props.playArrival ?? true) && start === 'room' ? 0 : null
+    };
+  }
+  componentDidMount() {
+    this.applyTheme();
+    if (this.state.arrival === 0) this.runArrival();
+    if ((this.props.liveDemo ?? true) && !this._demoRan) {
+      this._demoRan = true;
+      this.t(() => this.setState({ typingSeat: 'm3x9' }), 5000);
+      this.t(() => this.setState(s => ({
+        typingSeat: null,
+        messages: [...s.messages, { id: 'mL', seat: 'm3x9', body: "eyes up. it's happening.", ts: '21:04' }],
+        cursors: { ...s.cursors, m3x9: 'mL' }
+      })), 8600);
+    }
+  }
+  componentWillUnmount() { this._timers.forEach(clearTimeout); }
+  componentDidUpdate(pp, ps) {
+    if (ps.messages !== this.state.messages || ps.typingSeat !== this.state.typingSeat) {
+      const f = this._feedEl; if (f) f.scrollTop = f.scrollHeight;
+    }
+    if (ps.theme !== this.state.theme || pp.accent !== this.props.accent || pp.fontStyle !== this.props.fontStyle) this.applyTheme();
+  }
+  t(fn, ms) { this._timers.push(setTimeout(fn, ms)); }
+  eff() {
+    const T = this.THEMES[this.state.theme];
+    const ac = this.props.accent || T.ac;
+    const fonts = { mono: "'JetBrains Mono',ui-monospace,monospace", sans: "-apple-system,system-ui,'Helvetica Neue',sans-serif", serif: "ui-serif,'Iowan Old Style',Georgia,serif" };
+    return { ...T, ac, acTx: this.props.accent ? '#0D0D0D' : T.acTx, bodyfont: fonts[this.props.fontStyle] || T.bodyfont };
+  }
+  applyTheme() {
+    const el = this._appEl; if (!el) return;
+    const T = this.eff();
+    el.style.setProperty('--bg', T.bg); el.style.setProperty('--sf', T.sf);
+    el.style.setProperty('--tx', T.tx); el.style.setProperty('--dim', T.dim);
+    el.style.setProperty('--ac', T.ac); el.style.setProperty('--acTx', T.acTx);
+    el.style.setProperty('--ln', T.ln); el.style.setProperty('--bodyfont', T.bodyfont);
+  }
+  runArrival() {
+    for (let i = 1; i <= 3; i++) this.t(() => this.setState(s => s.arrival === null ? null : { arrival: i }), 550 * i);
+    this.t(() => this.setState({ arrival: null }), 550 * 3 + 700);
+  }
+  hash(str) { let h = 0; for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) >>> 0; return h; }
+  seatColor(key) { return this.PAL[this.hash(key) % this.PAL.length]; }
+  initial(label) { const t = (label || '?').trim(); return t ? t[0].toUpperCase() : '?'; }
+  av(label, key, size) {
+    const c = this.seatColor(key);
+    return { width: size + 'px', height: size + 'px', flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1.5px solid ' + c, borderRadius: '2px', color: c, fontFamily: "'JetBrains Mono',ui-monospace,monospace", fontWeight: 700, fontSize: Math.max(9, Math.round(size * .5)) + 'px', lineHeight: 1, boxSizing: 'border-box' };
+  }
+  dot(key, size) { return { width: size + 'px', height: size + 'px', background: this.seatColor(key), borderRadius: '2px', flex: 'none' }; }
+  nameOf(seat) { return this.state.profiles[seat] || 'seat ' + seat; }
+  snippet(m) { const b = m.deleted ? '(removed)' : (m.body || ''); return b.length > 34 ? b.slice(0, 34) + '…' : b; }
+  now() { const d = new Date(); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); }
+  showToast(msg) {
+    clearTimeout(this._toastT);
+    this.setState({ toast: msg });
+    this._toastT = setTimeout(() => this.setState({ toast: null }), 2000);
+  }
+  toggleReact(id, e) {
+    this.setState(s => ({
+      messages: s.messages.map(m => {
+        if (m.id !== id) return m;
+        const rx = { ...(m.reactions || {}) };
+        const list = rx[e] ? [...rx[e]] : [];
+        const i = list.indexOf(this.ME);
+        if (i >= 0) list.splice(i, 1); else list.push(this.ME);
+        if (list.length) rx[e] = list; else delete rx[e];
+        return { ...m, reactions: rx };
+      })
+    }));
+  }
+  send() {
+    const body = this.state.draft.trim(); if (!body) return;
+    if (this.state.editing) {
+      const eid = this.state.editing;
+      this.setState(s => ({ messages: s.messages.map(m => m.id === eid ? { ...m, body, edited: true } : m), draft: '', editing: null }));
+      return;
+    }
+    const id = 'm' + Date.now();
+    const parent = this.state.replyTo;
+    this.setState(s => ({ messages: [...s.messages, { id, seat: this.ME, body, ts: this.now(), parent: parent || undefined }], draft: '', replyTo: null }));
+  }
+  renderVals() {
+    const s = this.state, T = this.eff();
+    const R = this.props.bubbleRadius ?? 6;
+    const msgs = s.messages;
+    const msgById = {}; msgs.forEach(m => { msgById[m.id] = m; });
+    const readersOf = {};
+    if (this.props.showReceipts ?? true) {
+      Object.entries(s.cursors).forEach(([seat, mid]) => {
+        if (seat === this.ME) return;
+        (readersOf[mid] = readersOf[mid] || []).push(seat);
+      });
+    }
+    const rows = [{ key: 'dv', isDiv: true, label: 'today' }];
+    const real = msgs.filter(m => !m.sys);
+    msgs.forEach((m, gi) => {
+      if (m.sys) { rows.push({ key: m.id, isSys: true, sysText: m.sysText }); return; }
+      const ri = real.indexOf(m);
+      const prev = ri > 0 ? real[ri - 1] : null;
+      const next = ri < real.length - 1 ? real[ri + 1] : null;
+      const prevAdj = prev && msgs[msgs.indexOf(m) - 1] === prev;
+      const nextAdj = next && msgs[msgs.indexOf(m) + 1] === next;
+      const mine = m.seat === this.ME;
+      const groupStart = !(prevAdj && prev.seat === m.seat) || !!m.parent;
+      const groupEnd = !(nextAdj && next.seat === m.seat);
+      const parent = m.parent ? msgById[m.parent] : null;
+      const bubbleStyle = {
+        maxWidth: '100%', padding: '9px 13px', fontSize: '14px', lineHeight: 1.4,
+        fontFamily: 'var(--bodyfont)', cursor: 'pointer', overflowWrap: 'break-word',
+        background: mine ? T.ac : T.sf, color: mine ? T.acTx : T.tx,
+        borderRadius: mine
+          ? R + 'px ' + R + 'px ' + (groupEnd ? Math.min(1, R) : R) + 'px ' + R + 'px'
+          : R + 'px ' + R + 'px ' + R + 'px ' + (groupEnd ? Math.min(1, R) : R) + 'px'
+      };
+      rows.push({
+        key: m.id, isMsg: true, mine,
+        wrapStyle: { display: 'flex', flexDirection: 'column', alignItems: mine ? 'flex-end' : 'flex-start', marginTop: groupStart ? '10px' : '2px' },
+        lineStyle: { display: 'flex', gap: '6px', maxWidth: '80%', alignItems: 'flex-end' },
+        showHead: !mine && groupStart,
+        avatarSlot: !mine, showAvatar: !mine && groupEnd,
+        glyphStyle: this.av(this.nameOf(m.seat), m.seat, 20),
+        glyphLetter: this.initial(this.nameOf(m.seat)),
+        name: this.nameOf(m.seat), time: m.ts,
+        deleted: !!m.deleted, visible: !m.deleted, edited: !!m.edited,
+        isReply: !!parent, replyName: parent ? this.nameOf(parent.seat) : '', replySnippet: parent ? this.snippet(parent) : '',
+        quoteStyle: {
+          fontSize: '11px', opacity: .75, marginBottom: '7px', paddingBottom: '6px',
+          borderBottom: '1px solid ' + (mine ? 'rgba(0,0,0,.18)' : T.ln)
+        },
+        body: m.body, bubbleStyle,
+        hasReactions: !!(m.reactions && Object.keys(m.reactions).length),
+        reactions: Object.entries(m.reactions || {}).map(([e, list]) => ({
+          e, n: list.length,
+          style: {
+            cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px', fontSize: '12px',
+            padding: '2px 8px', borderRadius: '4px',
+            border: '1px solid ' + (list.includes(this.ME) ? T.ac : T.ln),
+            background: T.sf, color: T.tx
+          },
+          onTap: (ev) => { ev.stopPropagation(); this.toggleReact(m.id, e); }
+        })),
+        reactRowStyle: { display: 'flex', gap: '5px', marginTop: '4px', flexWrap: 'wrap', padding: mine ? '0' : '0 0 0 32px' },
+        hasReaders: !!readersOf[m.id], readers: (readersOf[m.id] || []).map(seat => ({ style: this.dot(seat, 9) })),
+        open: () => { if (!m.deleted) this.setState({ sheetFor: m.id }); }
+      });
+    });
+    const seats = ['k7f2', 'm3x9', 'z44d', 'q8c1'];
+    const roster = seats.map(seat => ({
+      glyphStyle: this.av(this.nameOf(seat), seat, 30),
+      letter: this.initial(this.nameOf(seat)),
+      chipStyle: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', flex: 'none', opacity: s.online[seat] ? 1 : .45 },
+      label: s.typingSeat === seat ? 'typing…' : (seat === this.ME ? 'you' : this.nameOf(seat)),
+      online: !!s.online[seat]
+    }));
+    const sheetMsg = s.sheetFor ? msgById[s.sheetFor] : null;
+    const replyMsg = s.replyTo ? msgById[s.replyTo] : null;
+    const onlineCount = seats.filter(x => s.online[x]).length;
+    const arrivalLines = ['checking the pocket…', 'catching up…', 'connected — ' + (onlineCount - 1) + ' others here'];
+    const themes = Object.entries(this.THEMES).map(([key, t]) => ({
+      key, label: t.label,
+      cardStyle: {
+        cursor: 'pointer', background: t.bg, color: t.tx, borderRadius: '10px', padding: '12px',
+        border: '2px solid ' + (s.theme === key ? T.ac : T.ln)
+      },
+      dotA: { width: '10px', height: '10px', borderRadius: '50%', background: t.ac },
+      dotB: { width: '10px', height: '10px', borderRadius: '50%', background: t.tx, opacity: .8 },
+      dotC: { width: '10px', height: '10px', borderRadius: '50%', background: t.dim },
+      onPick: () => {
+        this.setState({ theme: key });
+        try { localStorage.setItem('spools-theme-v2', key); } catch (e) {}
+      }
+    }));
+    const stashRooms = [
+      { name: s.roomName, snippet: "you: copy. wearing the orange glasses…", meta: '21:04', glyphStyle: this.av(s.roomName, 'room1', 40), letter: this.initial(s.roomName), hasUnread: false, unread: 0, onOpen: () => { this.setState({ screen: 'room', arrival: (this.props.playArrival ?? true) ? 0 : null }, () => { if (this.state.arrival === 0) this.runArrival(); }); } },
+      { name: 'family', snippet: 'mom: what does lol mean exactly', meta: 'tue', glyphStyle: this.av('family', 'room2', 40), letter: 'F', hasUnread: true, unread: 3, onOpen: () => this.showToast('one room in this demo') },
+      { name: 'gas station summer', snippet: '14 tracks · wound in july', meta: 'jul', glyphStyle: this.av('gas station summer', 'room3', 40), letter: 'G', hasUnread: false, unread: 0, onOpen: () => this.showToast('one room in this demo') }
+    ];
+    return {
+      appRef: this.appRef, feedRef: this.feedRef,
+      frameDark: s.theme === 'dark' || s.theme === 'terminal',
+      isRoom: s.screen === 'room', isStash: s.screen === 'stash', isSettings: s.screen === 'settings',
+      goStash: () => this.setState({ screen: 'stash', sheetFor: null }),
+      goSettings: () => this.setState({ screen: 'settings' }),
+      goRoomBack: () => this.setState({ screen: 'room' }),
+      roomName: s.roomName, namedBy: s.namedBy,
+      onRoomName: (ev) => { const v = ev.target.value; this.setState({ roomName: v, namedBy: 'named by you' }); },
+      presenceLine: onlineCount + ' active',
+      roster, rows, rosterOpen: s.rosterOpen,
+      rosterChevron: s.rosterOpen ? '▲' : '▼',
+      toggleRoster: (ev) => { ev.stopPropagation(); this.setState(st => ({ rosterOpen: !st.rosterOpen })); },
+      typingVisible: !!s.typingSeat, typingGlyph: s.typingSeat ? this.av(this.nameOf(s.typingSeat), s.typingSeat, 20) : {},
+      typingLetter: s.typingSeat ? this.initial(this.nameOf(s.typingSeat)) : '',
+      draft: s.draft,
+      onDraft: (ev) => { const v = ev.target.value; this.setState({ draft: v }); },
+      onKey: (ev) => { if (ev.key === 'Enter') this.send(); },
+      send: () => this.send(),
+      replying: !!replyMsg, replyName: replyMsg ? this.nameOf(replyMsg.seat) : '', replySnippet: replyMsg ? this.snippet(replyMsg) : '',
+      cancelReply: () => this.setState({ replyTo: null }),
+      editing: !!s.editing,
+      cancelEdit: () => this.setState({ editing: null, draft: '' }),
+      stashRooms,
+      newSpool: () => this.showToast('not in this demo'),
+      people: seats.map(seat => ({
+        glyphStyle: this.av(this.nameOf(seat), seat, 20),
+        letter: this.initial(this.nameOf(seat)),
+        name: this.nameOf(seat), suffix: '#' + seat + (seat === this.ME ? ' · you' : ''),
+        onRename: (ev) => { const v = ev.target.value; this.setState(st => ({ profiles: { ...st.profiles, [seat]: v } })); }
+      })),
+      themes,
+      link: 'spools.lol/#spool=b7k2…&k=•••••',
+      copyLink: () => { try { navigator.clipboard.writeText('https://spools.lol/#spool=b7k2&relay=wss://relay.spools.lol&k=demo'); } catch (e) {} this.showToast('copied'); },
+      hasSheet: !!sheetMsg,
+      closeSheet: () => this.setState({ sheetFor: null }),
+      stop: (ev) => ev.stopPropagation(),
+      sheetName: sheetMsg ? this.nameOf(sheetMsg.seat) : '', sheetSnippet: sheetMsg ? this.snippet(sheetMsg) : '',
+      quick: ['👍', '😆', '💀', '🔥', '❤️'].map(e => ({ e, onTap: (ev) => { ev.stopPropagation(); if (s.sheetFor) this.toggleReact(s.sheetFor, e); this.setState({ sheetFor: null }); } })),
+      actReply: () => this.setState({ replyTo: s.sheetFor, sheetFor: null, editing: null }),
+      actEdit: () => { if (sheetMsg) this.setState({ editing: sheetMsg.id, draft: sheetMsg.body, replyTo: null, sheetFor: null }); },
+      actRemove: () => { const id = s.sheetFor; this.setState(st => ({ messages: st.messages.map(m => m.id === id ? { ...m, deleted: true } : m), sheetFor: null })); this.showToast('removed'); },
+      hasArrival: s.arrival !== null,
+      arrivalShown: arrivalLines.slice(0, (s.arrival ?? 0) + 1).map(text => ({ text })),
+      skipArrival: () => this.setState({ arrival: null }),
+      hasToast: !!s.toast, toast: s.toast
+    };
+  }
+}
+</script>
+</body>
+</html>

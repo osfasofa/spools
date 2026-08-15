@@ -178,6 +178,14 @@ honestly (T-127) rather than discovered in production:
 
 ## 6. Design sketch (draft until T-110/T-113 say otherwise)
 
+- **Visual design is settled** (owner design spike, Aug 2026):
+  [docs/design/room/README.md](design/room/README.md) is the high-fidelity
+  handoff — exact tokens for all four themes (blackout/terminal/daylight/paper),
+  per-component measurements, all five screens, and the SDK mapping (it uses
+  this brief's wind kinds verbatim). The `.dc.html` files beside it are
+  interactive **references to recreate in React, not code to ship**. Where that
+  README specifies visuals, it wins; where this brief specifies mechanics and
+  constraints, it wins.
 - **App**: `apps/room` — Vite + React, `base: './'`, forked from the mixtape's
   `useSpool` pattern; deployed early to `gh-pages` beside the mixtape so every
   ticket after the scaffold is a real multi-device test.

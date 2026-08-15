@@ -14,6 +14,15 @@ conversation with a composer that never loses focus.
 
 ## Context
 
+**The visual design is settled and high-fidelity: implement per
+`docs/design/room/README.md`** — token system (8 custom properties + a radius
+scalar, four themes), typography, and per-component measurements are final;
+recreate the `.dc.html` prototypes in React, don't ship them. The README's
+screen inventory is the app's surface: room feed, **stash (spool list — reuses
+`stash.list()`)**, settings, message action sheet, arrival overlay. Later
+tickets own their screens' behavior; this ticket lands the token system, the
+shell/routing, and the feed.
+
 Reuse the mixtape's bones (`apps/mixtape/src/useSpool.ts` — including its two
 paid-for bug fixes) and the house patterns: no event replay on load (render from
 `spool.entries`, then subscribe); `hashchange → reload`; open-from-hash or

@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>body{margin:0;background:#000;color:#F2F2F2}a{color:#D6D6D6}a:hover{color:#fff}</style>
+</helmet>
+<div style="min-height:100vh;background:#000;font-family:-apple-system,system-ui,'Helvetica Neue',sans-serif;color:#F2F2F2;display:flex;justify-content:center;padding:56px 24px 80px">
+<div style="width:100%;max-width:760px;display:flex;flex-direction:column;gap:44px">
+
+  <div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#9A9A9A;letter-spacing:.18em;margin-bottom:10px">SPOOLS / ROOM · BASE MODEL V0</div>
+    <div style="font-weight:800;font-size:34px;letter-spacing:-.02em;line-height:1.1">One layout. Eight tokens.<br>Everything else is a skin.</div>
+    <div style="font-size:14px;color:#9A9A9A;margin-top:12px;max-width:520px;line-height:1.55">The room client never hard-codes a color, a font, or a corner. It reads tokens. A theme is a set of token values, chosen per device — it syncs nothing. <a href="Spools Room v2.dc.html">Open the prototype →</a></div>
+  </div>
+
+  <div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#9A9A9A;letter-spacing:.18em;margin-bottom:14px">01 · TOKENS</div>
+    <div style="display:grid;grid-template-columns:110px repeat(4,1fr);gap:1px;background:#1F1F1F;border:1px solid #1F1F1F;font-size:11px">
+      <div style="background:#000;padding:10px;font-family:'JetBrains Mono',monospace;color:#9A9A9A"></div>
+      <div style="background:#000;padding:10px;font-weight:700">blackout</div>
+      <div style="background:#000;padding:10px;font-weight:700">terminal</div>
+      <div style="background:#000;padding:10px;font-weight:700">daylight</div>
+      <div style="background:#000;padding:10px;font-weight:700">paper</div>
+      <div style="background:#000;padding:10px;font-family:'JetBrains Mono',monospace;color:#9A9A9A">--bg</div>
+      <div style="background:#000;padding:8px"><div style="height:22px;background:#000000;border:1px solid #333"></div></div>
+      <div style="background:#000;padding:8px"><div style="height:22px;background:#0A0D0A;border:1px solid #333"></div></div>
+      <div style="background:#000;padding:8px"><div style="height:22px;background:#FAFAF7"></div></div>
+      <div style="background:#000;padding:8px"><div style="height:22px;background:#F4EEE1"></div></div>
+      <div style="background:#000;padding:10px;font-family:'JetBrains Mono',monospace;color:#9A9A9A">--sf</div>
+      <div style="background:#000;padding:8px"><div style="height:22px;background:#161616"></div></div>
+      <div style="background:#000;padding:8px"><div style="height:22px;background:#141B13"></div></div>
+      <div style="background:#000;padding:8px"><div style="height:22px;background:#EFEFEA"></div></div>
+      <div style="background:#000;padding:8px"><div style="height:22px;background:#EAE1CD"></div></div>
+      <div style="background:#000;padding:10px;font-family:'JetBrains Mono',monospace;color:#9A9A9A">--tx</div>
+      <div style="background:#000;padding:8px"><div style="height:22px;background:#F2F2F2"></div></div>
+      <div style="background:#000;padding:8px"><div style="height:22px;background:#D9E7D9"></div></div>
+      <div style="background:#000;padding:8px"><div style="height:22px;background:#171717"></div></div>
+      <div style="background:#000;padding:8px"><div style="height:22px;background:#29221A"></div></div>
+      <div style="background:#000;padding:10px;font-family:'JetBrains Mono',monospace;color:#9A9A9A">--dim</div>
+      <div style="background:#000;padding:8px"><div style="height:22px;background:#9A9A9A"></div></div>
+      <div style="background:#000;padding:8px"><div style="height:22px;background:#7A8C7A"></div></div>
+      <div style="background:#000;padding:8px"><div style="height:22px;background:#6E6E6A"></div></div>
+      <div style="background:#000;padding:8px"><div style="height:22px;background:#6F6355"></div></div>
+      <div style="background:#000;padding:10px;font-family:'JetBrains Mono',monospace;color:#9A9A9A">--ac</div>
+      <div style="background:#000;padding:8px"><div style="height:22px;background:#D6D6D6"></div></div>
+      <div style="background:#000;padding:8px"><div style="height:22px;background:#00E653"></div></div>
+      <div style="background:#000;padding:8px"><div style="height:22px;background:#0B8F3C"></div></div>
+      <div style="background:#000;padding:8px"><div style="height:22px;background:#C9553E"></div></div>
+      <div style="background:#000;padding:10px;font-family:'JetBrains Mono',monospace;color:#9A9A9A">--ln</div>
+      <div style="background:#000;padding:8px"><div style="height:22px;background:#1F1F1F"></div></div>
+      <div style="background:#000;padding:8px"><div style="height:22px;background:#1B231B"></div></div>
+      <div style="background:#000;padding:8px"><div style="height:22px;background:#E3E3DE"></div></div>
+      <div style="background:#000;padding:8px"><div style="height:22px;background:#D9CFB8"></div></div>
+      <div style="background:#000;padding:10px;font-family:'JetBrains Mono',monospace;color:#9A9A9A">--bodyfont</div>
+      <div style="background:#000;padding:10px;color:#9A9A9A">sans</div>
+      <div style="background:#000;padding:10px;color:#9A9A9A;font-family:'JetBrains Mono',monospace">mono</div>
+      <div style="background:#000;padding:10px;color:#9A9A9A">sans</div>
+      <div style="background:#000;padding:10px;color:#9A9A9A;font-family:Georgia,serif">serif</div>
+    </div>
+    <div style="font-size:12px;color:#9A9A9A;margin-top:10px;line-height:1.6">Plus <span style="font-family:'JetBrains Mono',monospace">--acTx</span> (text on accent) and a radius scalar (default 6px, 1px tail). Every theme must pass WCAG AA for text and essential UI — that's an acceptance criterion, not a later fix.</div>
+  </div>
+
+  <div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#9A9A9A;letter-spacing:.18em;margin-bottom:14px">02 · TYPE</div>
+    <div style="display:flex;flex-direction:column;gap:10px;border:1px solid #1F1F1F;padding:18px">
+      <div style="display:flex;align-items:baseline;gap:16px"><span style="font-weight:800;font-size:24px;letter-spacing:-.02em">Header</span><span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#9A9A9A">system sans · 800 · 16–24px</span></div>
+      <div style="display:flex;align-items:baseline;gap:16px"><span style="font-size:14px">Message body</span><span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#9A9A9A">--bodyfont · 400 · 14px</span></div>
+      <div style="display:flex;align-items:baseline;gap:16px"><span style="font-size:11px;color:#9A9A9A;font-weight:600">nadia <span style="font-family:'JetBrains Mono',monospace;font-weight:400;font-size:9px">20:41</span></span><span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#9A9A9A">sans 600 + mono meta · 9–11px</span></div>
+      <div style="display:flex;align-items:baseline;gap:16px"><span style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.14em;color:#9A9A9A">SECTION LABEL</span><span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#9A9A9A">mono · uppercase · 10px</span></div>
+    </div>
+    <div style="font-size:12px;color:#9A9A9A;margin-top:10px">Mono is reserved for machine-ish things: timestamps, seat ids, labels, links. Human words get the theme's body font.</div>
+  </div>
+
+  <div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#9A9A9A;letter-spacing:.18em;margin-bottom:14px">03 · PARTS</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1px;background:#1F1F1F;border:1px solid #1F1F1F">
+      <div style="background:#000;padding:18px">
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px">
+          <div style="width:30px;height:30px;border:1.5px solid #FF6A2B;border-radius:2px;color:#FF6A2B;font-family:'JetBrains Mono',monospace;font-weight:700;font-size:15px;display:flex;align-items:center;justify-content:center">N</div>
+          <div style="width:30px;height:30px;border:1.5px solid #4DC4FF;border-radius:2px;color:#4DC4FF;font-family:'JetBrains Mono',monospace;font-weight:700;font-size:15px;display:flex;align-items:center;justify-content:center">T</div>
+          <div style="width:9px;height:9px;background:#FF8FB3;border-radius:2px"></div>
+        </div>
+        <div style="font-size:12px;font-weight:700">seat tile + read dot</div>
+        <div style="font-size:11px;color:#9A9A9A;margin-top:4px;line-height:1.5">Initial of the display name; color hashed from the seat id — stable through renames, legible without uniqueness rules.</div>
+      </div>
+      <div style="background:#000;padding:18px">
+        <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:12px">
+          <div style="align-self:flex-start;background:#161616;color:#F2F2F2;border-radius:6px 6px 6px 1px;padding:8px 12px;font-size:13px">them, left</div>
+          <div style="align-self:flex-end;background:#D6D6D6;color:#0D0D0D;border-radius:6px 6px 1px 6px;padding:8px 12px;font-size:13px">you, right</div>
+        </div>
+        <div style="font-size:12px;font-weight:700">bubbles</div>
+        <div style="font-size:11px;color:#9A9A9A;margin-top:4px;line-height:1.5">Surface vs accent. Hard 6px corners, 1px tail on the last of a group. Radius is a token.</div>
+      </div>
+      <div style="background:#000;padding:18px">
+        <div style="display:flex;gap:6px;align-items:center;margin-bottom:12px">
+          <div style="border:1px solid #D6D6D6;background:#161616;border-radius:4px;padding:2px 8px;font-size:12px">🔥 <span style="font-size:10px">2</span></div>
+          <div style="border:1px solid #1F1F1F;background:#161616;border-radius:4px;padding:2px 8px;font-size:12px">💀 <span style="font-size:10px">1</span></div>
+        </div>
+        <div style="font-size:12px;font-weight:700">reactions</div>
+        <div style="font-size:11px;color:#9A9A9A;margin-top:4px;line-height:1.5">Accent border = yours. Any emoji; OS keyboard is the picker.</div>
+      </div>
+      <div style="background:#000;padding:18px">
+        <div style="text-align:center;font-size:10.5px;color:#9A9A9A;margin-bottom:12px">nadia renamed z44d to “the intern”</div>
+        <div style="font-size:12px;font-weight:700">system line</div>
+        <div style="font-size:11px;color:#9A9A9A;margin-top:4px;line-height:1.5">Renames and room events, centered and dim. The audit trail is free — every entry carries its author.</div>
+      </div>
+      <div style="background:#000;padding:18px">
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px">
+          <div style="flex:1;background:#161616;border:1px solid #1F1F1F;border-radius:6px;color:#9A9A9A;font-size:13px;padding:10px 12px">Message</div>
+          <div style="background:#D6D6D6;color:#0D0D0D;font-weight:700;font-size:15px;border-radius:6px;width:38px;height:38px;display:flex;align-items:center;justify-content:center">↑</div>
+        </div>
+        <div style="font-size:12px;font-weight:700">composer</div>
+        <div style="font-size:11px;color:#9A9A9A;margin-top:4px;line-height:1.5">44px targets. Reply and edit ride above it as one dismissible line.</div>
+      </div>
+      <div style="background:#000;padding:18px">
+        <div style="display:inline-flex;align-items:center;gap:5px;font-size:11px;color:#9A9A9A;margin-bottom:12px"><span style="width:6px;height:6px;border-radius:50%;background:#D6D6D6;display:inline-block"></span>3 active <span style="font-size:8px">▼</span></div>
+        <div style="font-size:12px;font-weight:700">presence</div>
+        <div style="font-size:11px;color:#9A9A9A;margin-top:4px;line-height:1.5">One line in the header; tap to slide out the people drawer. No standing roster bar.</div>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#9A9A9A;letter-spacing:.18em;margin-bottom:14px">04 · RULES OF THE SKIN</div>
+    <div style="display:flex;flex-direction:column;gap:0;border:1px solid #1F1F1F">
+      <div style="padding:14px 18px;border-bottom:1px solid #1F1F1F;font-size:13px;line-height:1.55"><span style="font-weight:700">Skins change tokens, never layout.</span> <span style="color:#9A9A9A">If a theme needs a structural change, it's not a theme — it's a new client.</span></div>
+      <div style="padding:14px 18px;border-bottom:1px solid #1F1F1F;font-size:13px;line-height:1.55"><span style="font-weight:700">Themes are per-device.</span> <span style="color:#9A9A9A">A theme is your handwriting. It lives in localStorage and syncs nothing.</span></div>
+      <div style="padding:14px 18px;border-bottom:1px solid #1F1F1F;font-size:13px;line-height:1.55"><span style="font-weight:700">AA contrast is an acceptance criterion.</span> <span style="color:#9A9A9A">No theme ships below the floor.</span></div>
+      <div style="padding:14px 18px;font-size:13px;line-height:1.55"><span style="font-weight:700">Future skins are additive.</span> <span style="color:#9A9A9A">Custom assets arrive later as URL + hash pointers — never bytes in the doc.</span></div>
+    </div>
+  </div>
+
+  <div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#9A9A9A;letter-spacing:.18em;margin-bottom:14px">05 · WHAT THE UI READS</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:12px;line-height:2;color:#9A9A9A;border:1px solid #1F1F1F;padding:16px 18px">
+      <div><span style="color:#F2F2F2">message</span> → kind:'message', body, data.seat, parent?</div>
+      <div><span style="color:#F2F2F2">nickname</span> → kind:'room:profile', newest wins per seat, resolved at render</div>
+      <div><span style="color:#F2F2F2">room name</span> → kind:'room:name', newest wins</div>
+      <div><span style="color:#F2F2F2">seen</span> → one 'room:read' entry per seat, body rewritten</div>
+      <div><span style="color:#F2F2F2">presence</span> → awareness, sealed; expires on its own</div>
+      <div><span style="color:#F2F2F2">theme</span> → localStorage. not an entry. not synced.</div>
+    </div>
+    <div style="font-size:12px;color:#9A9A9A;margin-top:10px">Never denormalize a name into a message. Store the seat; resolve at render.</div>
+  </div>
+
+  <div style="border-top:1px solid #1F1F1F;padding-top:18px;display:flex;justify-content:space-between;align-items:baseline">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#9A9A9A;letter-spacing:.12em">spools.lol · the relay can't read this</div>
+    <a href="Spools Room v2.dc.html" style="font-family:'JetBrains Mono',monospace;font-size:11px">prototype →</a>
+  </div>
+
+</div>
+</div>
+</x-dc>
+</body>
+</html>
