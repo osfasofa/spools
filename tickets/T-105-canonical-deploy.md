@@ -58,8 +58,35 @@ Promised TTL recorded in the relay README ("What the canonical relay
 promises"): 60 days as a courtesy window, not an archive; K=4, 8 MiB per
 deposit, 1 GiB relay-wide.
 
-**Remaining, owner at keyboard:** the cross-device midnight test against
-`DEFAULT_RELAY` — phone writes a keyed spool and goes genuinely offline, laptop
-cold-opens the share link from a fresh profile (no IndexedDB copy) and collects
-from the pocket. That's milestone criterion 1's real-world half and the last
-box before this ticket, M10, and the v1 roadmap close.
+**A test client is deployed.** Neither client had a host — T-090's
+"cross-device" was two origins on one laptop — so the mixtape `dist/` now ships
+to GitHub Pages from an orphan `gh-pages` branch:
+**https://osfasofa.github.io/spools/**. Rebuilt first: the committed `dist/`
+predated T-104 and had no pocket beat in it. `base: './'` means the subpath
+works untouched. Two notes for whoever redeploys: the crypto is pure-JS
+tweetnacl (`nacl.hash` for the token, secretbox for sealing), *not* WebCrypto,
+so there is no secure-context requirement and a plain-http LAN host would also
+have worked; and the `gh` CLI here is authed as `jdomonell`, which has only
+read access to `osfasofa/spools`, so the Pages REST API 404s — pushing the
+branch auto-enabled Pages anyway, and git push uses different credentials.
+
+**Production round trip, browser-proven (15 Aug 2026).** Against
+`DEFAULT_RELAY`, from the deployed client, with 0 rooms and 0 connections on
+the relay at open time:
+
+1. Fresh keyed spool `ivory-river-033` auto-created on load (newSpool keys by
+   default), one track wound → production pocket went 2 → 3 rooms/deposits.
+2. Writer tab closed; the origin's IndexedDB deleted outright (`ivory-river-033`
+   removed, nothing remaining) — a genuine cold device, no local copy.
+3. Cold open of the same link with nobody online: the beat rendered
+   **"⤵ 1 sealed copy from the pocket"** and the track came back. 0 console
+   errors.
+
+That closes the loop the automated harness could only prove locally: the
+production pocket both accepts deposits and serves them to a cold reader.
+
+**Remaining, owner at keyboard:** the genuinely-two-devices version — phone
+writes a keyed spool and goes offline (airplane mode, ideally on cellular so
+it isn't LAN-local), laptop cold-opens the share link from a fresh profile.
+The single-machine half above is proven; what's left is the physical-device,
+separate-network confirmation of milestone criterion 1.
