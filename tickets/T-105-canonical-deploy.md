@@ -1,7 +1,7 @@
 ---
 id: T-105
 title: "Canonical relay: pocket deploy"
-status: doing
+status: done
 milestone: M10
 depends: [T-101]
 ---
@@ -19,7 +19,7 @@ The default-link story actually gets fixed: the canonical Railway relay runs the
 - [x] Railway: volume mounted, `POCKET_DIR` + knobs set, deploy, verify health `pocket` block from production.
 - [x] fly.toml variant: `[mounts]` + revise the stateless comment (scale-to-zero now trades pocket latency, not correctness — deposits persist on the volume; note whatever Fly wake behavior is observed).
 - [x] README deploy button docs updated for both paths, including running *without* the pocket (env-less = today's relay).
-- [ ] Cross-device midnight test against production (milestone criterion 1's real-world half): phone writes + goes offline, laptop cold-opens the link.
+- [x] Cross-device midnight test against production (milestone criterion 1's real-world half): phone writes + goes offline, laptop cold-opens the link.
 - [x] Record the promised TTL + budget knob values in the README honesty section.
 
 ## Acceptance criteria
@@ -85,8 +85,14 @@ the relay at open time:
 That closes the loop the automated harness could only prove locally: the
 production pocket both accepts deposits and serves them to a cold reader.
 
-**Remaining, owner at keyboard:** the genuinely-two-devices version — phone
-writes a keyed spool and goes offline (airplane mode, ideally on cellular so
-it isn't LAN-local), laptop cold-opens the share link from a fresh profile.
-The single-machine half above is proven; what's left is the physical-device,
-separate-network confirmation of milestone criterion 1.
+**Cross-device run: owner-confirmed, 15 Aug 2026.** The two-physical-device
+version was run by the owner against the deployed client and `DEFAULT_RELAY`
+and reported working ("tested it pretty well and it seems to work"). Recorded
+as owner attestation rather than a measured run — the instrumented evidence in
+this ticket is the single-machine round trip above plus the volume restart;
+`scratch/torture-t104/midnight.mjs` remains the repeatable automated proof.
+
+**Ticket closed — M10 complete, and with it the v1 roadmap.** Milestone
+criterion 1 (a spool opens from the pocket when nobody is online) and
+criterion 2 (deposits survive a relay restart) are both met against the
+canonical relay.

@@ -77,6 +77,8 @@ Session-sized chunks of the build order (DESIGN_DOC §4). Each ticket is one fil
 
 Signed off Aug 2026 (all four decisions + two review-round hardenings); design record: [docs/M10-async-brief.md](../docs/M10-async-brief.md). The relay gains an optional capability: it holds the last few sealed full-state deposits per key-derived namespace — ciphertext or nothing — so the spool is there when a friend opens the link while the writer sleeps. T-100 gates everything; T-106 (SPEC) goes last, per the constitution.
 
+**Complete, 15 Aug 2026.** The canonical relay runs the pocket volume-backed (60-day TTL, stock knobs); deposits survive restarts, and a cold reader collects them with nobody online. A test client is deployed at <https://osfasofa.github.io/spools/> (mixtape `dist/` on the `gh-pages` branch). **M10 closed — and with it the v1 roadmap: every ticket T-001…T-107 is done.**
+
 | Ticket | Title | Depends | Status |
 |---|---|---|---|
 | [T-100](T-100-spike-pocket.md) | **Spike:** pocket feasibility (midnight loop, per-tag ring, 200-trap, frame-log numbers) | — | done |
@@ -84,7 +86,7 @@ Signed off Aug 2026 (all four decisions + two review-round hardenings); design r
 | [T-102](T-102-sdk-fetch-on-open.md) | SDK: token derivation, capability probe, fetch-merge on open, `pocket` event | T-100 | done |
 | [T-103](T-103-sdk-deposit-scheduler.md) | SDK: deposit scheduler, `leave()` flush, deposit-if-ahead + refresh-if-stale | T-102 | done |
 | [T-104](T-104-clients-pocket-beat.md) | Clients: "checking the pocket…" beat + midnight torture row | T-102 | done |
-| [T-105](T-105-canonical-deploy.md) | Canonical relay deploy: Railway volume (+ Fly mounts) — **owner at keyboard** | T-101 | doing |
+| [T-105](T-105-canonical-deploy.md) | Canonical relay deploy: Railway volume (+ Fly mounts) — **owner at keyboard** | T-101 | done |
 | [T-106](T-106-spec-amendment.md) | SPEC v1.1: optional pocket capability + honesty clause; SDK-API; docs | T-101, T-103 | done |
 | [T-107](T-107-keeper.md) | `spools-keeper`: headless always-on peer (optional) | T-100 | done |
 
