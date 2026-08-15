@@ -9,12 +9,22 @@
 // relay URL ending in /yjs):
 //   ws(s)://host/yjs/{room}   opaque byte broadcast, room = path segment
 //   ws(s)://host/             y-webrtc signaling (topic pub/sub)
-//   GET  any path             health JSON — counts only, never content
+//   PUT/GET /pocket/{room}/{token}
+//                             the pocket (M10): sealed full-state deposits,
+//                             held unread so a spool survives the gap between
+//                             one friend's evening and another's midnight
+//   GET  any other path       health JSON — counts only, never content
 //
 // Signaling half lifted from fosho server/server.js:50–173. Broadcast half
-// per T-003: fan out to the room, sender excluded, bytes untouched.
+// per T-003: fan out to the room, sender excluded, bytes untouched. Pocket
+// per T-100/T-101: deposits live under key-derived namespaces the relay
+// can't guess into, newest-per-tag so nobody's worldview gets flushed, and
+// the relay only ever reads a deposit's 7 plaintext header bytes.
 
 import http from 'node:http'
+import fs from 'node:fs'
+import fsp from 'node:fs/promises'
+import path from 'node:path'
 import { WebSocketServer } from 'ws'
 import * as map from 'lib0/map'
 
@@ -32,6 +42,17 @@ const PING_TIMEOUT_MS = 30_000
 // is single-digit MB at most; a room is an intimate-scale rendezvous.
 const MAX_FRAME_BYTES = 8 * 1024 * 1024
 const MAX_CONNS_PER_ROOM = 64
+
+// Pocket knobs (T-101). Memory by default — npx-and-done stays npx-and-done,
+// and a restart degrades to exactly v1 semantics. POCKET_DIR makes deposits
+// files on disk: no database, just <room>/<token>/<tag>.
+const POCKET_TTL_DAYS = Number(process.env.POCKET_TTL_DAYS ?? 60)
+const POCKET_MAX_BYTES = Number(process.env.POCKET_MAX_BYTES ?? MAX_FRAME_BYTES)
+const POCKET_K = Number(process.env.POCKET_K ?? 4) // distinct tags kept per namespace
+const POCKET_MAX_TOTAL_BYTES = Number(process.env.POCKET_MAX_TOTAL_BYTES ?? 1024 * 1024 * 1024)
+const POCKET_PUTS_PER_MIN = Number(process.env.POCKET_PUTS_PER_MIN ?? 12) // per IP
+const POCKET_SWEEP_MS = Number(process.env.POCKET_SWEEP_MS ?? 3_600_000)
+const POCKET_DIR = process.env.POCKET_DIR || null
 
 const wsReadyStateConnecting = 0
 const wsReadyStateOpen = 1
@@ -163,6 +184,175 @@ const onSignalingConnection = (conn) => {
   })
 }
 
+// ========== POCKET HALF (sealed deposits, /pocket/{room}/{token}) ==========
+// The relay's third job (M10, user-approved): hold the last few sealed
+// full-state deposits per key-derived namespace, so the spool is there when
+// a friend opens the link while the writer sleeps. The token is a one-way
+// hash of the key derived by CLIENTS — this server never learns the key,
+// can't verify the token, and can't read a deposit past its 7-byte plaintext
+// header (magic ‖ version ‖ tag). Ciphertext or nothing, by construction:
+// keyless spools derive no token and so have no pocket.
+
+const POCKET_MAGIC_0 = 0xe2
+const POCKET_MAGIC_1 = 0xe3
+const POCKET_VERSION = 1
+const POCKET_HEADER_LEN = 7 // magic(2) + version(1) + tag(4)
+// namespace segments become file paths under POCKET_DIR — charset is the
+// traversal guard. Codes and base64url tokens both fit comfortably.
+const SEGMENT_RE = /^[A-Za-z0-9_-]{1,64}$/
+
+/** `${room}/${token}` → { room, token, touchedAt, tags: Map(tagHex → {at, bytes, blob|null}) } */
+const namespaces = new Map()
+let pocketTotalBytes = 0
+/** ip → [put timestamps] within the last minute */
+const putLog = new Map()
+
+const nsDir = (ns) => path.join(POCKET_DIR, ns.room, ns.token)
+
+/** disk mode: rebuild the index from files at boot; touch times restart as deposit times */
+if (POCKET_DIR) {
+  fs.mkdirSync(POCKET_DIR, { recursive: true })
+  for (const room of fs.readdirSync(POCKET_DIR)) {
+    const roomPath = path.join(POCKET_DIR, room)
+    if (!fs.statSync(roomPath).isDirectory()) continue
+    for (const token of fs.readdirSync(roomPath)) {
+      const ns = { room, token, touchedAt: 0, tags: new Map() }
+      for (const tag of fs.readdirSync(path.join(roomPath, token))) {
+        const st = fs.statSync(path.join(roomPath, token, tag))
+        ns.tags.set(tag, { at: st.mtimeMs, bytes: st.size, blob: null })
+        ns.touchedAt = Math.max(ns.touchedAt, st.mtimeMs)
+        pocketTotalBytes += st.size
+      }
+      if (ns.tags.size > 0) namespaces.set(`${room}/${token}`, ns)
+    }
+  }
+}
+
+const evictNamespace = async (nsKey) => {
+  const ns = namespaces.get(nsKey)
+  if (!ns) return
+  for (const t of ns.tags.values()) pocketTotalBytes -= t.bytes
+  namespaces.delete(nsKey)
+  if (POCKET_DIR) await fsp.rm(nsDir(ns), { recursive: true, force: true }).catch(() => {})
+}
+
+const evictTag = async (ns, tagHex) => {
+  const t = ns.tags.get(tagHex)
+  if (!t) return
+  pocketTotalBytes -= t.bytes
+  ns.tags.delete(tagHex)
+  if (POCKET_DIR) await fsp.rm(path.join(nsDir(ns), tagHex), { force: true }).catch(() => {})
+}
+
+/** make room under the relay-wide budget by dropping stalest namespaces (never the one being written) */
+const ensureBudget = async (incomingBytes, protectedKey) => {
+  while (pocketTotalBytes + incomingBytes > POCKET_MAX_TOTAL_BYTES) {
+    let stalest = null
+    for (const [key, ns] of namespaces) {
+      if (key !== protectedKey && (!stalest || ns.touchedAt < stalest.ns.touchedAt)) stalest = { key, ns }
+    }
+    if (!stalest) return false
+    await evictNamespace(stalest.key)
+  }
+  return true
+}
+
+const pocketJson = (response, status, body) => {
+  response.writeHead(status, { 'Content-Type': 'application/json' })
+  response.end(JSON.stringify({ format: 'spool-pocket', version: POCKET_VERSION, ...body }))
+}
+
+/** {room, token} when the path has the exact pocket shape, else null */
+const parsePocketPath = (pathname) => {
+  const segments = pathname.split('/').filter((s) => s.length > 0)
+  if (segments.length !== 3 || segments[0] !== 'pocket') return null
+  return { room: segments[1], token: segments[2] }
+}
+
+const handlePocketPut = (request, response, { room, token }) => {
+  const ip = request.socket.remoteAddress ?? 'unknown'
+  const now = Date.now()
+  const recent = (putLog.get(ip) ?? []).filter((t) => now - t < 60_000)
+  if (recent.length >= POCKET_PUTS_PER_MIN) return pocketJson(response, 429, { error: 'rate limited' })
+  recent.push(now)
+  putLog.set(ip, recent)
+
+  const chunks = []
+  let size = 0
+  let overflowed = false
+  request.on('data', (chunk) => {
+    size += chunk.length
+    if (size > POCKET_MAX_BYTES) {
+      overflowed = true
+      pocketJson(response, 413, { error: 'deposit too big', maxBytes: POCKET_MAX_BYTES })
+      request.destroy()
+      return
+    }
+    chunks.push(chunk)
+  })
+  request.on('end', async () => {
+    if (overflowed) return
+    const blob = Buffer.concat(chunks)
+    if (
+      blob.length < POCKET_HEADER_LEN ||
+      blob[0] !== POCKET_MAGIC_0 ||
+      blob[1] !== POCKET_MAGIC_1 ||
+      blob[2] !== POCKET_VERSION
+    ) {
+      return pocketJson(response, 400, { error: 'not a deposit envelope' })
+    }
+    const nsKey = `${room}/${token}`
+    const ns = map.setIfUndefined(namespaces, nsKey, () => ({ room, token, touchedAt: 0, tags: new Map() }))
+    ns.touchedAt = Date.now()
+    const tagHex = blob.subarray(3, 7).toString('hex')
+    const replacing = ns.tags.get(tagHex)?.bytes ?? 0
+    if (!(await ensureBudget(blob.length - replacing, nsKey))) {
+      if (ns.tags.size === 0) namespaces.delete(nsKey)
+      return pocketJson(response, 507, { error: 'relay storage budget exhausted' })
+    }
+    // newest per tag: a writer only ever replaces their own slot (T-100 S3c)
+    if (replacing) pocketTotalBytes -= replacing
+    ns.tags.set(tagHex, { at: Date.now(), bytes: blob.length, blob: POCKET_DIR ? null : blob })
+    pocketTotalBytes += blob.length
+    if (ns.tags.size > POCKET_K) {
+      let stalest = null
+      for (const [t, d] of ns.tags) if (!stalest || d.at < stalest.at) stalest = { t, at: d.at }
+      await evictTag(ns, stalest.t)
+    }
+    if (POCKET_DIR) {
+      await fsp.mkdir(nsDir(ns), { recursive: true })
+      await fsp.writeFile(path.join(nsDir(ns), tagHex), blob)
+    }
+    pocketJson(response, 200, { stored: true })
+  })
+}
+
+const handlePocketGet = async (request, response, { room, token }) => {
+  const ns = namespaces.get(`${room}/${token}`)
+  if (ns) ns.touchedAt = Date.now() // touch-on-read: opened spools stay covered
+  const list = ns ? [...ns.tags.entries()].sort((a, b) => b[1].at - a[1].at) : []
+  const deposits = []
+  for (const [tagHex, t] of list) {
+    const blob = t.blob ?? (await fsp.readFile(path.join(nsDir(ns), tagHex)).catch(() => null))
+    if (blob) deposits.push({ at: Math.round(t.at), blob: blob.toString('base64') })
+  }
+  pocketJson(response, 200, { ttlDays: POCKET_TTL_DAYS, deposits })
+}
+
+/** TTL sweep + rate-log pruning; interval unref'd so it never holds the process open */
+setInterval(() => {
+  const expiry = Date.now() - POCKET_TTL_DAYS * 86_400_000
+  for (const [key, ns] of namespaces) {
+    if (ns.touchedAt < expiry) evictNamespace(key)
+  }
+  const cutoff = Date.now() - 60_000
+  for (const [ip, times] of putLog) {
+    const recent = times.filter((t) => t > cutoff)
+    if (recent.length === 0) putLog.delete(ip)
+    else putLog.set(ip, recent)
+  }
+}, POCKET_SWEEP_MS).unref()
+
 // ========== HTTP + UPGRADE ROUTING ==========
 
 const broadcastWss = new WebSocketServer({ noServer: true, maxPayload: MAX_FRAME_BYTES })
@@ -176,12 +366,26 @@ const countConns = (m) => {
 }
 
 const server = http.createServer((request, response) => {
+  const pathname = new URL(request.url, 'http://relay').pathname
+  const pocket = parsePocketPath(pathname)
   response.setHeader('Access-Control-Allow-Origin', '*')
-  response.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS')
+  response.setHeader('Access-Control-Allow-Methods', pocket ? 'GET, PUT, OPTIONS' : 'GET, OPTIONS')
+  if (pocket) response.setHeader('Access-Control-Allow-Headers', 'Content-Type')
   if (request.method === 'OPTIONS') {
     response.writeHead(204)
     response.end()
     return
+  }
+  if (pocket) {
+    if (!SEGMENT_RE.test(pocket.room) || !SEGMENT_RE.test(pocket.token)) {
+      return pocketJson(response, 400, { error: 'bad namespace' })
+    }
+    if (request.method === 'PUT') return handlePocketPut(request, response, pocket)
+    if (request.method === 'GET') {
+      handlePocketGet(request, response, pocket).catch(() => pocketJson(response, 500, { error: 'pocket read failed' }))
+      return
+    }
+    return pocketJson(response, 405, { error: 'GET and PUT only' })
   }
   response.writeHead(200, { 'Content-Type': 'application/json' })
   response.end(
@@ -190,6 +394,13 @@ const server = http.createServer((request, response) => {
       service: 'spools-relay',
       relay: { rooms: rooms.size, connections: countConns(rooms) },
       signaling: { topics: topics.size, connections: countConns(topics) },
+      // counts and advertised limits only — never namespace ids, never content
+      pocket: {
+        rooms: new Set([...namespaces.values()].map((ns) => ns.room)).size,
+        deposits: [...namespaces.values()].reduce((n, ns) => n + ns.tags.size, 0),
+        ttlDays: POCKET_TTL_DAYS,
+        maxBytes: POCKET_MAX_BYTES,
+      },
     })
   )
 })
