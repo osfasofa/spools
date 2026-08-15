@@ -276,7 +276,17 @@ export const MessageList = ({
       if (atBottom.current) setPill(false)
     }
     el.addEventListener('scroll', onScroll, { passive: true })
-    return () => el.removeEventListener('scroll', onScroll)
+    // the virtual keyboard resizes the app (main.tsx's --app-height) without
+    // a React render — keep a bottom-pinned reader pinned through it
+    const vv = window.visualViewport
+    const onViewport = () => {
+      if (atBottom.current) el.scrollTop = el.scrollHeight
+    }
+    vv?.addEventListener('resize', onViewport)
+    return () => {
+      el.removeEventListener('scroll', onScroll)
+      vv?.removeEventListener('resize', onViewport)
+    }
   }, [])
 
   const showEarlier = () => {

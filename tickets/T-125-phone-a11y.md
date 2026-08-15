@@ -65,6 +65,19 @@ screen reader narrates every peer keystroke; contrast floors (T-122 baseline).
   header/composer/rows ≥ 44 px.
 - Contrast floors were closed in T-122 (all four themes ≥ 4.5 on every
   text pair, measured).
+- **iOS keyboard/zoom hardening** (owner-requested, post-close): the two
+  Safari behaviors that shear the layout on input focus are both defused —
+  (1) **auto-zoom**: all text inputs are now 16 px (iOS zooms the page when
+  a focused field is smaller; bubbles stay 14 px — the one deliberate
+  deviation from the design README's 14 px input, commented in CSS);
+  (2) **viewport shear**: the shell's height is `var(--app-height, 100dvh)`
+  driven by a `visualViewport` sync in main.tsx with page scroll pinned to
+  0, `body{overflow:hidden}` so Safari has nothing to "helpfully" scroll,
+  `interactive-widget=resizes-content` for Android Chrome, and a
+  visualViewport listener in the feed keeps a bottom-pinned reader pinned
+  through the resize. Verified headlessly (viewport 667→400: shell follows,
+  composer visible, feed pinned, `scrollY` 0, inputs 16 px); the real-device
+  feel check stays on the H5/keyboard row below.
 
 ### Remaining — the owner's hardware pass (iOS Safari + Android Chrome)
 
