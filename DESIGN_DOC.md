@@ -173,7 +173,7 @@ Sequenced to always have something working, never to design in the abstract. The
 - [x] **5. `rewind()`** — Yjs snapshot history + a scrubber in the reference client. The memory feature; the demo that sells the vision. *(done Aug 2026, T-060–T-061; pitch asset at `docs/assets/rewind-demo.gif`)*
 - [x] **6. Spec doc** — written from the working system. *(done Aug 2026, T-070: SPEC.md, three clean-room adversarial reads, zero blocking ambiguities on the final pass)*
 - [x] **7. Export / stash** — spool as portable file; local archive management. *(done Aug 2026, T-080: format (c) — readable + lossless in one JSON file; stash shipped in SDK + client)*
-- [ ] **Async sync — the pocket (M10)**: sealed state deposits + the keeper. Signed off Aug 2026; brief at [docs/M10-async-brief.md](docs/M10-async-brief.md), tickets T-100–T-107. *Code, spec (v1.1 §6), clients, and `spools-keeper` shipped Aug 2026 — remaining: the canonical-relay volume deploy (T-105, owner at keyboard) and npm publishes.*
+- [x] **8. Async sync — the pocket (M10)** — sealed state deposits + the keeper: the midnight mixtape arrives. *(done Aug 2026, T-100–T-107; brief at [docs/M10-async-brief.md](docs/M10-async-brief.md), spec v1.1 §6. Live and verified in production on the canonical relay — volume-backed, 60-day courtesy TTL, T-105. Remaining errand: npm publishes.)*
 - [ ] Later: encryption hardening pass, `splice`, more renderers (board, blog).
 
 **Immediate errands:** ~~publish `spools@0.0.1` stub on npm to claim the name; check domains~~ *done Aug 2026 (T-002): `spools@0.0.1` published as the real SDK, `spools-relay@0.1.0` live, repo public under `osfasofa`, domains recorded-not-bought (existing URLs suffice — the link format is host-agnostic by design).*

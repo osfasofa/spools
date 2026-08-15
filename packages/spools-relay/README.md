@@ -124,5 +124,14 @@ and another's midnight. If the pocket is empty, expired, or the relay is too
 old to have one, you get exactly the sync-when-together baseline: the
 feature only ever adds. That's the deal, and it's the point.
 
+**What the canonical relay promises** (the one the SDK defaults to): sealed
+deposits held **60 days** from their last touch — a read refreshes the clock,
+so a spool you keep opening keeps being covered — **8 MiB** per deposit, four
+writer-session slots per spool, on a disk that survives restarts. A courtesy
+window, not an archive: your devices are still where the spool lives, and
+there is no way to ask this relay to hand anything back early (deleting a
+deposit would mean proving standing, which is an identity system this project
+doesn't have). Run your own if you'd rather set those numbers yourself.
+
 Env: `PORT` (default 4444), `HOST` (default 0.0.0.0), pocket knobs above.
 Node ≥ 18. Tests: `pnpm test` (node:test, spawns real instances).
