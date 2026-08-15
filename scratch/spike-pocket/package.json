@@ -1,0 +1,14 @@
+{
+  "name": "spike-pocket",
+  "private": true,
+  "type": "module",
+  "description": "T-100: pocket feasibility spike — throwaway, not shipped",
+  "dependencies": {
+    "spools": "0.0.1",
+    "ws": "^8.18.0",
+    "lib0": "^0.2.97",
+    "yjs": "^13.6.0",
+    "tweetnacl": "^1.0.3",
+    "fake-indexeddb": "^6.0.0"
+  }
+}
