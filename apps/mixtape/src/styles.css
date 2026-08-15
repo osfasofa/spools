@@ -259,3 +259,17 @@ a.trackTitle:hover { border-bottom-color: var(--stripe); color: var(--stripe); }
   .page { padding-top: 1.25rem; }
   .deck { flex-wrap: wrap; }
 }
+
+/* the pocket beat (T-104): quiet narration, not chrome */
+.pocketBeat {
+  font-size: 0.8rem;
+  font-style: italic;
+  opacity: 0.7;
+  text-align: center;
+  margin: 0.3rem 0;
+  animation: pocketFade 0.4s ease-in;
+}
+@keyframes pocketFade {
+  from { opacity: 0; }
+  to { opacity: 0.7; }
+}

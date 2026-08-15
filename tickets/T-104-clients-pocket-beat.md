@@ -1,7 +1,7 @@
 ---
 id: T-104
 title: "Clients: the pocket beat"
-status: todo
+status: done
 milestone: M10
 depends: [T-102]
 ---
@@ -27,4 +27,9 @@ Fetched deposits fire ordinary `entry` diff events, so both clients (`apps/clien
 
 ## Notes / open questions
 
-(filled during work)
+- **The zero-change claim held exactly.** Neither client's renderers changed a line — midnight-fetched entries arrive through the ordinary `entry` diff events (§5 event-contract decision paying rent, as predicted). The only additions are narration: a `#pocket` span + `showPocket` in the static client, a `pocket` field in `useSpool` + three conditional lines in the mixtape App.
+- Beat behavior in both clients: `checking` shows while the fetch is in flight; `applied` flashes "N sealed copies from the pocket" (+ dropped count) and fades after 4 s; `empty`/`unavailable` stay silent — a v1 relay must *feel* like v1; `depositError` is the one persistent line ("too big"/"relay full" → live-only, said out loud).
+- Vendor bundle rebuilt (`pnpm run client:vendor`, 654 KB, pocket included); mixtape `tsc --noEmit && vite build` green.
+- **The torture row is automated in a real browser**: `scratch/torture-t104/midnight.mjs`, same zero-dep CDP idiom as the T-021/T-051 harnesses (Tab class copied). 3/3: midnight cold-open from deposits alone (fresh origin, empty room, `leave()`-flushed deposit), old relay in vivo (silent `unavailable`, winding fine), empty pocket (silent). Results table added to TESTING.md.
+- Harness gotcha for containerized runs: Chromium as root needs `--no-sandbox --disable-dev-shm-usage`; the harness defaults `CHROME_BIN` to the Playwright chromium path with env override.
+- `visibilitychange` flush remains manual-only (headless CDP can't fake it faithfully) — it's in scenario 7's manual steps for a human pass.
