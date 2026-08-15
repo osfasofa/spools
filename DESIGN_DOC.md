@@ -144,7 +144,7 @@ Design goal: **so dumb that running one is trivial and trusting one is unnecessa
 
 1. WebRTC signaling — introduce peers so they can connect directly.
 2. Websocket byte relay — per-room broadcast of **opaque frames**; the reliable sync path when direct P2P fails (NAT) or as the always-works default. The relay never parses a frame and never holds a doc. This is what makes "relay never sees content" literally true rather than aspirational, and it's what lets encrypted frames pass through unchanged.
-3. *(Deferred, v2 decision)* optional encrypted-blob persistence so a spool can sync even when peers are never simultaneously online. Do not spec until needed. Note: the dumb-relay design makes this cheap later — persistence is appending the bytes already being forwarded and replaying them on join.
+3. *(Shipped, M10 — the pocket, SPEC §6.)* Optional sealed-deposit storage so a spool syncs even when peers are never simultaneously online: clients deposit the whole spool sealed under key-derived namespaces; the relay holds the newest per session tag, TTL'd, reading nothing past a 7-byte header. Keyed-only — ciphertext or nothing. (The frame-log sketch that used to sit here was retired on evidence — §5 and docs/M10-async-brief.md.)
 
 - fosho's ~200-line `server.js` provides the signaling half verbatim; its y-websocket half (which parses messages and keeps a server-side doc) gets **replaced** by the dumb broadcaster. Half extraction, half small invention — gated by a feasibility spike (do y-websocket clients complete their sync handshake through a pipe that only forwards? peers answer each other's sync steps, so they should — verify first).
 - Ship as `npx spools-relay` + a one-click Railway/Fly deploy button in the README. **If spinning up a relay takes longer than making coffee, the self-hosting promise has failed.**
@@ -173,7 +173,7 @@ Sequenced to always have something working, never to design in the abstract. The
 - [x] **5. `rewind()`** — Yjs snapshot history + a scrubber in the reference client. The memory feature; the demo that sells the vision. *(done Aug 2026, T-060–T-061; pitch asset at `docs/assets/rewind-demo.gif`)*
 - [x] **6. Spec doc** — written from the working system. *(done Aug 2026, T-070: SPEC.md, three clean-room adversarial reads, zero blocking ambiguities on the final pass)*
 - [x] **7. Export / stash** — spool as portable file; local archive management. *(done Aug 2026, T-080: format (c) — readable + lossless in one JSON file; stash shipped in SDK + client)*
-- [ ] **Async sync — the pocket (M10)**: sealed state deposits + the keeper. Signed off Aug 2026; brief at [docs/M10-async-brief.md](docs/M10-async-brief.md), tickets T-100–T-107.
+- [ ] **Async sync — the pocket (M10)**: sealed state deposits + the keeper. Signed off Aug 2026; brief at [docs/M10-async-brief.md](docs/M10-async-brief.md), tickets T-100–T-107. *Code, spec (v1.1 §6), clients, and `spools-keeper` shipped Aug 2026 — remaining: the canonical-relay volume deploy (T-105, owner at keyboard) and npm publishes.*
 - [ ] Later: encryption hardening pass, `splice`, more renderers (board, blog).
 
 **Immediate errands:** ~~publish `spools@0.0.1` stub on npm to claim the name; check domains~~ *done Aug 2026 (T-002): `spools@0.0.1` published as the real SDK, `spools-relay@0.1.0` live, repo public under `osfasofa`, domains recorded-not-bought (existing URLs suffice — the link format is host-agnostic by design).*

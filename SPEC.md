@@ -1,4 +1,4 @@
-# Spool Protocol — v1
+# Spool Protocol — v1.1
 
 Spool is a protocol for a few people to share a living document — a mixtape,
 a chat, a list — with no server that ever sees their content. This document
@@ -203,7 +203,8 @@ text but the rule is *forward, don't inspect* — to every other connection
 in the same room, verbatim: bytes untouched, frame type (opcode) preserved,
 sender excluded. It MUST NOT parse,
 transform, filter, or persist frames (v1), and MUST NOT share frames across
-rooms. A standard y-websocket server is **not** a compliant relay: it parses
+rooms. (Deposits, §6, are not frames: the pocket adds sealed storage beside
+the broadcast path without touching this rule.) A standard y-websocket server is **not** a compliant relay: it parses
 every message and materializes a server-side copy of the document — it sees
 content, and it cannot carry encrypted frames (§4) at all. The relay MAY
 additionally serve y-webrtc signaling at its root path; the canonical
@@ -307,7 +308,12 @@ sizes and timing. For a **keyed** spool it can never observe document
 content, entry text, or the key — the key makes that physics, not policy.
 For a **plaintext** spool the relay merely promises not to look: its frames
 are ordinary Yjs messages any server could parse. The key is what upgrades
-the promise. Do not claim more than this.
+the promise. A relay offering the pocket (§6) additionally holds sealed
+deposits at rest and observes: that a spool has deposits, their sizes and
+times, an opaque key-derived namespace id (never invertible to the key),
+and how many distinct session tags deposited recently — still zero content,
+because the pocket is keyed-only: **it stores ciphertext or nothing.** Do
+not claim more than this.
 
 ## 5. The export file (optional surface)
 
@@ -327,6 +333,126 @@ that code (a CRDT merge; restoring into nothing and reunifying with
 existing state are the same operation). Keyed spools export **decrypted**,
 and the key MUST NOT be written into the file — the link is the only key
 carrier. Readers MUST reject a `version` newer than they understand.
+
+## 6. The pocket (optional relay capability)
+
+A dumb relay cannot answer a waiting peer, so §3 sync requires two people
+online together. The **pocket** closes that gap without opening the relay's
+eyes: clients holding a spool's key periodically hand the relay a
+**deposit** — the whole spool, sealed — and whoever opens the link later
+collects, decrypts, and merges. The relay stores ciphertext it cannot read
+under names it cannot guess, or it stores nothing: **the pocket is
+keyed-only.** A plaintext spool has no pocket; its asynchronous option is an
+always-on peer (e.g. the reference `spools-keeper` — an ordinary client,
+outside this spec's scope because it needs nothing from it).
+
+The capability is OPTIONAL for relays, and this whole section is additive:
+no §3 rule changes (deposits are not frames), the link grammar is untouched
+(the capability is discovered from the relay the link already names), and a
+client or relay ignorant of this section remains fully conformant.
+
+**Namespace token.** Deposits live under a per-spool namespace derived from
+the key, by clients only:
+
+```
+token = base64url-unpadded( SHA-512( "spool-pocket-v1" ‖ key )[0..12) )
+```
+
+— the UTF-8 bytes of the domain string, then the 32 key bytes; the first 12
+digest bytes; base64url without padding (16 characters). The token is a
+capability, not an identity: deriving it requires the key, so only
+link-holders can write — or even read — where link-holders read. The relay
+cannot verify a token and MUST NOT be expected to; a namespace's whole
+defense is that strangers can't guess 96 bits. The derivation is one-way
+(the token never yields the key) and the token appears only in URL paths.
+
+**The deposit envelope.**
+
+```
+0xE2 0xE3 ‖ version (1 byte, = 0x01) ‖ tag (4 bytes) ‖ nonce (24 bytes) ‖ ciphertext
+```
+
+— §4's secretbox, same 32-byte key as-is, over `Y.encodeStateAsUpdate(doc)`:
+one writer's whole worldview, applied on receipt with `Y.applyUpdate` — a
+CRDT merge with no clobber path (restoring into nothing and reunifying with
+existing state are the same operation, as in §5). The 7-byte plaintext
+header is the only part of a deposit a relay may read. The **tag** is 4
+random bytes drawn fresh each session: a ring-partition key with no
+continuity — spoofable by any key-holder, deliberately not identity, there
+so one writer's repeated deposits replace their *own* slot instead of
+flushing a diverged peer's only worldview. Readers MUST drop, unapplied, any
+deposit whose magic is wrong or whose version is newer than they understand.
+
+**Endpoints.** The pocket lives on the relay URL's origin, scheme-mapped
+ws→http / wss→https:
+
+- `PUT <origin>/pocket/<room>/<token>` — body: one deposit,
+  `application/octet-stream`. Success is `200` with `"stored": true` in the
+  envelope. The relay MUST reject bodies lacking the 7-byte header shape
+  (400) and MAY enforce per-deposit size (413), admission rate (429), and
+  storage-budget (507) limits.
+- `GET <origin>/pocket/<room>/<token>` — the held deposits, newest first,
+  at most one per tag; `at` is stamped by the relay's clock at storage:
+
+```
+{ "format": "spool-pocket", "version": 1, "ttlDays": <number>,
+  "deposits": [ { "at": <ms>, "blob": <standard base64 of one envelope> }, … ] }
+```
+
+Every pocket response — success or error — MUST carry
+`"format": "spool-pocket"` and a numeric `"version"`. Both path segments
+MUST be constrained to `[A-Za-z0-9_-]`, at most 64 characters each (reject
+others with 400) — spool codes and tokens both fit, and namespace segments
+become storage names, so the charset is the traversal guard. Browser clients
+reach these endpoints cross-origin: a relay offering the pocket MUST answer
+CORS preflights permissively for GET and PUT on pocket paths.
+
+**Detection is the envelope, never the status code.** Relays predating this
+section answer `200` + health JSON to *any* HTTP request. A `200` whose body
+is not a pocket envelope therefore means **the relay does not offer the
+pocket** — it MUST NOT be read as an empty pocket, and a depositor MUST NOT
+treat such a response as stored. An envelope `version` newer than the client
+understands reads the same way (the §5 export-file rule). Relays offering
+the pocket SHOULD also advertise a `pocket` block (counts and limits only,
+never namespace ids) in their health JSON — informative for humans and
+operators; the envelope rule alone is normative.
+
+**Relay conformance, if offered.** A relay serving these endpoints:
+
+1. MUST keep, per namespace, the newest deposit per distinct tag, and
+   SHOULD retain at least 2 distinct tags — a joiner needs more than one
+   worldview to union writers who diverged offline. It MAY cap distinct
+   tags per namespace, evicting the stalest tag first (the reference keeps
+   4); the cap plus per-deposit size bounds a namespace.
+2. MUST NOT read a deposit beyond its 7-byte header, and MUST NOT serve one
+   namespace's deposits under another.
+3. MUST expire untouched namespaces after an advertised `ttlDays` (~60
+   recommended) and SHOULD refresh expiry on reads, so spools that keep
+   being opened stay covered. The pocket is a courtesy window, never an
+   archive — devices remain the spool's home.
+4. Everything else — storage medium, eviction under a relay-wide budget,
+   admission limits — is the relay's own business, exactly as in §3.
+
+**Client behavior, if used.** A client holding both a key and a relay URL:
+
+- SHOULD fetch the pocket on open, after local persistence has loaded;
+  MUST verify and decrypt deposits client-side, apply survivors with
+  `Y.applyUpdate` — in any order; merges commute — and drop, never hand to
+  Yjs, any deposit that fails authentication (§4's rule, reapplied; SHOULD
+  count and surface drops).
+- SHOULD deposit debounced while writing and flush a final deposit when
+  leaving; SHOULD re-deposit when it holds state the pocket lacks
+  ("deposit-if-ahead" — what repopulates a pocket after expiry) and when
+  the newest held deposit is older than half the advertised TTL
+  ("refresh-if-stale" — quiet-but-opened spools stay covered).
+- MUST NOT block opening on any of this. A missing, empty, expired, or
+  refused pocket degrades to exactly §3 behavior: the feature only ever
+  adds.
+
+*(Proof: `packages/spools/src/pocket-fetch.test.ts` and
+`pocket-deposit.test.ts` (the midnight loop, both sides),
+`packages/spools-relay/test/pocket.test.js` (ring, TTL, caps, the 200-trap),
+and a real-browser run in `scratch/torture-t104/`.)*
 
 ---
 
@@ -351,6 +477,9 @@ You are a **compliant client** if:
    keyed spools you never transmit content in plaintext to anyone.
    (Plaintext spools sync in the clear by definition — that is their
    documented contract, not a violation.)
+8. If you use the pocket (§6, optional): you derive the token exactly as
+   specified, never read a non-envelope `200` as pocket data or as stored,
+   and drop unauthenticated deposits unapplied.
 
 You are a **compliant relay** if:
 
@@ -363,13 +492,20 @@ You are a **compliant relay** if:
    are outside this conformance.)
 4. (If you serve signaling) it is y-webrtc topic pub/sub per §3 at the root
    path, per the one-URL convention.
+5. (If you offer the pocket) you meet §6's relay conformance: envelope
+   responses on every pocket path, newest-per-tag under key-derived
+   namespaces, nothing read past a deposit's 7-byte header, TTL'd as
+   advertised.
 
 ## Versioning
 
-This is **v1**, and it is humble: the compatibility promise is the
+This is **v1.1**, and it is humble: the compatibility promise is the
 forward-compatibility rule itself. Future revisions may *add* — new metadata
 fields, new root types, new entry kinds — and compliant v1 clients will
 ignore and preserve those additions, so spools outlive spec revisions.
+Revision v1.1 (Aug 2026) added exactly one thing, §6 — purely additive:
+every v1 client and relay remains conformant unchanged, and mixed
+generations interoperate (the §6 detection rule exists precisely for that).
 Nothing listed here will be removed, renamed, or re-typed within v1; a
 change that would break rule 3 of client conformance is not a revision of
 this protocol but a different protocol. There is no version negotiation on
