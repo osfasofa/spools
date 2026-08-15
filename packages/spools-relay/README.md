@@ -22,10 +22,18 @@ That's the whole setup. No config file, no database, no state.
 
 - **Railway:** `railway init && railway up` — `railway.json` is included
   (NIXPACKS, health check on `/`). Point the service's root directory at
-  `packages/spools-relay` if deploying from the monorepo.
-- **Fly.io:** `fly launch --copy-config` — `fly.toml` is included, sized tiny
-  (shared CPU, 256 MB) with scale-to-zero: a relay with no connections has
-  nobody waiting on it, and Fly wakes it on the next one.
+  `packages/spools-relay` if deploying from the monorepo. For a durable
+  pocket, attach a volume (Railway dashboard → service → volume, mount it
+  at `/data`) and set `POCKET_DIR=/data/pocket`.
+- **Fly.io:** `fly volumes create pocket_data --size 1`, then
+  `fly launch --copy-config` — `fly.toml` is included, sized tiny (shared
+  CPU, 256 MB), volume-mounted for the pocket, scale-to-zero on. With the
+  volume, scale-to-zero trades pocket *latency* (cold wake on the next
+  request), not correctness — deposits persist.
+- **No volume?** The pocket runs in memory: everything works, and a restart
+  simply degrades to sync-when-together until deposits accrue again. Honest,
+  but it defeats the pocket's purpose during exactly the gaps it exists to
+  bridge — give the canonical relay a disk.
 
 Resource expectations: tiny. The relay does no computation on frames — it's
 a fan-out loop. A hobby-tier instance carries intimate-scale traffic easily.

@@ -1,7 +1,20 @@
 # Fly.io config for spools-relay. `fly launch --copy-config` from this
-# directory, pick an app name, done. The relay is stateless: scale-to-zero is
-# safe (no connections = nobody waiting; Fly wakes it on the next one).
+# directory, pick an app name, done. The broadcast half is stateless; the
+# pocket (M10) is not — deposits are exactly somebody waiting, so give it a
+# volume or accept that a restart empties the pocket (which degrades cleanly
+# to sync-when-together, but during precisely the gaps the pocket bridges).
+#
+# With the volume: `fly volumes create pocket_data --size 1` first, and note
+# scale-to-zero now trades pocket *latency* (cold wake on the next request),
+# not correctness — deposits persist on the volume.
 primary_region = "iad"
+
+[env]
+  POCKET_DIR = "/data/pocket"
+
+[[mounts]]
+  source = "pocket_data"
+  destination = "/data"
 
 [http_service]
   internal_port = 4444

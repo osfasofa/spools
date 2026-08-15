@@ -29,4 +29,6 @@ The default-link story actually gets fixed: the canonical Railway relay runs the
 
 ## Notes / open questions
 
-(filled during work)
+**Prepped headless (Aug 2026) — the parts that don't need auth:** fly.toml now mounts `pocket_data` at `/data` with `POCKET_DIR=/data/pocket` and its "stateless: scale-to-zero is safe" comment is rewritten honestly (deposits *are* somebody waiting; with the volume, scale-to-zero trades latency, not correctness). The relay README's deploy section covers the volume steps for both platforms and the honest no-volume mode.
+
+**Remaining, owner at keyboard:** (1) Railway dashboard — attach a volume to the production service, mount `/data`, set `POCKET_DIR=/data/pocket` (+ any knob overrides), redeploy from this branch; (2) verify `curl https://spools-relay-production.up.railway.app/` shows the `pocket` block, and again after a restart with a deposit in place; (3) the cross-device midnight test against `DEFAULT_RELAY` (milestone criterion 1's real-world half — phone writes and goes offline, laptop cold-opens); (4) record the promised TTL in this ticket and flip it done.
