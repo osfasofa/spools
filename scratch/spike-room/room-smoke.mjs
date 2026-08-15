@@ -581,6 +581,39 @@ await scenario('12. edit-own, tombstones, restore, cross-writer honesty', async 
   return `edit prefilled+marked; tombstone → restore round-trip; cross-writer edit attributed ("${attributed}"); honest sentence present`
 })
 
+// ---------- T-121: ephemeral read receipts (the D4 decision) ----------
+
+await scenario('13. seen markers: ephemeral, positioned, vanish with the tab, zero doc entries', async () => {
+  // only the front tab is document.visibilityState === 'visible' in one
+  // browser — bring each side forward before expecting its marker
+  await b.call('Page.bringToFront')
+  await sleep(2_500) // read broadcasts are throttled to one per 2 s
+  const markerAtNewest = `(() => {
+    const rows = [...document.querySelectorAll('.seenRow')]
+    if (rows.length === 0) return false
+    const wrappers = [...document.querySelectorAll('[data-rid]')]
+    return rows.every((r) => r.closest('[data-rid]') === wrappers[wrappers.length - 1])
+  })()`
+  await a.until(markerAtNewest, 10_000, "A shows B's marker under the newest message")
+
+  // the amended D3, structurally: NOTHING about reading is in the doc
+  const cleanDoc = await a.eval(
+    `window.spool.entries.every((e) => e.kind !== 'room:read') && !window.spool.export().includes('room:read')`
+  )
+  if (!cleanDoc) throw new Error('a room:read entry leaked into the doc — D4 says awareness only')
+
+  // A reads too — B sees A's marker land on the newest message
+  await a.call('Page.bringToFront')
+  await sleep(2_500)
+  await b.until(markerAtNewest, 10_000, "B shows A's marker under the newest message")
+
+  // close B: its marker vanishes from A (presence removal, not a timeout)
+  await b.close()
+  await a.until(`document.querySelectorAll('.seenRow').length === 0`, 8_000, "B's marker vanishes with its tab")
+  if (a.errors.length) throw new Error(`page errors: ${a.errors.join(' | ')}`)
+  return "markers at the newest message both ways; zero room:read entries in the doc; marker died with B's tab"
+})
+
 // ---------- T-117: arrival ----------
 
 await scenario('7. cold open on a sleeping room: checking beat → content from the pocket', async () => {

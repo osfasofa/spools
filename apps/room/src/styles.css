@@ -435,6 +435,21 @@ body {
   color: var(--dim);
 }
 
+/* ephemeral read receipts (T-121): seat-color squares, right-aligned under
+   the furthest message each participant has seen */
+.seenRow {
+  display: flex;
+  justify-content: flex-end;
+  gap: 3px;
+  padding: 2px 4px 0 0;
+}
+
+.seenSquare {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+}
+
 /* tombstones + edited marker (T-120) */
 .tombstone {
   background: none;

@@ -137,7 +137,7 @@ const Settings = ({
           <div className="sectionLabel">fine print</div>
           <div className="finePrint">
             anyone with the link can edit or delete anything. no push, no server that knows you. rewind
-            never forgets.
+            never forgets. "seen" is live-only — nobody learns what you read while they were away.
           </div>
         </section>
       </div>
@@ -249,8 +249,19 @@ export const App = () => {
   const seats = useMemo(() => participants(entries, SEAT), [entries])
   const resolveName = (seat: string) => nameFor(profiles, seat)
 
-  // presence (T-119): sealed awareness, zero doc bytes, ghosts expire ≤30 s
-  const { presence, onTyping, clearTyping } = usePresence(spool, SEAT)
+  // presence (T-119) + ephemeral read receipts (T-121): sealed awareness,
+  // zero doc bytes, ghosts expire ≤30 s, "seen" dies with the tab (D3 amended)
+  const { presence, onTyping, clearTyping, setRead } = usePresence(spool, SEAT)
+  const readMarkers = useMemo(() => {
+    const m = new Map<string, string[]>()
+    for (const [seat, p] of presence) {
+      if (seat === SEAT || !p.read) continue
+      const list = m.get(p.read) ?? []
+      list.push(seat)
+      m.set(p.read, list)
+    }
+    return m
+  }, [presence])
   const [drawerOpen, setDrawerOpen] = useState(false)
   const typingSeats = useMemo(
     () => [...presence].filter(([seat, p]) => p.typing && seat !== SEAT).map(([seat]) => seat),
@@ -360,6 +371,8 @@ export const App = () => {
         typingSeats={typingSeats}
         deletedRecords={deletedRecords}
         editedBy={editedBy}
+        onSeen={setRead}
+        readMarkers={readMarkers}
       />
       {inviteCopied ? <div className="notice">link copied — hand it to someone you trust</div> : null}
       {!profiles.get(SEAT) && !namePromptDismissed ? (

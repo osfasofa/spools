@@ -108,7 +108,7 @@ Signed off Aug 2026 (decisions D1–D5); design record: [docs/M11-room-brief.md]
 | [T-119](T-119-presence.md) | Presence: online dots (+ typing, gated on T-111's numbers) | T-111, T-112, T-114 | done |
 | — | *— MVP line — below is follow-on —* | | |
 | [T-120](T-120-edit-delete.md) | Edit, delete, and the honest write contract | T-113, T-114 | done |
-| [T-121](T-121-read-receipts.md) | Read receipts: ephemeral awareness-only (D4 decided in T-110) | T-110, T-111, T-112, T-114 | todo |
+| [T-121](T-121-read-receipts.md) | Read receipts: ephemeral awareness-only (D4 decided in T-110) | T-110, T-111, T-112, T-114 | done |
 | [T-122](T-122-room-name-theme.md) | Room name (shared) + themes (per-device) | T-114 | todo |
 | [T-123](T-123-unread-notifications.md) | Unread divider + in-tab notifications (and the honest closed-tab sentence) | T-119 or T-121 | todo |
 | [T-124](T-124-relay-group-knobs.md) | Relay knobs at group scale (`POCKET_K` — **sign-off required**) | T-110, T-111 | todo |

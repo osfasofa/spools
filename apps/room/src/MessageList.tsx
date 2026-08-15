@@ -113,6 +113,8 @@ export const MessageList = ({
   typingSeats,
   deletedRecords,
   editedBy,
+  onSeen,
+  readMarkers,
 }: {
   records: Rec[]
   mySeat: string
@@ -132,6 +134,10 @@ export const MessageList = ({
   deletedRecords?: Rec[]
   /** resolved editor name for an edited message id, else null (T-120) */
   editedBy?: (id: string) => string | null
+  /** the furthest message that's been on screen (pinned + visible tab) — the ephemeral read cursor's source (T-121) */
+  onSeen?: (id: string) => void
+  /** message id → seats whose ephemeral read marker sits there (T-121) */
+  readMarkers?: Map<string, string[]>
 }) => {
   // render counter for the scratch harnesses (T-116/T-126): a runaway
   // render loop is measurable instead of a mystery hang
@@ -292,12 +298,37 @@ export const MessageList = ({
     // keep a pinned reader pinned
   }, [items, typingSeats?.length])
 
+  // the newest real message currently rendered — what "seen" can honestly claim
+  const lastMsg = [...items].reverse().find((it) => !it.fallback && !it.removed)
+  const lastMsgId = useRef<string | null>(null)
+  lastMsgId.current = lastMsg?.rec.id ?? null
+  const onSeenRef = useRef(onSeen)
+  onSeenRef.current = onSeen
+  const reportSeen = () => {
+    if (
+      lastMsgId.current &&
+      atBottom.current &&
+      document.visibilityState === 'visible'
+    ) {
+      onSeenRef.current?.(lastMsgId.current)
+    }
+  }
+
   // post-paint geometry check: scroll events can be missed (headless frames,
-  // programmatic scrolls) — self-heal at-bottom-ness after every paint
+  // programmatic scrolls) — self-heal at-bottom-ness after every paint, and
+  // report read progress (deduped + throttled downstream, T-121)
   useEffect(() => {
     const el = scroller.current
     if (el) atBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 40
+    reportSeen()
   })
+
+  // coming back to the tab is also "seeing" — renders don't happen for it
+  useEffect(() => {
+    document.addEventListener('visibilitychange', reportSeen)
+    return () => document.removeEventListener('visibilitychange', reportSeen)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   return (
     <div className="feedWrap">
@@ -406,6 +437,18 @@ export const MessageList = ({
                   </div>
                 </div>
               )}
+              {readMarkers?.get(it.rec.id)?.length ? (
+                <div className="seenRow">
+                  {readMarkers.get(it.rec.id)!.map((seat) => (
+                    <span
+                      key={seat}
+                      className="seenSquare"
+                      style={{ background: seatColor(seat) }}
+                      title={`seen by ${resolveName(seat)}`}
+                    />
+                  ))}
+                </div>
+              ) : null}
             </div>
           )
         })}
