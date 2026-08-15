@@ -51,6 +51,7 @@ interface Spool {
   readonly undecryptableFrames: number    // relay frames dropped: someone in the room is on the wrong key / no key (T-051); always 0 for keyless spools
   readonly pocket: PocketState | null     // what the relay's pocket did on open (M10); null = keyless/relayless spool, no pocket by construction
   readonly doc: Y.Doc                // escape hatch for power users binding editors
+  readonly awareness: Awareness | null  // the engine's shared-across-both-transports awareness (M11, T-112); null when relayless. App-defined payload, best-effort, EPHEMERAL BY DESIGN — state expires ~30 s after its writer goes quiet; never persist it (ghost presence is a named refusal). Sealed on keyed spools by construction: awareness frames are indistinguishable from sync frames on the wire
 
   readonly history: number[]         // recorded moment timestamps (ms), ascending — what rewind() can target; the scrubber's tick marks
 

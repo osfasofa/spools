@@ -12,6 +12,7 @@ export { parseSpoolLink, buildSpoolLink, generateCode, isValidCode, SpoolLinkErr
 export type { ParsedLink, BuildLinkInput } from './link'
 export { SpoolEngine } from './engine'
 export type { SpoolEngineOptions, SpoolStatus } from './engine'
+export type { Awareness } from 'y-protocols/awareness'
 export { SpoolHistoryError } from './history'
 export type { EntrySnapshot } from './history'
 export { SpoolKeyError, keyFingerprint } from './crypto'

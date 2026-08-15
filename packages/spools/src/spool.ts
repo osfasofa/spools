@@ -1,4 +1,5 @@
 import * as Y from 'yjs'
+import type { Awareness } from 'y-protocols/awareness'
 import { SpoolEngine, type SpoolStatus } from './engine'
 import { EntryStore, type Entry, type EntryChange, type WindInput } from './entry'
 import { HistoryLog, type EntrySnapshot, type HistoryTuning } from './history'
@@ -109,6 +110,18 @@ export class Spool {
 
   get status(): SpoolStatus {
     return this.#engine.status
+  }
+
+  /**
+   * The engine's awareness instance, shared across both transports (M11,
+   * T-112) — the one SDK change of the milestone. App-defined payload,
+   * best-effort, ephemeral by design: state expires ~30 s after its writer
+   * goes quiet and must never be persisted (ghost presence is a named
+   * refusal). Sealed on keyed spools by construction — awareness frames ride
+   * the same encrypted transport as sync frames. null when relayless.
+   */
+  get awareness(): Awareness | null {
+    return this.#engine.awareness
   }
 
   /** short key fingerprint for "are we on the same key?" UX; null for keyless spools */

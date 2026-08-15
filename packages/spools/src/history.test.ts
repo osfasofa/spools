@@ -79,8 +79,10 @@ it('rewind shows the right world at each phase: winds, edits, soft deletes', asy
   const spool = mkSpool('history-phases-101')
   await spool.whenReady
 
-  // phase 1: two entries
+  // phase 1: two entries (a beat apart — same-ms winds tie on createdAt and
+  // fall to the random-id tie-break, which makes the expected order a coin flip)
   const first = spool.wind({ kind: 'note', body: 'the first draft' })
+  await sleep(2)
   const second = spool.wind({ kind: 'note', body: 'a second thought' })
   expect(await waitUntil(() => spool.history.length === 1)).toBe(true)
   const t1 = spool.history[0]

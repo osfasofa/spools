@@ -98,7 +98,7 @@ Signed off Aug 2026 (decisions D1–D5); design record: [docs/M11-room-brief.md]
 |---|---|---|---|
 | [T-110](T-110-spike-chat-budget.md) | **Spike:** the chat-hour budget (doc growth, cursor cost, ring at group scale) | — | done |
 | [T-111](T-111-spike-awareness.md) | **Spike:** awareness at group scale (ghosts, traffic, 64-conn wall, sealing proof) | — | done |
-| [T-112](T-112-sdk-awareness-passthrough.md) | SDK: `get awareness()` passthrough (the one SDK change) | — | todo |
+| [T-112](T-112-sdk-awareness-passthrough.md) | SDK: `get awareness()` passthrough (the one SDK change) | — | done |
 | [T-113](T-113-room-scaffold.md) | `apps/room` scaffold + message feed (mobile constraints in AC) | — | todo |
 | [T-114](T-114-seats-profiles.md) | Seats + the profile table (nicknames anyone can edit) | T-113 | todo |
 | [T-115](T-115-deploy-early.md) | Deploy early to gh-pages (every later ticket becomes multi-device) | T-113 | todo |

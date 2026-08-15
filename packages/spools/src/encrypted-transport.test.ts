@@ -210,6 +210,42 @@ it('wrong key: both sides drop and count, neither converges, neither corrupts', 
   expect(b.doc.getMap('m').get('b-data')).toBe('from b')
 })
 
+it('spool.awareness is the shared engine instance; presence propagates sealed (T-112)', async () => {
+  const relay = await startRelay()
+  cleanups.push(relay.close)
+  const url = `ws://127.0.0.1:${relay.port}`
+  const key = generateKey()
+  const PRESENCE_MARKER = 'presence the relay must never see'
+  const ea = mkEngine({ code: 'aware-room-112', relay: url, key })
+  const a = new Spool(ea, url, key, 'a')
+  spools.push(a)
+  const eb = mkEngine({ code: 'aware-room-112', relay: url, key })
+  const b = new Spool(eb, url, key, 'b')
+  spools.push(b)
+
+  // the passthrough, not a new object — both transports share this instance
+  expect(a.awareness).toBe(ea.awareness)
+  expect(a.awareness).not.toBeNull()
+
+  await waitUntil(() => a.status === 'connected' && b.status === 'connected')
+  a.awareness!.setLocalStateField('room', { seat: 'seat-a', note: PRESENCE_MARKER })
+  const seen = () =>
+    [...b.awareness!.getStates().values()].some(
+      (state) => (state as { room?: { seat?: string } }).room?.seat === 'seat-a'
+    )
+  expect(await waitUntil(seen)).toBe(true)
+
+  // awareness frames are sync-frame-indistinguishable on the wire (brief §2)
+  expect(relay.frames.every(isSealed)).toBe(true)
+  expect(anyFrameContains(relay.frames, new TextEncoder().encode(PRESENCE_MARKER))).toBe(false)
+})
+
+it('spool.awareness is null on a relayless spool', () => {
+  const offline = new Spool(mkEngine({ code: 'aware-offline-112', relay: '' }), '', undefined, 'x')
+  spools.push(offline)
+  expect(offline.awareness).toBeNull()
+})
+
 it("Spool surfaces the counter and on('undecryptable')", async () => {
   const relay = await startRelay()
   cleanups.push(relay.close)
