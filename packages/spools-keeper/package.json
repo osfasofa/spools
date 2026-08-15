@@ -1,0 +1,29 @@
+{
+  "name": "spools-keeper",
+  "version": "0.1.0",
+  "description": "A headless always-on peer for a spool. Your hardware, your key, nobody's server.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/osfasofa/spools.git",
+    "directory": "packages/spools-keeper"
+  },
+  "files": [
+    "keeper.js"
+  ],
+  "type": "module",
+  "main": "./keeper.js",
+  "bin": {
+    "spools-keeper": "keeper.js"
+  },
+  "scripts": {
+    "start": "node keeper.js",
+    "test": "node --test test/*.test.js"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "spools": "workspace:^"
+  }
+}

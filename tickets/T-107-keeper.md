@@ -1,7 +1,7 @@
 ---
 id: T-107
 title: "spools-keeper: the always-on peer"
-status: todo
+status: done
 milestone: M10
 depends: [T-100]
 ---
@@ -29,4 +29,10 @@ Brief §3.D. It's a *client*: it was handed the link, and the link is the key ex
 
 ## Notes / open questions
 
-(filled during work)
+- `packages/spools-keeper`: one ~120-line plain-ESM script over the SDK's public surface, no build step (the relay's discipline, inherited). `npx spools-keeper '<link>' [--file <path>]`.
+- Restore-or-open turned out to be one expression: file exists → `importSpool` (applies + connects), else `openSpool`. Durability is `spool.doc.on('update')` → debounced `export()` to `tmp+rename` — body edits and history moments included (entry events alone would miss moment appends).
+- A pleasant consequence discovered while writing the test: **the keeper is the async answer for keyless spools** — the pocket is keyed-only by decision 2, so plaintext spools' midnight story is exactly this. The smoke test leans into it: keyless spool on the real relay (pocket structurally out of the picture), writer leaves, cold reader converges from the keeper alone; then kill -9, restart from the file, and a third device converges from the restored keeper.
+- For keyed spools the keeper composes with the pocket for free: `leave()` on shutdown flushes a deposit (T-103), and while running it answers live like any peer.
+- Test gotcha worth remembering: after restarting the keeper, wait for `health.relay.connections ≥ 1` before opening the probe device — otherwise the probe's first SyncStep1 lands in an empty room and convergence waits a full 20 s resync interval.
+- Engines `>=22`: `openSpool` in Node relies on the global `WebSocket` (the SDK's public open functions don't expose `WebSocketPolyfill`; fine for Node ≥21, documented here rather than widening the SDK surface).
+- Publishing to npm is an owner-at-keyboard errand (T-002 precedent), listed in the M10 handoff.
