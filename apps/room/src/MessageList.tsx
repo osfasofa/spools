@@ -115,6 +115,7 @@ export const MessageList = ({
   editedBy,
   onSeen,
   readMarkers,
+  unreadAfter,
 }: {
   records: Rec[]
   mySeat: string
@@ -138,6 +139,8 @@ export const MessageList = ({
   onSeen?: (id: string) => void
   /** message id → seats whose ephemeral read marker sits there (T-121) */
   readMarkers?: Map<string, string[]>
+  /** last-seen timestamp captured at open — the "— new —" divider goes before the first later non-mine message (T-123) */
+  unreadAfter?: number | null
 }) => {
   // render counter for the scratch harnesses (T-116/T-126): a runaway
   // render loop is measurable instead of a mystery hang
@@ -197,6 +200,18 @@ export const MessageList = ({
     }
     return byParent
   }, [records])
+
+  // the "— new —" divider: before the first non-mine message later than the
+  // last-seen timestamp captured at open (T-123). Fixed for the session —
+  // the divider must not chase you while you read.
+  const unreadBreakId = useMemo(() => {
+    if (unreadAfter == null) return null
+    const first = visible.find(
+      (r) => r.kind === 'message' && r.createdAt > unreadAfter && seatOf(r) !== mySeat && !deletedIds.has(r.id)
+    )
+    return first?.id ?? null
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible.length > 0, unreadAfter, mySeat])
 
   /** jump to a message by id: widen the window if needed, then center it */
   const pendingJump = useRef<string | null>(null)
@@ -272,9 +287,30 @@ export const MessageList = ({
     setPill(false)
   }
 
+  // first render with content: land at the unread divider when there is one
+  // (jump-to-first-unread on open), otherwise pin to newest as always
+  const didInitialLand = useRef(false)
+
   useLayoutEffect(() => {
     const el = scroller.current
     if (!el) return
+    if (!didInitialLand.current && items.length > 0) {
+      didInitialLand.current = true
+      if (unreadBreakId) {
+        const idx = visible.findIndex((r) => r.id === unreadBreakId)
+        if (idx !== -1 && idx < hiddenCount) {
+          pendingJump.current = unreadBreakId
+          setStart(Math.max(0, idx - 5))
+          return
+        }
+        const target = el.querySelector(`[data-rid="${unreadBreakId}"]`)
+        if (target) {
+          target.scrollIntoView({ block: 'center' })
+          lastTailId.current = items[items.length - 1].rec.id
+          return
+        }
+      }
+    }
     if (pendingJump.current !== null) {
       const el = scroller.current?.querySelector(`[data-rid="${pendingJump.current}"]`)
       el?.scrollIntoView({ block: 'center' })
@@ -360,6 +396,7 @@ export const MessageList = ({
           return (
             <div key={it.rec.id} data-rid={it.rec.id}>
               {it.dayBreak ? <div className="dayDivider">{it.dayBreak}</div> : null}
+              {it.rec.id === unreadBreakId ? <div className="unreadDivider">— new —</div> : null}
               {it.fallback ? (
                 <div className="systemLine">
                   <span className="kindLabel">{it.rec.kind}</span> {it.rec.body || '(no text)'}

@@ -678,6 +678,65 @@ await scenario('14. shared name renames live + audited; themes never leave the d
   return `rename live + audited; theme per-device (survived reload, never synced); concurrent renames agree on "${names[0]}"`
 })
 
+// ---------- T-123: unread + in-tab notifications ----------
+
+await scenario('15. background badge, unread divider on open, opt-in only, mute, honest sentence', async () => {
+  // A goes to the background; B sends → A's title carries the count
+  await b.call('Page.bringToFront')
+  await sleep(400)
+  const noAmbush = await a.eval(`typeof Notification === 'undefined' || Notification.permission === 'default'`)
+  if (!noAmbush) throw new Error('notification permission was requested without the user asking')
+  await b.typeAndSend('unseen one')
+  await b.typeAndSend('unseen two')
+  await a.until(`document.title.startsWith('(2) ')`, 10_000, 'A badges (2) while hidden')
+  const favicon = await a.eval(`document.querySelector('link[rel="icon"]')?.href.startsWith('data:image/png')`)
+  if (!favicon) throw new Error('favicon badge missing')
+
+  // focus clears the badge
+  await a.call('Page.bringToFront')
+  await a.until(`!document.title.startsWith('(')`, 8_000, 'badge clears on focus')
+
+  // fresh open on the same device: the divider sits before the first unseen
+  // message. A's durable last-seen predates them because A was hidden when
+  // they arrived — background it again BEFORE closing so nothing gets seen.
+  await b.call('Page.bringToFront')
+  await sleep(300)
+  await b.typeAndSend('unseen three')
+  await sleep(800)
+  await a.close()
+  const d = await Tab.open(linkFor(ORIGINS[0]))
+  await d.ready()
+  await d.until(
+    `(() => {
+      const div = document.querySelector('.unreadDivider')
+      if (!div) return false
+      const wrapper = div.closest('[data-rid]')
+      return !!wrapper && wrapper.textContent.includes('unseen three')
+    })()`,
+    10_000,
+    'divider lands before the first message A never saw (one+two were seen at the badge-clear focus)'
+  )
+
+  // mute is a per-device toggle; the honest closed-tab sentence is findable
+  await d.eval(`document.querySelector('.headerTitle').click()`)
+  await d.until(`!!document.querySelector('.settingsBody')`, 5_000, 'settings open')
+  const honest = await d.eval(
+    `document.querySelector('.settingsBody').textContent.includes('there is no server to call you back')`
+  )
+  if (!honest) throw new Error('the honest closed-tab sentence is missing')
+  const enableThere = await d.eval(
+    `[...document.querySelectorAll('button')].some(el => el.textContent === 'enable notifications')`
+  )
+  if (!enableThere) throw new Error('notifications are not an explicit opt-in button')
+  await d.eval(`[...document.querySelectorAll('button')].find(el => el.textContent.includes('mute this device')).click()`)
+  const mutedStored = await d.eval(`localStorage.getItem('room-muted')`)
+  if (mutedStored !== '1') throw new Error('mute did not persist')
+  await d.eval(`document.querySelector('.headerBtn').click()`)
+  if (d.errors.length || b.errors.length) throw new Error(`page errors: ${[...d.errors, ...b.errors].join(' | ')}`)
+  a = d // the closing block takes it from here
+  return 'badge (2) while hidden + favicon; cleared on focus; divider before first unseen on reopen; opt-in button + mute + honest sentence'
+})
+
 // ---------- T-117: arrival ----------
 
 await scenario('7. cold open on a sleeping room: checking beat → content from the pocket', async () => {

@@ -110,7 +110,7 @@ Signed off Aug 2026 (decisions D1–D5); design record: [docs/M11-room-brief.md]
 | [T-120](T-120-edit-delete.md) | Edit, delete, and the honest write contract | T-113, T-114 | done |
 | [T-121](T-121-read-receipts.md) | Read receipts: ephemeral awareness-only (D4 decided in T-110) | T-110, T-111, T-112, T-114 | done |
 | [T-122](T-122-room-name-theme.md) | Room name (shared) + themes (per-device) | T-114 | done |
-| [T-123](T-123-unread-notifications.md) | Unread divider + in-tab notifications (and the honest closed-tab sentence) | T-119 or T-121 | todo |
+| [T-123](T-123-unread-notifications.md) | Unread divider + in-tab notifications (and the honest closed-tab sentence) | T-119 or T-121 | done |
 | [T-124](T-124-relay-group-knobs.md) | Relay knobs at group scale (`POCKET_K` — **sign-off required**) | T-110, T-111 | todo |
 | [T-125](T-125-phone-a11y.md) | Phone + accessibility polish pass | T-116…T-119 | todo |
 | [T-126](T-126-room-torture.md) | Room torture checklist (3+ devices, races, midnight, scale) | MVP set | todo |

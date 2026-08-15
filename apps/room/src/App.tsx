@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Spool } from 'spools'
 import { ActionSheet } from './ActionSheet'
 import { Arrival } from './Arrival'
+import { drawFavicon, pageTitle } from './badge'
 import { Composer } from './Composer'
 import { MessageList, seatOf, type ParentRef, type Rec } from './MessageList'
 import { normalizeEmoji, rememberEmoji } from './emoji'
@@ -87,6 +88,10 @@ const Settings = ({
   roomName,
   namedBy,
   onRenameRoom,
+  muted,
+  onToggleMute,
+  notifState,
+  onEnableNotifications,
   onBack,
 }: {
   spool: Spool
@@ -95,6 +100,10 @@ const Settings = ({
   roomName: string
   namedBy: string | null
   onRenameRoom: (name: string) => void
+  muted: boolean
+  onToggleMute: () => void
+  notifState: string
+  onEnableNotifications: () => void
   onBack: () => void
 }) => {
   const [copied, setCopied] = useState(false)
@@ -185,6 +194,27 @@ const Settings = ({
             />
           ))}
           <div className="caption">anyone can rename anyone — it applies everywhere</div>
+        </section>
+        <section className="settingsSection">
+          <div className="sectionLabel">notifications</div>
+          {notifState === 'granted' ? (
+            <div className="caption">enabled while a tab is open</div>
+          ) : notifState === 'denied' ? (
+            <div className="caption">blocked by the browser — change it in site settings</div>
+          ) : notifState === 'unsupported' ? (
+            <div className="caption">not supported here</div>
+          ) : (
+            <button className="copyBtn" onClick={onEnableNotifications}>
+              enable notifications
+            </button>
+          )}
+          <button className="copyBtn" onClick={onToggleMute}>
+            {muted ? 'unmute this device' : 'mute this device'}
+          </button>
+          <div className="caption">
+            this room can only reach you while it's open somewhere — there is no server to call you
+            back.
+          </div>
         </section>
         <section className="settingsSection">
           <div className="sectionLabel">link</div>
@@ -320,9 +350,54 @@ export const App = () => {
     return latest
   }, [entries])
   const roomName = roomNameRec?.body.trim() ?? ''
+
+  // T-123: unread. The durable last-seen is LOCAL-only (localStorage) — the
+  // shared read cursor is ephemeral by decision (D4), and unread must
+  // survive a reload. Captured once at open for the divider; advanced by the
+  // same onSeen signal that feeds the awareness marker.
+  const seenKey = spool ? `room-seen:${spool.code}` : null
+  const unreadAfter = useMemo(() => {
+    if (!seenKey) return null
+    const raw = localStorage.getItem(seenKey)
+    return raw ? Number(raw) : null
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seenKey])
+  const [unread, setUnread] = useState(0)
+  const [muted, setMuted] = useState(() => localStorage.getItem('room-muted') === '1')
+  const [notifState, setNotifState] = useState(() =>
+    typeof Notification !== 'undefined' ? Notification.permission : 'unsupported'
+  )
+  const seenMsgCount = useRef<number | null>(null)
   useEffect(() => {
-    document.title = roomName || 'a room'
-  }, [roomName])
+    const others = entries.filter((e) => e.kind === 'message' && seatOf(e) !== SEAT)
+    if (seenMsgCount.current === null) {
+      seenMsgCount.current = others.length // opening backlog is the divider's job, not the badge's
+      return
+    }
+    const fresh = others.length - seenMsgCount.current
+    seenMsgCount.current = others.length
+    if (fresh <= 0 || document.visibilityState === 'visible') return
+    setUnread((n) => n + fresh)
+    const latest = others[others.length - 1]
+    if (!muted && notifState === 'granted' && latest) {
+      // tag collapses the pile into one — this is a nudge, not a feed
+      new Notification(roomName || 'a room', {
+        body: `${nameFor(profileTable(entries), seatOf(latest))}: ${latest.body.slice(0, 80)}`,
+        tag: `room-${spool?.code ?? ''}`,
+      })
+    }
+  }, [entries, muted, notifState, roomName, spool])
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') setUnread(0)
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [])
+  useEffect(() => {
+    document.title = pageTitle(roomName, unread)
+    drawFavicon(unread)
+  }, [roomName, unread])
 
   // presence (T-119) + ephemeral read receipts (T-121): sealed awareness,
   // zero doc bytes, ghosts expire ≤30 s, "seen" dies with the tab (D3 amended)
@@ -382,6 +457,17 @@ export const App = () => {
         roomName={roomName}
         namedBy={roomNameRec ? resolveName(seatOf(roomNameRec)) : null}
         onRenameRoom={(name) => void spool.wind({ kind: 'room:name', body: name, data: { seat: SEAT } })}
+        muted={muted}
+        onToggleMute={() => {
+          const next = !muted
+          localStorage.setItem('room-muted', next ? '1' : '0')
+          setMuted(next)
+        }}
+        notifState={notifState}
+        onEnableNotifications={() => {
+          // a button, never an ambush — permission is asked only here
+          void Notification.requestPermission().then(setNotifState)
+        }}
         onBack={() => setView('room')}
       />
     )
@@ -456,8 +542,19 @@ export const App = () => {
         typingSeats={typingSeats}
         deletedRecords={deletedRecords}
         editedBy={editedBy}
-        onSeen={setRead}
+        onSeen={(id) => {
+          setRead(id) // the ephemeral shared marker (T-121)
+          if (seenKey) {
+            // …and the durable local last-seen (T-123)
+            const rec = entries.find((e) => e.id === id)
+            if (rec) {
+              const prev = Number(localStorage.getItem(seenKey) ?? 0)
+              if (rec.createdAt > prev) localStorage.setItem(seenKey, String(rec.createdAt))
+            }
+          }
+        }}
         readMarkers={readMarkers}
+        unreadAfter={unreadAfter}
       />
       {inviteCopied ? <div className="notice">link copied — hand it to someone you trust</div> : null}
       {!profiles.get(SEAT) && !namePromptDismissed ? (
