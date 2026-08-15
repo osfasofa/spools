@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
-import { newSpool, openSpool, type Entry, type Spool, type SpoolStatus } from 'spools'
+import { newSpool, openSpool, type Entry, type PocketState, type Spool, type SpoolStatus } from 'spools'
 
 export interface SpoolState {
   spool: Spool | null
   entries: Entry[]
   status: SpoolStatus
   undecryptable: number
+  /** what the relay's pocket did on open (null: keyless/relayless spool — no pocket) */
+  pocket: PocketState | null
   error: string | null
 }
 
@@ -21,6 +23,7 @@ export const useSpool = (author: string): SpoolState => {
     entries: [],
     status: 'offline',
     undecryptable: 0,
+    pocket: null,
     error: null,
   })
 
@@ -45,6 +48,10 @@ export const useSpool = (author: string): SpoolState => {
         offs.push(spool.on('entry', sync))
         offs.push(spool.on('status', sync))
         offs.push(spool.on('undecryptable', (total) => setState((s) => ({ ...s, undecryptable: total }))))
+        // midnight-fetched entries arrive through the ordinary entry events;
+        // this only narrates what the pocket is doing (T-104)
+        offs.push(spool.on('pocket', (pocket) => setState((s) => ({ ...s, pocket }))))
+        setState((s) => ({ ...s, pocket: spool.pocket }))
         sync()
       } catch (err) {
         if (alive) setState((s) => ({ ...s, error: err instanceof Error ? err.message : String(err) }))

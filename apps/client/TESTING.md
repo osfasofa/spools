@@ -39,6 +39,11 @@ the same checklist with `k=` in every link, plus S7 — rtc-only sync with the
 websocket path dead from birth. Rebuild the vendor bundle first if the SDK
 changed. Run both when touching sync or crypto.
 
+`node scratch/torture-t104/midnight.mjs` is the **pocket** variant (M10):
+scenario 7 below, automated — midnight cold-open from deposits alone, the
+old-relay 200-trap in vivo, and the quiet empty-pocket path. Run it when
+touching the pocket on either side.
+
 ## Scenarios
 
 ### 1. Refresh — entries come from IndexedDB, not the network
@@ -96,6 +101,33 @@ changed. Run both when touching sync or crypto.
 3. Wind an entry on A.
 4. **Expect:** B receives it — the established WebRTC data channel carries
    sync without the relay; status stays `connected` on the surviving path.
+
+### 7. Midnight mixtape — the pocket carries the gap (M10)
+
+1. Device A opens a **keyed** link on the local relay (the pocket is
+   keyed-only — no `k=`, no pocket), winds 3 entries, and leaves: close the
+   tab *via* the page (`await window.spool.leave()` from the console, or
+   just navigate away after ~15 s so the deposit debounce fires).
+2. Confirm the relay holds sealed copies:
+   `curl http://127.0.0.1:9401/` → `pocket.deposits ≥ 1`.
+3. Device B — **fresh profile/origin that has never seen this spool** —
+   opens the link while A is fully gone.
+4. **Expect:** "checking the pocket…" for a breath, then all 3 entries
+   render within seconds, then "N sealed copies from the pocket" fades out.
+   Status still says `connected`-to-an-empty-room; the *entries* are the
+   proof the pocket answered.
+5. Point the same link's `relay=` at a pre-M10 relay (or any web server):
+   **expect** silence — no beat, no errors, plain v1 behavior.
+6. When A returns later, live sync proceeds as always — the pocket only
+   ever adds.
+
+## Results — 2026-08-15, pocket variant (M10, T-104), automated: 3/3
+
+| # | Scenario | Result | Measured |
+|---|---|---|---|
+| 7a | Midnight cold-open from deposits alone | ✔ | 3/3 tracks from an empty room; `pocket.phase=applied`; beat present; 0 page errors |
+| 7b | Old relay (200-trap in vivo) | ✔ | `phase=unavailable`, beat silent, winding works, 0 page errors |
+| 7c | Empty pocket | ✔ | `phase=empty`, beat silent, 0 page errors |
 
 ## Results — 2026-08-11, against **spools-relay** (T-040), automated, 2× consecutive, 6/6
 

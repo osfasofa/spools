@@ -144,7 +144,18 @@ const AddTrack = ({ onWind }: { onWind: (fields: { url: string; title: string; a
 
 export const App = () => {
   const [author] = useState(() => localStorage.getItem('spool-author') || 'anonymous')
-  const { spool, entries, status, undecryptable, error } = useSpool(author)
+  const { spool, entries, status, undecryptable, pocket, error } = useSpool(author)
+
+  // the pocket beat: a breath of "checking…" on open, a brief note when
+  // sealed copies land, and a persistent warning only when depositing hit a
+  // hard relay limit (the spool itself is fine — live-only, said out loud)
+  const [pocketFlash, setPocketFlash] = useState(false)
+  useEffect(() => {
+    if (pocket?.phase !== 'applied') return
+    setPocketFlash(true)
+    const t = setTimeout(() => setPocketFlash(false), 4000)
+    return () => clearTimeout(t)
+  }, [pocket?.phase])
 
   // the tape's name lives on this device (stash label) — write on the cassette
   const [title, setTitle] = useState('')
@@ -208,6 +219,21 @@ export const App = () => {
 
       {undecryptable > 0 ? (
         <p className="warn">someone in this room isn't on your key — their {undecryptable} frame{undecryptable === 1 ? '' : 's'} were ignored.</p>
+      ) : null}
+
+      {pocket?.phase === 'checking' ? <p className="pocketBeat">checking the pocket…</p> : null}
+      {pocketFlash && pocket?.phase === 'applied' ? (
+        <p className="pocketBeat">
+          ⤵ {pocket.applied} sealed cop{pocket.applied === 1 ? 'y' : 'ies'} from the pocket
+          {pocket.dropped ? ` (${pocket.dropped} dropped — not on your key)` : ''}
+        </p>
+      ) : null}
+      {pocket?.depositError ? (
+        <p className="warn">
+          {pocket.depositError === 'too-big'
+            ? "this tape has outgrown the relay's pocket — syncing live-only now."
+            : "the relay's pocket is full — syncing live-only now."}
+        </p>
       ) : null}
 
       <div className="deck">

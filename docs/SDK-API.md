@@ -49,6 +49,7 @@ interface Spool {
   readonly status: 'offline' | 'connecting' | 'connected'
   readonly keyFingerprint: string | null  // 8 chars for "same key?" UX; null for keyless spools
   readonly undecryptableFrames: number    // relay frames dropped: someone in the room is on the wrong key / no key (T-051); always 0 for keyless spools
+  readonly pocket: PocketState | null     // what the relay's pocket did on open (M10); null = keyless/relayless spool, no pocket by construction
   readonly doc: Y.Doc                // escape hatch for power users binding editors
 
   readonly history: number[]         // recorded moment timestamps (ms), ascending — what rewind() can target; the scrubber's tick marks
@@ -57,11 +58,12 @@ interface Spool {
   on(event: 'entry', cb: (change: EntryChange) => void): () => void   // returns unsubscribe
   on(event: 'status', cb: (status: Spool['status']) => void): () => void
   on(event: 'undecryptable', cb: (total: number) => void): () => void // fires per dropped frame with the running total — "someone here isn't on your key" UX
+  on(event: 'pocket', cb: (state: PocketState) => void): () => void   // additive event (the status union stays closed); never fires for keyless spools
 
   share(): string                    // the shareable link
   rewind(ts: number): EntrySnapshot[]  // the spool as it was at the latest recorded moment ≤ ts; see "rewind()" below
   export(): string                   // the portable file (JSON text), yours forever; see "export() and the stash" below
-  leave(): Promise<void>             // teardown: webrtc → websocket → idb → doc.destroy()
+  leave(): Promise<void>             // final history moment → final pocket deposit → teardown: webrtc → websocket → idb → doc.destroy()
 }
 
 interface WindInput {
@@ -194,6 +196,44 @@ stash.forget(code): Promise<void>       // THE one hard delete in the system: re
 ```
 
 `StashedSpool`: `{ code, stored, link?, label?, archived?, lastOpened? }`. The registry lives in localStorage and **stores the full link, `k=` included** — deliberately: same device, same trust boundary as the browser history that already carries the link, and without it a sealed spool in the stash could never be reopened or exported. Persisted spools are stamped into the registry automatically on open; a link is only recorded when it carries something (relay/key), so an import never downgrades a stored sealed link.
+
+## The pocket (M10)
+
+For a **keyed** spool with a relay, the SDK quietly closes the midnight gap
+(SPEC §6): on open it collects whatever sealed deposits the relay's pocket
+holds, decrypts client-side, and merges — fetched entries arrive through the
+ordinary `entry` events, so rendering costs clients nothing; and while you
+write, it deposits the sealed whole spool back, debounced (~10 s, ≥ 60 s
+apart), with a final flush inside `leave()`. Keyless spools skip all of it
+structurally — no key, no namespace token, no pocket ("ciphertext or
+nothing" is physics here, not policy; their async option is
+`spools-keeper`).
+
+```ts
+type PocketPhase = 'checking' | 'applied' | 'empty' | 'unavailable'
+
+interface PocketState {
+  phase: PocketPhase
+  applied?: number   // deposits merged (once settled)
+  dropped?: number   // deposits dropped unapplied — bad envelope or failed authentication (counted, never handed to Yjs)
+  depositError?: 'too-big' | 'budget'  // depositing hit a hard relay limit and stopped: degraded, loudly, to live-only
+}
+```
+
+- `unavailable` covers every kind of nothing: an old relay (detected by the
+  §6 envelope rule — a bare `200` is never "empty"), a dead relay, a future
+  envelope version. All of them degrade to exactly v1 behavior; the pocket
+  never blocks `open()`, and `whenReady` stays purely local.
+- Repopulation is automatic: on open the SDK re-deposits when local state is
+  ahead of the pocket (covers TTL expiry and relay wipes) or when the newest
+  deposit is older than half the advertised TTL (quiet-but-loved spools stay
+  covered).
+- **The honest loss window**: a tab slammed shut mid-session loses at most
+  the last debounce of *pocket coverage* (`sendBeacon` can't carry a real
+  spool — the 64 KiB budget vs a measured 94 KB doc). Nothing is ever lost
+  locally; the gap is only in what the relay holds for absent friends, and
+  it heals on the next open. `visibilitychange → hidden` narrows it with a
+  best-effort flush.
 
 ## Under the hood (M1 shape)
 

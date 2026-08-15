@@ -28,6 +28,30 @@ async function main() {
   $('st').textContent = spool.status
   spool.on('status', (s) => { $('st').textContent = s })
 
+  // the pocket beat (T-104): narrate the midnight fetch, then get out of the
+  // way. Entries themselves arrive through ordinary entry events — the views
+  // needed zero changes; this line is the one thing worth adding.
+  let pocketFade = null
+  const showPocket = (p) => {
+    if (!p) return // keyless/relayless spools have no pocket
+    clearTimeout(pocketFade)
+    if (p.depositError) {
+      $('pocket').textContent = p.depositError === 'too-big'
+        ? '· pocket: spool too big to deposit — live-only'
+        : '· pocket: relay full — live-only'
+    } else if (p.phase === 'checking') {
+      $('pocket').textContent = '· checking the pocket…'
+    } else if (p.phase === 'applied') {
+      $('pocket').textContent = `· ${p.applied} sealed cop${p.applied === 1 ? 'y' : 'ies'} from the pocket` +
+        (p.dropped ? ` (${p.dropped} dropped)` : '')
+      pocketFade = setTimeout(() => { $('pocket').textContent = '' }, 4000)
+    } else {
+      $('pocket').textContent = '' // empty / unavailable: quiet — that's just v1
+    }
+  }
+  showPocket(spool.pocket)
+  spool.on('pocket', showPocket)
+
   // ---- rewind mode (T-061): a facade with the views' read surface, backed
   // by frozen EntrySnapshots. The renderers don't change at all — they were
   // already skins over {entries, deleted, children, wind}, and memory just

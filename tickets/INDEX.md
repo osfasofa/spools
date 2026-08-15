@@ -73,9 +73,24 @@ Session-sized chunks of the build order (DESIGN_DOC §4). Each ticket is one fil
 |---|---|---|---|
 | [T-090](T-090-mixtape-client.md) | Mixtape client — the nice one (Vite + React) | T-080 | done |
 
+## M10 — Async sync (the pocket)
+
+Signed off Aug 2026 (all four decisions + two review-round hardenings); design record: [docs/M10-async-brief.md](../docs/M10-async-brief.md). The relay gains an optional capability: it holds the last few sealed full-state deposits per key-derived namespace — ciphertext or nothing — so the spool is there when a friend opens the link while the writer sleeps. T-100 gates everything; T-106 (SPEC) goes last, per the constitution.
+
+| Ticket | Title | Depends | Status |
+|---|---|---|---|
+| [T-100](T-100-spike-pocket.md) | **Spike:** pocket feasibility (midnight loop, per-tag ring, 200-trap, frame-log numbers) | — | done |
+| [T-101](T-101-relay-pocket.md) | Relay: pocket endpoints, per-tag ring, TTL + touch-on-read, caps, `POCKET_DIR` | T-100 | done |
+| [T-102](T-102-sdk-fetch-on-open.md) | SDK: token derivation, capability probe, fetch-merge on open, `pocket` event | T-100 | done |
+| [T-103](T-103-sdk-deposit-scheduler.md) | SDK: deposit scheduler, `leave()` flush, deposit-if-ahead + refresh-if-stale | T-102 | done |
+| [T-104](T-104-clients-pocket-beat.md) | Clients: "checking the pocket…" beat + midnight torture row | T-102 | done |
+| [T-105](T-105-canonical-deploy.md) | Canonical relay deploy: Railway volume (+ Fly mounts) — **owner at keyboard** | T-101 | todo |
+| [T-106](T-106-spec-amendment.md) | SPEC v1.1: optional pocket capability + honesty clause; SDK-API; docs | T-101, T-103 | done |
+| [T-107](T-107-keeper.md) | `spools-keeper`: headless always-on peer (optional) | T-100 | done |
+
 ## Parked (no ticket until evidence demands one)
 
 - Structured `data` field for immutable kinds — T-030 records the verdict.
 - Permissions / signed authorship — DESIGN_DOC §6 has the banked sentence.
-- Relay persistence (v2) — DESIGN_DOC §6 has the enabler note.
 - `splice`, more renderers (board, blog).
+- Pocket follow-ons deliberately out of M10: deposit DELETE (needs standing → identity ladder), plaintext deposits, in-session pocket polling, compression/delta deposits, multi-relay.

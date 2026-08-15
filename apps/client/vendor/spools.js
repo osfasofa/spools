@@ -9238,7 +9238,7 @@ ${err.toString()}`);
   var require_nacl_fast = __commonJS({
     "../../node_modules/.pnpm/tweetnacl@1.0.3/node_modules/tweetnacl/nacl-fast.js"(exports, module) {
       "use strict";
-      (function(nacl2) {
+      (function(nacl3) {
         "use strict";
         var gf = function(init) {
           var i, r = new Float64Array(16);
@@ -11197,7 +11197,7 @@ ${err.toString()}`);
           return n;
         }
         var crypto_secretbox_KEYBYTES = 32, crypto_secretbox_NONCEBYTES = 24, crypto_secretbox_ZEROBYTES = 32, crypto_secretbox_BOXZEROBYTES = 16, crypto_scalarmult_BYTES = 32, crypto_scalarmult_SCALARBYTES = 32, crypto_box_PUBLICKEYBYTES = 32, crypto_box_SECRETKEYBYTES = 32, crypto_box_BEFORENMBYTES = 32, crypto_box_NONCEBYTES = crypto_secretbox_NONCEBYTES, crypto_box_ZEROBYTES = crypto_secretbox_ZEROBYTES, crypto_box_BOXZEROBYTES = crypto_secretbox_BOXZEROBYTES, crypto_sign_BYTES = 64, crypto_sign_PUBLICKEYBYTES = 32, crypto_sign_SECRETKEYBYTES = 64, crypto_sign_SEEDBYTES = 32, crypto_hash_BYTES = 64;
-        nacl2.lowlevel = {
+        nacl3.lowlevel = {
           crypto_core_hsalsa20,
           crypto_stream_xor,
           crypto_stream,
@@ -11270,12 +11270,12 @@ ${err.toString()}`);
         function cleanup(arr) {
           for (var i = 0; i < arr.length; i++) arr[i] = 0;
         }
-        nacl2.randomBytes = function(n) {
+        nacl3.randomBytes = function(n) {
           var b = new Uint8Array(n);
           randombytes(b, n);
           return b;
         };
-        nacl2.secretbox = function(msg, nonce, key) {
+        nacl3.secretbox = function(msg, nonce, key) {
           checkArrayTypes(msg, nonce, key);
           checkLengths(key, nonce);
           var m = new Uint8Array(crypto_secretbox_ZEROBYTES + msg.length);
@@ -11284,7 +11284,7 @@ ${err.toString()}`);
           crypto_secretbox(c, m, m.length, nonce, key);
           return c.subarray(crypto_secretbox_BOXZEROBYTES);
         };
-        nacl2.secretbox.open = function(box, nonce, key) {
+        nacl3.secretbox.open = function(box, nonce, key) {
           checkArrayTypes(box, nonce, key);
           checkLengths(key, nonce);
           var c = new Uint8Array(crypto_secretbox_BOXZEROBYTES + box.length);
@@ -11294,10 +11294,10 @@ ${err.toString()}`);
           if (crypto_secretbox_open(m, c, c.length, nonce, key) !== 0) return null;
           return m.subarray(crypto_secretbox_ZEROBYTES);
         };
-        nacl2.secretbox.keyLength = crypto_secretbox_KEYBYTES;
-        nacl2.secretbox.nonceLength = crypto_secretbox_NONCEBYTES;
-        nacl2.secretbox.overheadLength = crypto_secretbox_BOXZEROBYTES;
-        nacl2.scalarMult = function(n, p) {
+        nacl3.secretbox.keyLength = crypto_secretbox_KEYBYTES;
+        nacl3.secretbox.nonceLength = crypto_secretbox_NONCEBYTES;
+        nacl3.secretbox.overheadLength = crypto_secretbox_BOXZEROBYTES;
+        nacl3.scalarMult = function(n, p) {
           checkArrayTypes(n, p);
           if (n.length !== crypto_scalarmult_SCALARBYTES) throw new Error("bad n size");
           if (p.length !== crypto_scalarmult_BYTES) throw new Error("bad p size");
@@ -11305,39 +11305,39 @@ ${err.toString()}`);
           crypto_scalarmult(q, n, p);
           return q;
         };
-        nacl2.scalarMult.base = function(n) {
+        nacl3.scalarMult.base = function(n) {
           checkArrayTypes(n);
           if (n.length !== crypto_scalarmult_SCALARBYTES) throw new Error("bad n size");
           var q = new Uint8Array(crypto_scalarmult_BYTES);
           crypto_scalarmult_base(q, n);
           return q;
         };
-        nacl2.scalarMult.scalarLength = crypto_scalarmult_SCALARBYTES;
-        nacl2.scalarMult.groupElementLength = crypto_scalarmult_BYTES;
-        nacl2.box = function(msg, nonce, publicKey, secretKey) {
-          var k = nacl2.box.before(publicKey, secretKey);
-          return nacl2.secretbox(msg, nonce, k);
+        nacl3.scalarMult.scalarLength = crypto_scalarmult_SCALARBYTES;
+        nacl3.scalarMult.groupElementLength = crypto_scalarmult_BYTES;
+        nacl3.box = function(msg, nonce, publicKey, secretKey) {
+          var k = nacl3.box.before(publicKey, secretKey);
+          return nacl3.secretbox(msg, nonce, k);
         };
-        nacl2.box.before = function(publicKey, secretKey) {
+        nacl3.box.before = function(publicKey, secretKey) {
           checkArrayTypes(publicKey, secretKey);
           checkBoxLengths(publicKey, secretKey);
           var k = new Uint8Array(crypto_box_BEFORENMBYTES);
           crypto_box_beforenm(k, publicKey, secretKey);
           return k;
         };
-        nacl2.box.after = nacl2.secretbox;
-        nacl2.box.open = function(msg, nonce, publicKey, secretKey) {
-          var k = nacl2.box.before(publicKey, secretKey);
-          return nacl2.secretbox.open(msg, nonce, k);
+        nacl3.box.after = nacl3.secretbox;
+        nacl3.box.open = function(msg, nonce, publicKey, secretKey) {
+          var k = nacl3.box.before(publicKey, secretKey);
+          return nacl3.secretbox.open(msg, nonce, k);
         };
-        nacl2.box.open.after = nacl2.secretbox.open;
-        nacl2.box.keyPair = function() {
+        nacl3.box.open.after = nacl3.secretbox.open;
+        nacl3.box.keyPair = function() {
           var pk = new Uint8Array(crypto_box_PUBLICKEYBYTES);
           var sk = new Uint8Array(crypto_box_SECRETKEYBYTES);
           crypto_box_keypair(pk, sk);
           return { publicKey: pk, secretKey: sk };
         };
-        nacl2.box.keyPair.fromSecretKey = function(secretKey) {
+        nacl3.box.keyPair.fromSecretKey = function(secretKey) {
           checkArrayTypes(secretKey);
           if (secretKey.length !== crypto_box_SECRETKEYBYTES)
             throw new Error("bad secret key size");
@@ -11345,12 +11345,12 @@ ${err.toString()}`);
           crypto_scalarmult_base(pk, secretKey);
           return { publicKey: pk, secretKey: new Uint8Array(secretKey) };
         };
-        nacl2.box.publicKeyLength = crypto_box_PUBLICKEYBYTES;
-        nacl2.box.secretKeyLength = crypto_box_SECRETKEYBYTES;
-        nacl2.box.sharedKeyLength = crypto_box_BEFORENMBYTES;
-        nacl2.box.nonceLength = crypto_box_NONCEBYTES;
-        nacl2.box.overheadLength = nacl2.secretbox.overheadLength;
-        nacl2.sign = function(msg, secretKey) {
+        nacl3.box.publicKeyLength = crypto_box_PUBLICKEYBYTES;
+        nacl3.box.secretKeyLength = crypto_box_SECRETKEYBYTES;
+        nacl3.box.sharedKeyLength = crypto_box_BEFORENMBYTES;
+        nacl3.box.nonceLength = crypto_box_NONCEBYTES;
+        nacl3.box.overheadLength = nacl3.secretbox.overheadLength;
+        nacl3.sign = function(msg, secretKey) {
           checkArrayTypes(msg, secretKey);
           if (secretKey.length !== crypto_sign_SECRETKEYBYTES)
             throw new Error("bad secret key size");
@@ -11358,7 +11358,7 @@ ${err.toString()}`);
           crypto_sign(signedMsg, msg, msg.length, secretKey);
           return signedMsg;
         };
-        nacl2.sign.open = function(signedMsg, publicKey) {
+        nacl3.sign.open = function(signedMsg, publicKey) {
           checkArrayTypes(signedMsg, publicKey);
           if (publicKey.length !== crypto_sign_PUBLICKEYBYTES)
             throw new Error("bad public key size");
@@ -11369,13 +11369,13 @@ ${err.toString()}`);
           for (var i = 0; i < m.length; i++) m[i] = tmp[i];
           return m;
         };
-        nacl2.sign.detached = function(msg, secretKey) {
-          var signedMsg = nacl2.sign(msg, secretKey);
+        nacl3.sign.detached = function(msg, secretKey) {
+          var signedMsg = nacl3.sign(msg, secretKey);
           var sig = new Uint8Array(crypto_sign_BYTES);
           for (var i = 0; i < sig.length; i++) sig[i] = signedMsg[i];
           return sig;
         };
-        nacl2.sign.detached.verify = function(msg, sig, publicKey) {
+        nacl3.sign.detached.verify = function(msg, sig, publicKey) {
           checkArrayTypes(msg, sig, publicKey);
           if (sig.length !== crypto_sign_BYTES)
             throw new Error("bad signature size");
@@ -11388,13 +11388,13 @@ ${err.toString()}`);
           for (i = 0; i < msg.length; i++) sm[i + crypto_sign_BYTES] = msg[i];
           return crypto_sign_open(m, sm, sm.length, publicKey) >= 0;
         };
-        nacl2.sign.keyPair = function() {
+        nacl3.sign.keyPair = function() {
           var pk = new Uint8Array(crypto_sign_PUBLICKEYBYTES);
           var sk = new Uint8Array(crypto_sign_SECRETKEYBYTES);
           crypto_sign_keypair(pk, sk);
           return { publicKey: pk, secretKey: sk };
         };
-        nacl2.sign.keyPair.fromSecretKey = function(secretKey) {
+        nacl3.sign.keyPair.fromSecretKey = function(secretKey) {
           checkArrayTypes(secretKey);
           if (secretKey.length !== crypto_sign_SECRETKEYBYTES)
             throw new Error("bad secret key size");
@@ -11402,7 +11402,7 @@ ${err.toString()}`);
           for (var i = 0; i < pk.length; i++) pk[i] = secretKey[32 + i];
           return { publicKey: pk, secretKey: new Uint8Array(secretKey) };
         };
-        nacl2.sign.keyPair.fromSeed = function(seed) {
+        nacl3.sign.keyPair.fromSeed = function(seed) {
           checkArrayTypes(seed);
           if (seed.length !== crypto_sign_SEEDBYTES)
             throw new Error("bad seed size");
@@ -11412,31 +11412,31 @@ ${err.toString()}`);
           crypto_sign_keypair(pk, sk, true);
           return { publicKey: pk, secretKey: sk };
         };
-        nacl2.sign.publicKeyLength = crypto_sign_PUBLICKEYBYTES;
-        nacl2.sign.secretKeyLength = crypto_sign_SECRETKEYBYTES;
-        nacl2.sign.seedLength = crypto_sign_SEEDBYTES;
-        nacl2.sign.signatureLength = crypto_sign_BYTES;
-        nacl2.hash = function(msg) {
+        nacl3.sign.publicKeyLength = crypto_sign_PUBLICKEYBYTES;
+        nacl3.sign.secretKeyLength = crypto_sign_SECRETKEYBYTES;
+        nacl3.sign.seedLength = crypto_sign_SEEDBYTES;
+        nacl3.sign.signatureLength = crypto_sign_BYTES;
+        nacl3.hash = function(msg) {
           checkArrayTypes(msg);
           var h = new Uint8Array(crypto_hash_BYTES);
           crypto_hash(h, msg, msg.length);
           return h;
         };
-        nacl2.hash.hashLength = crypto_hash_BYTES;
-        nacl2.verify = function(x, y) {
+        nacl3.hash.hashLength = crypto_hash_BYTES;
+        nacl3.verify = function(x, y) {
           checkArrayTypes(x, y);
           if (x.length === 0 || y.length === 0) return false;
           if (x.length !== y.length) return false;
           return vn(x, 0, y, 0, x.length) === 0 ? true : false;
         };
-        nacl2.setPRNG = function(fn) {
+        nacl3.setPRNG = function(fn) {
           randombytes = fn;
         };
         (function() {
           var crypto2 = typeof self !== "undefined" ? self.crypto || self.msCrypto : null;
           if (crypto2 && crypto2.getRandomValues) {
             var QUOTA = 65536;
-            nacl2.setPRNG(function(x, n) {
+            nacl3.setPRNG(function(x, n) {
               var i, v = new Uint8Array(n);
               for (i = 0; i < n; i += QUOTA) {
                 crypto2.getRandomValues(v.subarray(i, i + Math.min(n - i, QUOTA)));
@@ -11447,7 +11447,7 @@ ${err.toString()}`);
           } else if (typeof __require !== "undefined") {
             crypto2 = require_crypto();
             if (crypto2 && crypto2.randomBytes) {
-              nacl2.setPRNG(function(x, n) {
+              nacl3.setPRNG(function(x, n) {
                 var i, v = crypto2.randomBytes(n);
                 for (i = 0; i < n; i++) x[i] = v[i];
                 cleanup(v);
@@ -14564,13 +14564,13 @@ ${err.toString()}`);
               }
             })
           );
-          this._docUpdateHandler = (update, _origin) => {
+          this._docUpdateHandler = (update, _origin2) => {
             const encoder = createEncoder();
             writeVarUint(encoder, messageSync2);
             writeUpdate(encoder, update);
             broadcastRoomMessage(this, toUint8Array(encoder));
           };
-          this._awarenessUpdateHandler = ({ added, updated, removed }, _origin) => {
+          this._awarenessUpdateHandler = ({ added, updated, removed }, _origin2) => {
             const changedClients = added.concat(updated).concat(removed);
             const encoderAwareness = createEncoder();
             writeVarUint(encoderAwareness, messageAwareness2);
@@ -14845,10 +14845,12 @@ ${err.toString()}`);
   var src_exports = {};
   __export(src_exports, {
     DEFAULT_RELAY: () => DEFAULT_RELAY,
+    DEPOSIT_MAGIC: () => DEPOSIT_MAGIC,
     EXPORT_FORMAT: () => EXPORT_FORMAT,
     EXPORT_VERSION: () => EXPORT_VERSION,
     EncryptedIndexeddbPersistence: () => EncryptedIndexeddbPersistence,
     Entry: () => Entry,
+    POCKET_VERSION: () => POCKET_VERSION,
     Spool: () => Spool,
     SpoolEngine: () => SpoolEngine,
     SpoolExportError: () => SpoolExportError,
@@ -15148,7 +15150,7 @@ ${reason}`);
         }
       };
       this.doc.on("update", this._updateHandler);
-      this._awarenessUpdateHandler = ({ added, updated, removed }, _origin) => {
+      this._awarenessUpdateHandler = ({ added, updated, removed }, _origin2) => {
         const changedClients = added.concat(updated).concat(removed);
         const encoder = createEncoder();
         writeVarUint(encoder, messageAwareness);
@@ -16495,6 +16497,272 @@ ${reason}`);
     }
   };
 
+  // src/pocket.ts
+  init_yjs();
+  var import_tweetnacl2 = __toESM(require_nacl_fast(), 1);
+  var POCKET_VERSION = 1;
+  var DEPOSIT_MAGIC = [226, 227];
+  var HEADER_LEN = 7;
+  var TOKEN_DOMAIN = "spool-pocket-v1";
+  var POCKET_TX_ORIGIN = "spool-pocket";
+  var deriveToken = (key) => {
+    const domain = new TextEncoder().encode(TOKEN_DOMAIN);
+    const input = new Uint8Array(domain.length + key.length);
+    input.set(domain, 0);
+    input.set(key, domain.length);
+    return encodeKey(import_tweetnacl2.default.hash(input).subarray(0, 12));
+  };
+  var sealDeposit = (update, key, tag) => {
+    const sealed = encrypt(update, key);
+    const blob = new Uint8Array(HEADER_LEN + sealed.length);
+    blob[0] = DEPOSIT_MAGIC[0];
+    blob[1] = DEPOSIT_MAGIC[1];
+    blob[2] = POCKET_VERSION;
+    blob.set(tag.subarray(0, 4), 3);
+    blob.set(sealed, HEADER_LEN);
+    return blob;
+  };
+  var openDeposit = (blob, key) => {
+    if (blob.length < HEADER_LEN || blob[0] !== DEPOSIT_MAGIC[0] || blob[1] !== DEPOSIT_MAGIC[1] || blob[2] !== POCKET_VERSION) {
+      return null;
+    }
+    return decrypt(blob.subarray(HEADER_LEN), key);
+  };
+  var pocketOrigin = (relay) => {
+    try {
+      const url = new URL(relay);
+      const scheme = url.protocol === "wss:" ? "https:" : url.protocol === "ws:" ? "http:" : null;
+      return scheme ? `${scheme}//${url.host}` : null;
+    } catch {
+      return null;
+    }
+  };
+  var isPocketEnvelope = (json) => typeof json === "object" && json !== null && json.format === "spool-pocket" && typeof json.version === "number";
+  var unavailableOrigins = /* @__PURE__ */ new Set();
+  var _origin, _code, _key2, _doc2, _whenReady, _state, _listeners2, _abort, _destroyed3, _fetched, _tag, _debounceMs2, _minGapMs2, _armed3, _dirty, _timer2, _lastDepositAt, _inflight, _onVisibility, _PocketClient_instances, set_fn, isAheadOf_fn, docHasState_fn, _onTransaction3, schedule_fn2, deposit_fn;
+  var PocketClient = class {
+    constructor(opts) {
+      __privateAdd(this, _PocketClient_instances);
+      __publicField(this, "token");
+      __privateAdd(this, _origin);
+      __privateAdd(this, _code);
+      __privateAdd(this, _key2);
+      __privateAdd(this, _doc2);
+      __privateAdd(this, _whenReady);
+      __privateAdd(this, _state, { phase: "checking" });
+      __privateAdd(this, _listeners2, /* @__PURE__ */ new Set());
+      __privateAdd(this, _abort, new AbortController());
+      __privateAdd(this, _destroyed3, false);
+      __privateAdd(this, _fetched, null);
+      // deposit side (T-103): a scheduler shaped exactly like HistoryLog's —
+      // armed only once the open-time fetch has settled, gated on tr.local so
+      // pocket-applied (remote-origin) state can never schedule a re-deposit
+      __privateAdd(this, _tag, crypto.getRandomValues(new Uint8Array(4)));
+      __privateAdd(this, _debounceMs2);
+      __privateAdd(this, _minGapMs2);
+      __privateAdd(this, _armed3, false);
+      __privateAdd(this, _dirty, false);
+      __privateAdd(this, _timer2, null);
+      __privateAdd(this, _lastDepositAt, 0);
+      __privateAdd(this, _inflight, null);
+      __privateAdd(this, _onVisibility, null);
+      __privateAdd(this, _onTransaction3, (tr) => {
+        if (!__privateGet(this, _armed3) || __privateGet(this, _destroyed3) || !tr.local) return;
+        __privateSet(this, _dirty, true);
+        __privateMethod(this, _PocketClient_instances, schedule_fn2).call(this);
+      });
+      __privateSet(this, _origin, pocketOrigin(opts.relay));
+      __privateSet(this, _code, opts.code);
+      __privateSet(this, _key2, opts.key);
+      __privateSet(this, _doc2, opts.doc);
+      __privateSet(this, _whenReady, opts.whenReady);
+      this.token = deriveToken(opts.key);
+      __privateSet(this, _debounceMs2, opts.tuning?.debounceMs ?? 1e4);
+      __privateSet(this, _minGapMs2, opts.tuning?.minGapMs ?? 6e4);
+      __privateGet(this, _doc2).on("afterTransaction", __privateGet(this, _onTransaction3));
+      if (typeof document !== "undefined") {
+        __privateSet(this, _onVisibility, () => {
+          if (document.visibilityState === "hidden" && __privateGet(this, _dirty)) void this.flush();
+        });
+        document.addEventListener("visibilitychange", __privateGet(this, _onVisibility));
+      }
+    }
+    get state() {
+      return __privateGet(this, _state);
+    }
+    /** @internal what the open-time fetch learned; T-103's deposit-if-ahead / refresh-if-stale read this */
+    get fetched() {
+      return __privateGet(this, _fetched);
+    }
+    onState(cb) {
+      __privateGet(this, _listeners2).add(cb);
+      return () => __privateGet(this, _listeners2).delete(cb);
+    }
+    /** fetch → verify envelope → decrypt → merge after local persistence loads */
+    async start() {
+      if (!__privateGet(this, _origin) || unavailableOrigins.has(__privateGet(this, _origin))) {
+        __privateMethod(this, _PocketClient_instances, set_fn).call(this, { phase: "unavailable" });
+        return;
+      }
+      __privateMethod(this, _PocketClient_instances, set_fn).call(this, { phase: "checking" });
+      let json;
+      try {
+        const res = await fetch(`${__privateGet(this, _origin)}/pocket/${__privateGet(this, _code)}/${this.token}`, {
+          signal: __privateGet(this, _abort).signal
+        });
+        json = await res.json();
+      } catch {
+        __privateMethod(this, _PocketClient_instances, set_fn).call(this, { phase: "unavailable" });
+        return;
+      }
+      if (!isPocketEnvelope(json)) {
+        unavailableOrigins.add(__privateGet(this, _origin));
+        __privateMethod(this, _PocketClient_instances, set_fn).call(this, { phase: "unavailable" });
+        return;
+      }
+      if (json.version > POCKET_VERSION) {
+        __privateMethod(this, _PocketClient_instances, set_fn).call(this, { phase: "unavailable" });
+        return;
+      }
+      const raw = Array.isArray(json.deposits) ? json.deposits : [];
+      await __privateGet(this, _whenReady);
+      if (__privateGet(this, _destroyed3)) return;
+      let applied = 0;
+      let dropped = 0;
+      const appliedUpdates = [];
+      for (const d of raw) {
+        let update = null;
+        if (typeof d.blob === "string") {
+          try {
+            update = openDeposit(b64decode(d.blob), __privateGet(this, _key2));
+          } catch {
+            update = null;
+          }
+        }
+        if (!update) {
+          dropped++;
+          continue;
+        }
+        applyUpdate(__privateGet(this, _doc2), update, POCKET_TX_ORIGIN);
+        appliedUpdates.push(update);
+        applied++;
+      }
+      __privateSet(this, _fetched, {
+        newestAt: typeof raw[0]?.at === "number" ? raw[0].at : 0,
+        ttlDays: typeof json.ttlDays === "number" ? json.ttlDays : 60,
+        count: raw.length
+      });
+      __privateMethod(this, _PocketClient_instances, set_fn).call(this, applied > 0 ? { phase: "applied", applied, dropped } : { phase: "empty", applied, dropped });
+      __privateSet(this, _armed3, true);
+      const ahead = __privateMethod(this, _PocketClient_instances, isAheadOf_fn).call(this, appliedUpdates);
+      const halfTtl = __privateGet(this, _fetched).ttlDays * 864e5 / 2;
+      const stale = __privateGet(this, _fetched).newestAt > 0 && Date.now() - __privateGet(this, _fetched).newestAt > halfTtl;
+      if (ahead || stale && __privateMethod(this, _PocketClient_instances, docHasState_fn).call(this)) {
+        __privateSet(this, _dirty, true);
+        void __privateMethod(this, _PocketClient_instances, deposit_fn).call(this);
+      }
+    }
+    /**
+     * Capture pending changes right now instead of waiting out the debounce —
+     * leave()'s last act before teardown, and the visibilitychange fallback.
+     * Resolves once the PUT settles (or fails; failure is not a reason to
+     * block leaving — the doc stays safe locally either way).
+     */
+    async flush() {
+      if (__privateGet(this, _timer2)) {
+        clearTimeout(__privateGet(this, _timer2));
+        __privateSet(this, _timer2, null);
+      }
+      if (__privateGet(this, _inflight)) await __privateGet(this, _inflight);
+      if (__privateGet(this, _dirty) && __privateGet(this, _armed3)) await __privateMethod(this, _PocketClient_instances, deposit_fn).call(this);
+    }
+    destroy() {
+      __privateSet(this, _destroyed3, true);
+      if (__privateGet(this, _timer2)) clearTimeout(__privateGet(this, _timer2));
+      __privateSet(this, _timer2, null);
+      __privateGet(this, _doc2).off("afterTransaction", __privateGet(this, _onTransaction3));
+      if (__privateGet(this, _onVisibility)) document.removeEventListener("visibilitychange", __privateGet(this, _onVisibility));
+      __privateGet(this, _abort).abort();
+      __privateGet(this, _listeners2).clear();
+    }
+  };
+  _origin = new WeakMap();
+  _code = new WeakMap();
+  _key2 = new WeakMap();
+  _doc2 = new WeakMap();
+  _whenReady = new WeakMap();
+  _state = new WeakMap();
+  _listeners2 = new WeakMap();
+  _abort = new WeakMap();
+  _destroyed3 = new WeakMap();
+  _fetched = new WeakMap();
+  _tag = new WeakMap();
+  _debounceMs2 = new WeakMap();
+  _minGapMs2 = new WeakMap();
+  _armed3 = new WeakMap();
+  _dirty = new WeakMap();
+  _timer2 = new WeakMap();
+  _lastDepositAt = new WeakMap();
+  _inflight = new WeakMap();
+  _onVisibility = new WeakMap();
+  _PocketClient_instances = new WeakSet();
+  set_fn = function(state) {
+    __privateSet(this, _state, state);
+    for (const cb of __privateGet(this, _listeners2)) cb(state);
+  };
+  /** does the local doc hold anything beyond what the given updates carry? */
+  isAheadOf_fn = function(updates) {
+    if (!__privateMethod(this, _PocketClient_instances, docHasState_fn).call(this)) return false;
+    if (updates.length === 0) return true;
+    const probe = new Doc({ gc: false });
+    for (const u of updates) applyUpdate(probe, u);
+    const probeSv = decodeStateVector(encodeStateVector(probe));
+    probe.destroy();
+    const localSv = decodeStateVector(encodeStateVector(__privateGet(this, _doc2)));
+    for (const [client, clock] of localSv) {
+      if ((probeSv.get(client) ?? 0) < clock) return true;
+    }
+    return false;
+  };
+  docHasState_fn = function() {
+    return decodeStateVector(encodeStateVector(__privateGet(this, _doc2))).size > 0;
+  };
+  _onTransaction3 = new WeakMap();
+  schedule_fn2 = function() {
+    if (__privateGet(this, _timer2)) clearTimeout(__privateGet(this, _timer2));
+    const wait = Math.max(__privateGet(this, _debounceMs2), __privateGet(this, _lastDepositAt) + __privateGet(this, _minGapMs2) - Date.now());
+    __privateSet(this, _timer2, setTimeout(() => {
+      __privateSet(this, _timer2, null);
+      void __privateMethod(this, _PocketClient_instances, deposit_fn).call(this);
+    }, wait));
+  };
+  deposit_fn = async function() {
+    if (__privateGet(this, _inflight)) return __privateGet(this, _inflight);
+    if (__privateGet(this, _destroyed3) || !__privateGet(this, _dirty) || !__privateGet(this, _origin) || __privateGet(this, _state).depositError) return;
+    __privateSet(this, _inflight, (async () => {
+      const blob = sealDeposit(encodeStateAsUpdate(__privateGet(this, _doc2)), __privateGet(this, _key2), __privateGet(this, _tag));
+      __privateSet(this, _dirty, false);
+      try {
+        const res = await fetch(`${__privateGet(this, _origin)}/pocket/${__privateGet(this, _code)}/${this.token}`, {
+          method: "PUT",
+          body: blob
+        });
+        __privateSet(this, _lastDepositAt, Date.now());
+        if (res.status === 413) __privateMethod(this, _PocketClient_instances, set_fn).call(this, { ...__privateGet(this, _state), depositError: "too-big" });
+        else if (res.status === 507) __privateMethod(this, _PocketClient_instances, set_fn).call(this, { ...__privateGet(this, _state), depositError: "budget" });
+        else if (!res.ok) __privateSet(this, _dirty, true);
+      } catch {
+        __privateSet(this, _dirty, true);
+        __privateSet(this, _lastDepositAt, Date.now());
+      }
+    })());
+    try {
+      await __privateGet(this, _inflight);
+    } finally {
+      __privateSet(this, _inflight, null);
+    }
+  };
+
   // src/spool.ts
   var DEFAULT_RELAY = "wss://spools-relay-production.up.railway.app/yjs";
   var deriveSignaling = (relay) => {
@@ -16507,10 +16775,10 @@ ${reason}`);
     }
     return void 0;
   };
-  var _engine, _store2, _history, _relay, _key2;
+  var _engine, _store2, _history, _pocket, _relay, _key3;
   var Spool = class {
-    /** @internal use newSpool/openSpool; historyTuning is for tests only */
-    constructor(engine, relay, key, author, historyTuning) {
+    /** @internal use newSpool/openSpool; historyTuning/pocketTuning are for tests only */
+    constructor(engine, relay, key, author, historyTuning, pocketTuning) {
       __publicField(this, "code");
       __publicField(this, "whenReady");
       /** escape hatch for power users binding editors */
@@ -16520,25 +16788,35 @@ ${reason}`);
       __privateAdd(this, _engine);
       __privateAdd(this, _store2);
       __privateAdd(this, _history);
+      __privateAdd(this, _pocket);
       __privateAdd(this, _relay);
       /** carried from the link / generated fresh; seals storage (T-050) and both transports (T-051) */
-      __privateAdd(this, _key2);
+      __privateAdd(this, _key3);
       __privateSet(this, _engine, engine);
       __privateSet(this, _relay, relay);
-      __privateSet(this, _key2, key);
+      __privateSet(this, _key3, key);
       this.author = author;
       this.code = engine.code;
       this.doc = engine.doc;
       this.whenReady = engine.whenReady;
       __privateSet(this, _store2, new EntryStore(engine.doc, author, engine.whenReady));
       __privateSet(this, _history, new HistoryLog(engine.doc, engine.whenReady, historyTuning));
+      __privateSet(this, _pocket, key && relay ? new PocketClient({
+        relay,
+        code: engine.code,
+        key,
+        doc: engine.doc,
+        whenReady: engine.whenReady,
+        tuning: pocketTuning
+      }) : null);
+      void __privateGet(this, _pocket)?.start();
     }
     get status() {
       return __privateGet(this, _engine).status;
     }
     /** short key fingerprint for "are we on the same key?" UX; null for keyless spools */
     get keyFingerprint() {
-      return __privateGet(this, _key2) ? keyFingerprint(__privateGet(this, _key2)) : null;
+      return __privateGet(this, _key3) ? keyFingerprint(__privateGet(this, _key3)) : null;
     }
     /**
      * Relay frames dropped because they weren't sealed with this spool's key —
@@ -16547,6 +16825,15 @@ ${reason}`);
      */
     get undecryptableFrames() {
       return __privateGet(this, _engine).undecryptableFrames;
+    }
+    /**
+     * What the pocket did on open: `checking` → `applied` / `empty` /
+     * `unavailable` (old relay, no relay, dead relay — all degrade to v1
+     * behavior). null for keyless or relayless spools, which have no pocket
+     * by construction. Watch transitions via on('pocket').
+     */
+    get pocket() {
+      return __privateGet(this, _pocket)?.state ?? null;
     }
     /** live truth: sorted by createdAt (id tie-break), soft-deleted excluded */
     get entries() {
@@ -16564,6 +16851,8 @@ ${reason}`);
       if (event === "entry") return __privateGet(this, _store2).onEntry(cb);
       if (event === "status") return __privateGet(this, _engine).onStatus(cb);
       if (event === "undecryptable") return __privateGet(this, _engine).onUndecryptable(cb);
+      if (event === "pocket") return __privateGet(this, _pocket)?.onState(cb) ?? (() => {
+      });
       throw new Error(`unknown event: ${String(event)}`);
     }
     /**
@@ -16606,11 +16895,14 @@ ${reason}`);
     }
     /** the shareable link — hand it to someone */
     share(base) {
-      return buildSpoolLink({ code: this.code, relay: __privateGet(this, _relay), key: __privateGet(this, _key2), base });
+      return buildSpoolLink({ code: this.code, relay: __privateGet(this, _relay), key: __privateGet(this, _key3), base });
     }
     /** disconnect and release resources; local data is retained (a spool is a keepsake) */
-    leave() {
+    async leave() {
       __privateGet(this, _history).flush();
+      await __privateGet(this, _pocket)?.flush().catch(() => {
+      });
+      __privateGet(this, _pocket)?.destroy();
       __privateGet(this, _history).destroy();
       __privateGet(this, _store2).destroy();
       return __privateGet(this, _engine).leave();
@@ -16619,8 +16911,9 @@ ${reason}`);
   _engine = new WeakMap();
   _store2 = new WeakMap();
   _history = new WeakMap();
+  _pocket = new WeakMap();
   _relay = new WeakMap();
-  _key2 = new WeakMap();
+  _key3 = new WeakMap();
   var connect = (code, relay, key, opts) => {
     const engine = new SpoolEngine({
       code,
