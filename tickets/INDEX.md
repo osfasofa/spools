@@ -94,6 +94,8 @@ Signed off Aug 2026 (all four decisions + two review-round hardenings); design r
 
 Signed off Aug 2026 (decisions D1–D5); design record: [docs/M11-room-brief.md](../docs/M11-room-brief.md). A Messenger-class group chat as the next SDK testbed — the first client demanding mutable shared state, ephemeral presence, and stable pseudonymous identity, all as **app conventions with zero protocol change** (that SPEC doesn't move is the thesis; if it must, that evidence goes to the owner). T-110 gates the read-receipt design (the D4 pricing question) and the growth story; T-127 (docs/SPEC) goes last, per the constitution. Tickets below the *MVP line* are follow-on, not launch-blocking.
 
+**Closed, 15 Aug 2026 — the thesis held: SPEC v1.1 never moved.** The room is live at <https://osfasofa.github.io/spools/room/> on `DEFAULT_RELAY`, torture-verified twice over (`apps/room/TESTING.md`), with D4 resolved ephemeral-only on T-110's quadratic measurement and the relay's group knobs raised with sign-off (T-124: K=8, 24 PUTs/min). The brief's close-out block records every deviation. Remaining with the owner: the real-hardware rows (T-125's checklist + TESTING.md H1–H5 — three real devices, cellular, VoiceOver/TalkBack); T-125 stays `doing` until that pass reports.
+
 | Ticket | Title | Depends | Status |
 |---|---|---|---|
 | [T-110](T-110-spike-chat-budget.md) | **Spike:** the chat-hour budget (doc growth, cursor cost, ring at group scale) | — | done |
@@ -114,7 +116,7 @@ Signed off Aug 2026 (decisions D1–D5); design record: [docs/M11-room-brief.md]
 | [T-124](T-124-relay-group-knobs.md) | Relay knobs at group scale (`POCKET_K` — **sign-off required**) | T-110, T-111 | done |
 | [T-125](T-125-phone-a11y.md) | Phone + accessibility polish pass | T-116…T-119 | doing |
 | [T-126](T-126-room-torture.md) | Room torture checklist (3+ devices, races, midnight, scale) | MVP set | done |
-| [T-127](T-127-m11-docs.md) | Brief/§5/SPEC amendment — **last**, from working code | everything | todo |
+| [T-127](T-127-m11-docs.md) | Brief/§5/SPEC amendment — **last**, from working code | everything | done |
 
 ## Parked (no ticket until evidence demands one)
 

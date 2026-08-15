@@ -1,9 +1,32 @@
 # M11 — the room: a group chat on the SDK
 
-*Status: **signed off** (Aug 2026). Decisions D1–D5 below were approved by the
-owner in the planning session; one open item (D4's real cost) is deliberately
-left to T-110's numbers. This brief is the design record for the M11 rail in
-[tickets/INDEX.md](../tickets/INDEX.md).*
+*Status: **closed** (15 Aug 2026). Decisions D1–D5 were approved by the owner
+in the planning session; D4's open pricing was settled by T-110's numbers
+(resolution recorded in §3). This brief is the design record for the M11 rail
+in [tickets/INDEX.md](../tickets/INDEX.md).*
+
+> **Close-out — what actually shipped (T-127).** The room is live at
+> <https://osfasofa.github.io/spools/room/> on `DEFAULT_RELAY`, all five
+> screens, torture-verified (`apps/room/TESTING.md`, 2× green including a
+> five-seat midnight against the production pocket with the deployed client
+> as the cold joiner). **The headline: SPEC v1.1 stands untouched** — every
+> feature is an app convention, the SDK changed exactly once (`get
+> awareness()`, per D5), and the owner declined even a non-normative
+> spec sentence: the thesis is the finding. Deviations from this brief, each
+> decided when hit: **D3/D4 amended** — read receipts are ephemeral
+> awareness-only (the body-rewrite cursor measured *quadratic*, ~2.7·n² B;
+> §3's resolution note and DESIGN_DOC §5 hold the numbers); one reserved
+> kind was added beyond §6's list — **`room:edit`** (parent = message,
+> seat = editor) because nothing in the model can otherwise say a body
+> changed, and it doubles as the edit audit; §5's "~0.5 KB/moment" fear was
+> wrong for append-only rooms (**~73 B** measured; delete-heavy shapes are
+> where moments explode — the reason D4 died); the pocket ring and per-IP
+> knobs moved with sign-off (**`POCKET_K` 8, 24 PUTs/min**, T-124); and two
+> daylight/paper theme tokens were minimally darkened to meet the design
+> README's own WCAG AA rule (T-122). Still open with the owner: the
+> real-hardware rows — milestone #1's three-real-devices run, the cellular
+> phone check, and T-125's iOS/Android + screen-reader audit
+> (`apps/room/TESTING.md` H1–H5).
 
 ## 1. The gap: everything so far is a feed
 

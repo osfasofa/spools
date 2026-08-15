@@ -243,3 +243,21 @@ Per-spool instance bundles: `Y.Doc` + `IndexeddbPersistence` (db name = spool co
 ## Deferred surface (designed later, listed so names stay reserved)
 
 - `splice` — reserved verb, no design.
+
+### Parked with evidence (M11 — the room shipped these as app conventions; promotion waits for a second client to want them)
+
+- **Profiles / seats** — `room:profile` entries keyed by an opaque per-device
+  seat id, newest-wins at render. Any promoted surface must preserve D1's
+  rules: seat ids stay opaque + variable-length, several seats may map to one
+  person, `author` keeps being written.
+- **Presence payload conventions** — `awareness` `room` field
+  (`{ seat, typing?, read? }`), transitions-only typing, the latecomer
+  re-touch nudge (T-111), pagehide cleanup. A `presence` event or helper
+  would calcify exactly the contracts §5 says calcify hardest — evidence
+  first.
+- **Ephemeral read markers** — the D4 decision (T-110): reading writes
+  nothing to the doc, ever. Any future persisted variant starts from
+  append-only newest-wins entries, never body-rewrite (measured quadratic).
+- **Pocket ring tag persistence** — pocket.ts's 4-byte tag is per-instance,
+  so every reload takes a fresh ring slot (T-124 evidence). A localStorage
+  tag beside `spool-author` would pin one slot per device.
