@@ -6,6 +6,7 @@ import { buildExport, parseExport } from './export'
 import { touch } from './stash'
 import { buildSpoolLink, generateCode, generateKey, parseSpoolLink } from './link'
 import { keyFingerprint } from './crypto'
+import { PocketClient, type PocketState } from './pocket'
 
 /**
  * The canonical spools-relay (deployed T-041). A true dumb byte relay — it
@@ -65,6 +66,7 @@ export class Spool {
   #engine: SpoolEngine
   #store: EntryStore
   #history: HistoryLog
+  #pocket: PocketClient | null
   #relay: string
   /** carried from the link / generated fresh; seals storage (T-050) and both transports (T-051) */
   #key: Uint8Array | undefined
@@ -86,6 +88,15 @@ export class Spool {
     this.whenReady = engine.whenReady
     this.#store = new EntryStore(engine.doc, author, engine.whenReady)
     this.#history = new HistoryLog(engine.doc, engine.whenReady, historyTuning)
+    // the pocket needs both a key (to derive the namespace and unseal) and a
+    // relay (to fetch from) — keyless or offline spools skip it structurally.
+    // start() is fire-and-forget: worst case is exactly v1 behavior, and
+    // whenReady stays purely local either way.
+    this.#pocket =
+      key && relay
+        ? new PocketClient({ relay, code: engine.code, key, doc: engine.doc, whenReady: engine.whenReady })
+        : null
+    void this.#pocket?.start()
   }
 
   get status(): SpoolStatus {
@@ -106,6 +117,16 @@ export class Spool {
     return this.#engine.undecryptableFrames
   }
 
+  /**
+   * What the pocket did on open: `checking` → `applied` / `empty` /
+   * `unavailable` (old relay, no relay, dead relay — all degrade to v1
+   * behavior). null for keyless or relayless spools, which have no pocket
+   * by construction. Watch transitions via on('pocket').
+   */
+  get pocket(): PocketState | null {
+    return this.#pocket?.state ?? null
+  }
+
   /** live truth: sorted by createdAt (id tie-break), soft-deleted excluded */
   get entries(): Entry[] {
     return this.#store.list()
@@ -124,13 +145,21 @@ export class Spool {
   on(event: 'entry', cb: (change: EntryChange) => void): () => void
   on(event: 'status', cb: (status: SpoolStatus) => void): () => void
   on(event: 'undecryptable', cb: (total: number) => void): () => void
+  on(event: 'pocket', cb: (state: PocketState) => void): () => void
   on(
-    event: 'entry' | 'status' | 'undecryptable',
-    cb: ((change: EntryChange) => void) | ((status: SpoolStatus) => void) | ((total: number) => void)
+    event: 'entry' | 'status' | 'undecryptable' | 'pocket',
+    cb:
+      | ((change: EntryChange) => void)
+      | ((status: SpoolStatus) => void)
+      | ((total: number) => void)
+      | ((state: PocketState) => void)
   ): () => void {
     if (event === 'entry') return this.#store.onEntry(cb as (change: EntryChange) => void)
     if (event === 'status') return this.#engine.onStatus(cb as (status: SpoolStatus) => void)
     if (event === 'undecryptable') return this.#engine.onUndecryptable(cb as (total: number) => void)
+    // additive event (the status union stays closed); keyless spools have no
+    // pocket, so the subscription is a valid no-op that never fires
+    if (event === 'pocket') return this.#pocket?.onState(cb as (state: PocketState) => void) ?? (() => {})
     throw new Error(`unknown event: ${String(event)}`)
   }
 
@@ -185,6 +214,7 @@ export class Spool {
 
   /** disconnect and release resources; local data is retained (a spool is a keepsake) */
   leave(): Promise<void> {
+    this.#pocket?.destroy() // aborts any in-flight fetch
     this.#history.flush() // stamp the final moment before closing the notebook
     this.#history.destroy()
     this.#store.destroy()
