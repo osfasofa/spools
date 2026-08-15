@@ -101,7 +101,7 @@ Signed off Aug 2026 (decisions D1–D5); design record: [docs/M11-room-brief.md]
 | [T-112](T-112-sdk-awareness-passthrough.md) | SDK: `get awareness()` passthrough (the one SDK change) | — | done |
 | [T-113](T-113-room-scaffold.md) | `apps/room` scaffold + message feed (mobile constraints in AC) | — | done |
 | [T-114](T-114-seats-profiles.md) | Seats + the profile table (nicknames anyone can edit) | T-113 | done |
-| [T-115](T-115-deploy-early.md) | Deploy early to gh-pages (every later ticket becomes multi-device) | T-113 | todo |
+| [T-115](T-115-deploy-early.md) | Deploy early to gh-pages (every later ticket becomes multi-device) | T-113 | done |
 | [T-116](T-116-scroll-ordering.md) | Scroll, windowing, ordering (clock skew, reply-before-parent) | T-113 | todo |
 | [T-117](T-117-arrival.md) | Arrival: first run + the empty-room trap | T-113, T-114 | todo |
 | [T-118](T-118-reactions-replies.md) | Reactions (any emoji, toggle, normalize) + inline replies | T-114 | todo |
