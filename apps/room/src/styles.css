@@ -315,15 +315,106 @@ body {
   text-decoration: underline;
 }
 
+/* reply quote inside the bubble, above the body (design §1) */
+.replyQuote {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--ln);
+  color: inherit;
+  opacity: 0.75;
+  font-size: 11px;
+  font-family: inherit;
+  padding: 0 0 6px;
+  margin: 0 0 7px;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bubble.mine .replyQuote {
+  border-bottom-color: rgba(0, 0, 0, 0.18);
+}
+
+/* reaction chips under the bubble, aligned to its side */
+.reactionRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 3px;
+}
+
+.msgRow.mine .reactionRow {
+  justify-content: flex-end;
+}
+
+.reactionChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--sf);
+  border: 1px solid var(--ln);
+  border-radius: 4px;
+  color: var(--tx);
+  font-size: 12px;
+  padding: 2px 8px;
+  min-height: 24px;
+  cursor: pointer;
+}
+
+.reactionChip.active {
+  border-color: var(--ac);
+}
+
+.reactionCount {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--dim);
+}
+
 /* ---------- composer ---------- */
 
 .composer {
   display: flex;
-  gap: 8px;
+  flex-direction: column;
+  gap: 6px;
   padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
   border-top: 1px solid var(--ln);
   flex: none;
   background: var(--bg);
+}
+
+.composerRow {
+  display: flex;
+  gap: 8px;
+}
+
+.replyBanner {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.replyBannerText {
+  flex: 1;
+  font-size: 11px;
+  color: var(--dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.replyBannerClose {
+  background: none;
+  border: none;
+  color: var(--dim);
+  font-size: 11px;
+  width: 28px;
+  height: 28px;
+  cursor: pointer;
 }
 
 .composerInput {
@@ -588,6 +679,126 @@ body {
   max-width: 280px;
   margin: 0 auto;
   line-height: 1.5;
+}
+
+/* ---------- message action sheet (T-118, design §4) ---------- */
+
+.sheetBackdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  animation: sheetFade 150ms ease-out;
+}
+
+@keyframes sheetFade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.sheet {
+  background: var(--bg);
+  border-top: 1px solid var(--ln);
+  border-radius: 18px 18px 0 0;
+  padding: 16px 16px calc(16px + env(safe-area-inset-bottom));
+  animation: sheetUp 180ms ease-out;
+  max-width: 640px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+@keyframes sheetUp {
+  from {
+    transform: translateY(40px);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+.sheetPreview {
+  font-size: 11px;
+  color: var(--dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-bottom: 12px;
+}
+
+.sheetReactRow {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+
+.sheetReact {
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  background: var(--sf);
+  border: 1px solid var(--ln);
+  font-size: 22px;
+  cursor: pointer;
+}
+
+.sheetReact:hover,
+.sheetReact.active {
+  border-color: var(--ac);
+}
+
+.sheetCustom {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.sheetCustomInput {
+  flex: 1;
+  min-height: 40px;
+  background: var(--sf);
+  border: 1px solid var(--ln);
+  border-radius: var(--radius);
+  color: var(--tx);
+  font-size: 14px;
+  padding: 8px 12px;
+  outline: none;
+}
+
+.sheetCustomInput::placeholder {
+  color: var(--dim);
+}
+
+.sheetCustomGo {
+  width: 40px;
+  min-height: 40px;
+  border: none;
+  border-radius: var(--radius);
+  background: var(--ac);
+  color: var(--acTx);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.sheetAction {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 44px;
+  background: none;
+  border: none;
+  border-top: 1px solid var(--ln);
+  color: var(--tx);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0 4px;
 }
 
 /* ---------- errors ---------- */

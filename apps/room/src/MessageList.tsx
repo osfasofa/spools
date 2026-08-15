@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { seatColor, seatSuffix, initialOf } from './seat'
+import { normalizeEmoji } from './emoji'
 
 /**
  * THE BOUNDARY (T-113): every feed pixel renders through this component and
@@ -29,8 +30,14 @@ const WINDOW_STEP = 300
 /** a createdAt this far past our now is a peer clock running ahead — annotate, don't hide (v1 order IS the writer's clock) */
 const CLOCK_AHEAD_MS = 90_000
 
-const seatOf = (rec: Rec): string =>
+export const seatOf = (rec: Rec): string =>
   typeof rec.data?.seat === 'string' && rec.data.seat !== '' ? rec.data.seat : `author:${rec.author}`
+
+/** what a reply quote resolves to — structurally by id, never by position (T-116) */
+export type ParentRef =
+  | { kind: 'ok'; seat: string; body: string }
+  | { kind: 'removed' }
+  | { kind: 'missing' }
 
 /** entries come from peers; a url is untrusted input — http(s) only (T-030) */
 const URL_RE = /https?:\/\/[^\s<>"')\]]+/gi
@@ -99,6 +106,9 @@ export const MessageList = ({
   mySeat,
   resolveName,
   onInvite,
+  onBubbleTap,
+  onToggleReaction,
+  resolveParent,
 }: {
   records: Rec[]
   mySeat: string
@@ -106,6 +116,12 @@ export const MessageList = ({
   resolveName: (seat: string) => string
   /** copy the room link — the empty state's invite affordance (T-117) */
   onInvite?: () => void
+  /** tap a message bubble → the action sheet (T-118) */
+  onBubbleTap?: (rec: Rec) => void
+  /** toggle my reaction on a message (T-118) */
+  onToggleReaction?: (parentId: string, emoji: string) => void
+  /** resolve a reply's parent by id — live, tombstone-aware (T-118) */
+  resolveParent?: (id: string) => ParentRef
 }) => {
   // render counter for the scratch harnesses (T-116/T-126): a runaway
   // render loop is measurable instead of a mystery hang
@@ -143,6 +159,38 @@ export const MessageList = ({
   }
   const windowed = useMemo(() => visible.slice(Math.min(start, visible.length)), [visible, start])
   const hiddenCount = Math.min(start, visible.length)
+
+  // reactions grouped per parent by (seat, normalized emoji) — dedupe is the
+  // Set: the same seat reacting 👍 then 👍🏽 counts once (T-118)
+  const reactionGroups = useMemo(() => {
+    const byParent = new Map<string, Map<string, Set<string>>>()
+    for (const r of records) {
+      if (r.kind !== 'reaction' || !r.parent || !r.body) continue
+      const norm = normalizeEmoji(r.body)
+      if (!norm) continue
+      let m = byParent.get(r.parent)
+      if (!m) byParent.set(r.parent, (m = new Map()))
+      let set = m.get(norm)
+      if (!set) m.set(norm, (set = new Set()))
+      set.add(seatOf(r))
+    }
+    return byParent
+  }, [records])
+
+  /** jump to a message by id: widen the window if needed, then center it */
+  const pendingJump = useRef<string | null>(null)
+  const jumpTo = (id: string) => {
+    const idx = visible.findIndex((r) => r.id === id)
+    if (idx === -1) return
+    pendingJump.current = id
+    if (idx < hiddenCount) {
+      setStart(Math.max(0, idx - 5))
+    } else {
+      const el = scroller.current?.querySelector(`[data-rid="${id}"]`)
+      el?.scrollIntoView({ block: 'center' })
+      pendingJump.current = null
+    }
+  }
 
   const items = useMemo<Item[]>(() => {
     const now = Date.now()
@@ -203,6 +251,14 @@ export const MessageList = ({
   useLayoutEffect(() => {
     const el = scroller.current
     if (!el) return
+    if (pendingJump.current !== null) {
+      const el = scroller.current?.querySelector(`[data-rid="${pendingJump.current}"]`)
+      el?.scrollIntoView({ block: 'center' })
+      pendingJump.current = null
+      pendingPrepend.current = null
+      lastTailId.current = items.length > 0 ? items[items.length - 1].rec.id : null
+      return
+    }
     const tailId = items.length > 0 ? items[items.length - 1].rec.id : null
     if (pendingPrepend.current !== null) {
       // prepend: keep the reader anchored on what they were looking at
@@ -247,37 +303,74 @@ export const MessageList = ({
             ) : null}
           </div>
         ) : null}
-        {items.map((it) => (
-          <div key={it.rec.id}>
-            {it.dayBreak ? <div className="dayDivider">{it.dayBreak}</div> : null}
-            {it.fallback ? (
-              <div className="systemLine">
-                <span className="kindLabel">{it.rec.kind}</span> {it.rec.body || '(no text)'}
-              </div>
-            ) : (
-              <div className={`msgRow ${it.mine ? 'mine' : 'them'} ${it.groupStart ? 'groupStart' : ''}`}>
-                {!it.mine ? (
-                  <div className="tileCol">
-                    {it.groupEnd ? <SeatTile seat={it.seat} name={resolveName(it.seat)} /> : null}
-                  </div>
-                ) : null}
-                <div className="msgCol">
-                  {!it.mine && it.groupStart ? (
-                    <div className="senderLine">
-                      <span className="senderName">{resolveName(it.seat)}</span>
-                      <span className="senderSuffix">{seatSuffix(it.seat)}</span>
-                      <span className="senderTime">{timeLabel(it.rec.createdAt)}</span>
+        {items.map((it) => {
+          const groups = reactionGroups.get(it.rec.id)
+          const parentRef = it.rec.parent && resolveParent ? resolveParent(it.rec.parent) : null
+          return (
+            <div key={it.rec.id} data-rid={it.rec.id}>
+              {it.dayBreak ? <div className="dayDivider">{it.dayBreak}</div> : null}
+              {it.fallback ? (
+                <div className="systemLine">
+                  <span className="kindLabel">{it.rec.kind}</span> {it.rec.body || '(no text)'}
+                </div>
+              ) : (
+                <div className={`msgRow ${it.mine ? 'mine' : 'them'} ${it.groupStart ? 'groupStart' : ''}`}>
+                  {!it.mine ? (
+                    <div className="tileCol">
+                      {it.groupEnd ? <SeatTile seat={it.seat} name={resolveName(it.seat)} /> : null}
                     </div>
                   ) : null}
-                  <div className={`bubble ${it.mine ? 'mine' : 'them'} ${it.groupEnd ? 'groupEnd' : ''}`}>
-                    <Body text={it.rec.body} />
+                  <div className="msgCol">
+                    {!it.mine && it.groupStart ? (
+                      <div className="senderLine">
+                        <span className="senderName">{resolveName(it.seat)}</span>
+                        <span className="senderSuffix">{seatSuffix(it.seat)}</span>
+                        <span className="senderTime">{timeLabel(it.rec.createdAt)}</span>
+                      </div>
+                    ) : null}
+                    <div
+                      className={`bubble ${it.mine ? 'mine' : 'them'} ${it.groupEnd ? 'groupEnd' : ''}`}
+                      onClick={onBubbleTap ? () => onBubbleTap(it.rec) : undefined}
+                    >
+                      {parentRef ? (
+                        <button
+                          className="replyQuote"
+                          onClick={(ev) => {
+                            ev.stopPropagation()
+                            if (it.rec.parent) jumpTo(it.rec.parent)
+                          }}
+                        >
+                          {parentRef.kind === 'ok'
+                            ? `${resolveName(parentRef.seat)}: ${parentRef.body.slice(0, 34)}${parentRef.body.length > 34 ? '…' : ''}`
+                            : parentRef.kind === 'removed'
+                              ? 'removed'
+                              : 'not synced yet'}
+                        </button>
+                      ) : null}
+                      <Body text={it.rec.body} />
+                    </div>
+                    {groups && groups.size > 0 ? (
+                      <div className="reactionRow">
+                        {[...groups].map(([emoji, seats]) => (
+                          <button
+                            key={emoji}
+                            className={`reactionChip ${seats.has(mySeat) ? 'active' : ''}`}
+                            title={[...seats].map(resolveName).join(', ')}
+                            onClick={() => onToggleReaction?.(it.rec.id, emoji)}
+                          >
+                            {emoji}
+                            {seats.size > 1 ? <span className="reactionCount">{seats.size}</span> : null}
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+                    {it.clockAhead ? <span className="clockAhead">this device's clock runs ahead</span> : null}
                   </div>
-                  {it.clockAhead ? <span className="clockAhead">this device's clock runs ahead</span> : null}
                 </div>
-              </div>
-            )}
-          </div>
-        ))}
+              )}
+            </div>
+          )
+        })}
       </div>
       {pill ? (
         <button className="newMsgPill" onClick={jumpToBottom}>

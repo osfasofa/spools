@@ -365,6 +365,109 @@ await scenario('6. concurrent renames of the same seat converge newest-wins ever
   return `all three devices agree on "${names[0]}" (newest-wins), DOM matches, 0 page errors`
 })
 
+// ---------- T-118: reactions + replies ----------
+
+const bubbleSel = (text) => `[...document.querySelectorAll('.bubble')].find(el => el.textContent.includes(${JSON.stringify(text)}))`
+
+await scenario('9. reactions: toggle round-trip, skin-tone grouping, duplicate dedupe', async () => {
+  // B reacts 👍 to A's first message through the sheet
+  await b.eval(`${bubbleSel('hello from A')}.click()`)
+  await b.until(`!!document.querySelector('.sheet')`, 5_000, 'action sheet opens')
+  await b.eval(`[...document.querySelectorAll('.sheetReact')].find(el => el.textContent === '👍').click()`)
+  const chipOn = (tab) =>
+    tab.until(
+      `(() => { const bub = ${bubbleSel('hello from A')}; const row = bub?.parentElement.querySelector('.reactionRow'); return !!row && row.textContent.includes('👍') })()`,
+      10_000,
+      'reaction chip renders'
+    )
+  await chipOn(a)
+  await chipOn(b)
+
+  // toggle off: tap the chip on B → gone on both sides
+  await b.eval(`(() => { const bub = ${bubbleSel('hello from A')}; bub.parentElement.querySelector('.reactionChip').click() })()`)
+  await a.until(
+    `(() => { const bub = ${bubbleSel('hello from A')}; return !bub.parentElement.querySelector('.reactionRow') })()`,
+    10_000,
+    'un-react propagates'
+  )
+
+  // skin tone: B reacts 👍🏽 via the custom input — groups as 👍
+  await b.eval(`${bubbleSel('hello from A')}.click()`)
+  await b.until(`!!document.querySelector('.sheetCustomInput')`, 5_000, 'sheet again')
+  await b.eval(`(() => {
+    const input = document.querySelector('.sheetCustomInput')
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set
+    setter.call(input, '👍🏽')
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    document.querySelector('.sheetCustomGo').click()
+    document.querySelector('.sheetBackdrop')?.click()
+  })()`)
+  await chipOn(a)
+
+  // A reacts 👍 too → count 2 on one grouped chip
+  await a.eval(`${bubbleSel('hello from A')}.click()`)
+  await a.until(`!!document.querySelector('.sheet')`, 5_000, 'sheet on A')
+  await a.eval(`[...document.querySelectorAll('.sheetReact')].find(el => el.textContent === '👍').click()`)
+  await b.until(
+    `(() => { const bub = ${bubbleSel('hello from A')}; const chips = bub?.parentElement.querySelectorAll('.reactionChip'); return chips?.length === 1 && chips[0].textContent.includes('2') })()`,
+    10_000,
+    'one grouped chip counts 2'
+  )
+
+  // duplicate entries from one seat (offline-dupe shape) must not double-count
+  await b.eval(`(() => {
+    const target = window.spool.entries.find((e) => e.kind === 'message' && e.body === 'hello from A')
+    const seat = localStorage.getItem('spool-seat')
+    window.spool.wind({ kind: 'reaction', parent: target.id, body: '💀', data: { seat } })
+    window.spool.wind({ kind: 'reaction', parent: target.id, body: '💀', data: { seat } })
+  })()`)
+  await a.until(
+    `(() => { const bub = ${bubbleSel('hello from A')}; const chip = [...bub.parentElement.querySelectorAll('.reactionChip')].find(c => c.textContent.includes('💀')); return !!chip && !chip.textContent.includes('2') })()`,
+    10_000,
+    'duplicate reactions collapse to one'
+  )
+  return '👍 toggled on/off across devices; 👍🏽 grouped into 👍 (count 2 with A); duplicate 💀 entries collapsed'
+})
+
+await scenario('10. replies: quote, jump, and orphan stubs', async () => {
+  // B replies to A's message through the sheet
+  await b.eval(`${bubbleSel('hello from A')}.click()`)
+  await b.until(`!!document.querySelector('.sheet')`, 5_000, 'sheet opens')
+  await b.eval(`[...document.querySelectorAll('.sheetAction')].find(el => el.textContent.includes('reply')).click()`)
+  await b.until(`!!document.querySelector('.replyBanner')`, 5_000, 'reply banner shows')
+  await b.typeAndSend('replying to the first thing you said')
+  await a.until(
+    `(() => { const bub = ${bubbleSel('replying to the first thing')}; return !!bub?.querySelector('.replyQuote')?.textContent.includes('hello from A') })()`,
+    10_000,
+    'A renders the quoted reply'
+  )
+  // quote names the sender via the profile resolver (A's seat is "zora")
+  const quoted = await a.eval(`${bubbleSel('replying to the first thing')}.querySelector('.replyQuote').textContent`)
+  if (!quoted.startsWith('zora:')) throw new Error(`quote is "${quoted}" — expected the resolved name`)
+
+  // tap-to-jump exists and doesn't throw (structural lookup, small feed)
+  await a.eval(`${bubbleSel('replying to the first thing')}.querySelector('.replyQuote').click()`)
+
+  // orphan 1: parent soft-deleted → quote degrades to "removed"
+  await a.eval(`window.spool.entries.find((e) => e.kind === 'message' && e.body === 'hello from A').delete()`)
+  await b.until(
+    `(() => { const bub = ${bubbleSel('replying to the first thing')}; return bub?.querySelector('.replyQuote')?.textContent === 'removed' })()`,
+    10_000,
+    'deleted parent renders the removed stub'
+  )
+  // orphan 2: parent that never synced → "not synced yet"
+  await b.eval(`window.spool.wind({ kind: 'message', body: 'reply into the void', data: { seat: localStorage.getItem('spool-seat') }, parent: 'never-going-to-exist' })`)
+  await b.until(
+    `(() => { const bub = ${bubbleSel('reply into the void')}; return bub?.querySelector('.replyQuote')?.textContent === 'not synced yet' })()`,
+    10_000,
+    'missing parent renders the not-synced stub'
+  )
+  // restore the deleted message so later scenarios see a stable world
+  await a.eval(`window.spool.deleted.find((e) => e.body === 'hello from A')?.restore()`)
+  if (a.errors.length || b.errors.length) throw new Error(`page errors: ${[...a.errors, ...b.errors].join(' | ')}`)
+  return 'quote resolves via profiles; jump works; removed + not-synced stubs render; 0 page errors'
+})
+
 // ---------- T-117: arrival ----------
 
 await scenario('7. cold open on a sleeping room: checking beat → content from the pocket', async () => {

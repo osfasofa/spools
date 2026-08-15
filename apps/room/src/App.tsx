@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { Spool } from 'spools'
+import { ActionSheet } from './ActionSheet'
 import { Arrival } from './Arrival'
 import { Composer } from './Composer'
-import { MessageList } from './MessageList'
+import { MessageList, seatOf, type ParentRef, type Rec } from './MessageList'
+import { normalizeEmoji, rememberEmoji } from './emoji'
 import { mySeat, seatColor, seatSuffix, initialOf } from './seat'
 import { nameFor, participants, profileTable, type Profile } from './profiles'
 import { useRoom } from './useRoom'
@@ -174,6 +176,52 @@ export const App = () => {
     })
   }
 
+  // T-118: the two social gestures — both pure parent mechanics
+  const [sheetFor, setSheetFor] = useState<Rec | null>(null)
+  const [replyTo, setReplyTo] = useState<Rec | null>(null)
+
+  const toggleReaction = (parentId: string, emojiRaw: string) => {
+    if (!spool) return
+    const norm = normalizeEmoji(emojiRaw)
+    if (!norm) return
+    rememberEmoji(emojiRaw)
+    // my existing reaction found by SEAT (not author) + normalized emoji;
+    // soft delete = un-react, and the getters already exclude the deleted
+    const existing = spool.entries.find(
+      (e) =>
+        e.kind === 'reaction' &&
+        e.parent === parentId &&
+        seatOf(e) === SEAT &&
+        normalizeEmoji(e.body) === norm
+    )
+    if (existing) existing.delete()
+    else spool.wind({ kind: 'reaction', parent: parentId, body: emojiRaw, data: { seat: SEAT } })
+  }
+
+  // reply parents resolve structurally by id — live entries, then the
+  // soft-deleted (tombstone-aware), then "not synced yet" (T-116's rule:
+  // a reply can sort before its parent, so absence is a state, not an error)
+  const parentIndex = useMemo(() => {
+    if (!spool) return { live: new Map<string, Rec>(), deleted: new Set<string>() }
+    const live = new Map<string, Rec>()
+    for (const e of entries) live.set(e.id, e)
+    const deleted = new Set<string>(spool.deleted.map((e) => e.id))
+    return { live, deleted }
+  }, [spool, entries])
+  const resolveParent = (id: string): ParentRef => {
+    const rec = parentIndex.live.get(id)
+    if (rec) return { kind: 'ok', seat: seatOf(rec), body: rec.body }
+    return parentIndex.deleted.has(id) ? { kind: 'removed' } : { kind: 'missing' }
+  }
+
+  const myReactionsOn = (rec: Rec): Set<string> => {
+    const out = new Set<string>()
+    for (const e of entries) {
+      if (e.kind === 'reaction' && e.parent === rec.id && seatOf(e) === SEAT) out.add(normalizeEmoji(e.body))
+    }
+    return out
+  }
+
   // the profile table, recomputed behind the same feed subscription — names
   // resolve at render time, so renames apply retroactively by construction
   const profiles = useMemo(() => profileTable(entries), [entries])
@@ -244,7 +292,15 @@ export const App = () => {
         </div>
       ) : null}
 
-      <MessageList records={entries} mySeat={SEAT} resolveName={resolveName} onInvite={invite} />
+      <MessageList
+        records={entries}
+        mySeat={SEAT}
+        resolveName={resolveName}
+        onInvite={invite}
+        onBubbleTap={(rec) => setSheetFor(rec)}
+        onToggleReaction={toggleReaction}
+        resolveParent={resolveParent}
+      />
       {inviteCopied ? <div className="notice">link copied — hand it to someone you trust</div> : null}
       {!profiles.get(SEAT) && !namePromptDismissed ? (
         <div className="namePrompt">
@@ -256,7 +312,30 @@ export const App = () => {
           </button>
         </div>
       ) : null}
-      <Composer onSend={(body) => void spool.wind({ kind: 'message', body, data: { seat: SEAT } })} />
+      <Composer
+        onSend={(body) => {
+          void spool.wind({
+            kind: 'message',
+            body,
+            data: { seat: SEAT },
+            ...(replyTo ? { parent: replyTo.id } : {}),
+          })
+          setReplyTo(null)
+        }}
+        replyLabel={
+          replyTo ? `↩ ${resolveName(seatOf(replyTo))} — ${replyTo.body.slice(0, 40)}${replyTo.body.length > 40 ? '…' : ''}` : null
+        }
+        onCancelReply={() => setReplyTo(null)}
+      />
+      {sheetFor ? (
+        <ActionSheet
+          preview={`${resolveName(seatOf(sheetFor))} — ${sheetFor.body.slice(0, 48)}${sheetFor.body.length > 48 ? '…' : ''}`}
+          myReactions={myReactionsOn(sheetFor)}
+          onReact={(emoji) => toggleReaction(sheetFor.id, emoji)}
+          onReply={() => setReplyTo(sheetFor)}
+          onClose={() => setSheetFor(null)}
+        />
+      ) : null}
       {arrival === 'active' || (arrival === 'unknown' && entries.length === 0) ? (
         // 'unknown' + empty covers the one commit before the deciding effect
         // runs — without it, a fast pocket paints one bare-empty frame
