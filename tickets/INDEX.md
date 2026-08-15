@@ -77,5 +77,5 @@ Session-sized chunks of the build order (DESIGN_DOC §4). Each ticket is one fil
 
 - Structured `data` field for immutable kinds — T-030 records the verdict.
 - Permissions / signed authorship — DESIGN_DOC §6 has the banked sentence.
-- Relay persistence (v2) — DESIGN_DOC §6 has the enabler note.
+- Relay persistence (v2) — DESIGN_DOC §6 has the enabler note; planning brief drafted and **pending sign-off**: [docs/M10-async-brief.md](../docs/M10-async-brief.md) (the pocket). No M10 tickets until the brief's §5 decisions are answered.
 - `splice`, more renderers (board, blog).
