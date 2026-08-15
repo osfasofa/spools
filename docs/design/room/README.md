@@ -88,7 +88,7 @@ Full-screen overlay in `--bg`, mono 12.5px lines appearing sequentially (~550ms 
 - message → `wind({ kind:'message', body, data:{ seat }, parent? })`
 - nickname → `wind({ kind:'room:profile', body: name, data:{ seat: target } })`, newest wins per seat, resolved at render — **never denormalize a name into a message**
 - room name → `wind({ kind:'room:name', body })`, newest wins
-- seen → one `room:read` entry per seat, body rewritten under the T-110 throttle
+- seen → ~~one `room:read` entry per seat, body rewritten under the T-110 throttle~~ **superseded (T-110, Aug 2026): ephemeral awareness-only** — "seen" rides the awareness `room` field beside typing; nothing about reading is wound into the doc (the body-rewrite cursor measured quadratic; DESIGN_DOC §5 M11 mutable-state row). The read-receipt *visuals* above are unchanged
 - presence/typing → awareness (`room` field), sealed; keyed to peers, never `synced`; typing debounced hard
 - theme → localStorage only; not an entry, never synced
 - Render from `spool.entries` then subscribe (no event replay on load). Normalize emoji variants before grouping reactions (👍 vs 👍🏽).

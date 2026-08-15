@@ -38,6 +38,34 @@ importers:
         specifier: ^7.3.6
         version: 7.3.6(@types/node@26.2.0)(lightningcss@1.33.0)
 
+  apps/room:
+    dependencies:
+      react:
+        specifier: ^19.2.4
+        version: 19.2.8
+      react-dom:
+        specifier: ^19.2.4
+        version: 19.2.8(react@19.2.8)
+      spools:
+        specifier: workspace:*
+        version: link:../../packages/spools
+    devDependencies:
+      '@types/react':
+        specifier: ^19.2.4
+        version: 19.2.18
+      '@types/react-dom':
+        specifier: ^19.2.3
+        version: 19.2.4(@types/react@19.2.18)
+      '@vitejs/plugin-react':
+        specifier: ^5.1.4
+        version: 5.2.0(vite@7.3.6(@types/node@26.2.0)(lightningcss@1.33.0))
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+      vite:
+        specifier: ^7.3.6
+        version: 7.3.6(@types/node@26.2.0)(lightningcss@1.33.0)
+
   packages/spools:
     dependencies:
       tweetnacl:

@@ -1,0 +1,282 @@
+// T-113 acceptance: apps/room, two origins, one local relay, headless Chrome.
+//
+//  1. A and B converge on a conversation (real keystrokes through the
+//     composer, both directions).
+//  2. B's composer keeps focus AND its half-typed draft through peer traffic.
+//  3. Reserved room:* kinds are invisible; unknown kinds render the labeled
+//     fallback; nothing breaks.
+//  4. 375×667 with zero horizontal overflow; self bubbles right / other
+//     bubbles left with a seat tile.
+//
+// Harness idiom from scratch/torture-t104/midnight.mjs (raw CDP, no deps).
+// Run (repo root, after `pnpm build` in apps/room):
+//   mise x -- node scratch/spike-room/room-smoke.mjs
+
+import { spawn } from 'node:child_process'
+import { createServer } from 'node:http'
+import { readFile } from 'node:fs/promises'
+import { randomBytes } from 'node:crypto'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+
+const CHROME = process.env.CHROME_BIN ?? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+const CDP_PORT = 9347
+const RELAY_PORT = 9471
+const ORIGINS = [8791, 8792]
+const here = new URL('.', import.meta.url)
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+
+// ---------- static server for apps/room/dist ----------
+
+const serveDist = (port) =>
+  new Promise((resolve) => {
+    const root = new URL('../../apps/room/dist/', import.meta.url)
+    const types = { html: 'text/html', js: 'text/javascript', css: 'text/css', svg: 'image/svg+xml' }
+    const srv = createServer(async (req, res) => {
+      const path = req.url === '/' ? 'index.html' : req.url.slice(1).split('?')[0]
+      try {
+        const data = await readFile(new URL(path, root))
+        res.setHeader('content-type', types[path.split('.').pop()] ?? 'application/octet-stream')
+        res.end(data)
+      } catch {
+        res.statusCode = 404
+        res.end('not found')
+      }
+    })
+    srv.listen(port, () => resolve(srv))
+  })
+
+// ---------- minimal CDP Tab (verbatim idiom from torture-t021/t104) ----------
+
+class Tab {
+  static async open(url, { width = 375, height = 667 } = {}) {
+    const info = await (await fetch(`http://127.0.0.1:${CDP_PORT}/json/new`, { method: 'PUT' })).json()
+    const tab = new Tab()
+    tab.id = info.id
+    tab.errors = []
+    tab.ws = new WebSocket(info.webSocketDebuggerUrl)
+    await new Promise((r) => tab.ws.addEventListener('open', r))
+    tab.msgId = 0
+    tab.pending = new Map()
+    tab.ws.addEventListener('message', (event) => {
+      const msg = JSON.parse(event.data)
+      if (msg.id && tab.pending.has(msg.id)) {
+        tab.pending.get(msg.id)(msg)
+        tab.pending.delete(msg.id)
+      } else if (msg.method === 'Runtime.exceptionThrown') {
+        tab.errors.push(msg.params.exceptionDetails?.exception?.description ?? 'exception')
+      } else if (msg.method === 'Runtime.consoleAPICalled' && msg.params.type === 'error') {
+        tab.errors.push(msg.params.args.map((a) => a.value ?? a.description ?? '?').join(' '))
+      }
+    })
+    await tab.call('Runtime.enable')
+    await tab.call('Page.enable')
+    await tab.call('Emulation.setDeviceMetricsOverride', {
+      width,
+      height,
+      deviceScaleFactor: 2,
+      mobile: true,
+    })
+    await tab.call('Page.navigate', { url })
+    return tab
+  }
+
+  call(method, params = {}) {
+    const id = ++this.msgId
+    return new Promise((resolve, reject) => {
+      this.pending.set(id, (msg) => (msg.error ? reject(new Error(`${method}: ${msg.error.message}`)) : resolve(msg.result)))
+      this.ws.send(JSON.stringify({ id, method, params }))
+    })
+  }
+
+  async eval(expression) {
+    const { result, exceptionDetails } = await this.call('Runtime.evaluate', {
+      expression,
+      returnByValue: true,
+      awaitPromise: true,
+    })
+    if (exceptionDetails) throw new Error(exceptionDetails.exception?.description ?? 'page exception')
+    return result.value
+  }
+
+  async until(expression, timeoutMs, label = expression) {
+    const deadline = Date.now() + timeoutMs
+    while (Date.now() < deadline) {
+      try {
+        if (await this.eval(expression)) return Date.now() - (deadline - timeoutMs)
+      } catch {
+        // context mid-navigation — keep polling
+      }
+      await sleep(300)
+    }
+    throw new Error(`timeout (${timeoutMs} ms) waiting for: ${label}`)
+  }
+
+  ready(timeoutMs = 15_000) {
+    return this.until('!!window.spool', timeoutMs, 'room app ready')
+  }
+
+  /** real keystrokes: focus the composer, insert text, press Enter */
+  async typeAndSend(text) {
+    await this.eval(`document.querySelector('.composerInput').focus()`)
+    await this.call('Input.insertText', { text })
+    // the text field makes it a real keypress — without it Chrome treats the
+    // event as rawKeyDown and never runs implicit form submission
+    await this.call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', text: '\r', windowsVirtualKeyCode: 13 })
+    await this.call('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 })
+  }
+
+  async close() {
+    this.ws.close()
+    await fetch(`http://127.0.0.1:${CDP_PORT}/json/close/${this.id}`)
+  }
+}
+
+// ---------- scenario plumbing ----------
+
+const results = []
+const scenario = async (name, fn) => {
+  process.stdout.write(`\n▶ ${name}\n`)
+  try {
+    const detail = await fn()
+    results.push({ name, pass: true, detail: detail ?? '' })
+    console.log(`  PASS ${detail ?? ''}`)
+  } catch (err) {
+    results.push({ name, pass: false, detail: err.message })
+    console.log(`  FAIL ${err.message}`)
+  }
+}
+
+const code = `room-smoke-${String(Math.floor(Math.random() * 1000)).padStart(3, '0')}`
+const keyB64 = randomBytes(32).toString('base64url')
+const linkFor = (origin) =>
+  `http://localhost:${origin}/#spool=${code}&relay=${encodeURIComponent(`ws://localhost:${RELAY_PORT}/yjs`)}&k=${keyB64}`
+
+// ---------- run ----------
+
+const servers = await Promise.all(ORIGINS.map(serveDist))
+const relay = await new Promise((resolve) => {
+  const proc = spawn(process.execPath, [new URL('../../packages/spools-relay/server.js', here).pathname], {
+    stdio: ['ignore', 'pipe', 'inherit'],
+    env: { ...process.env, PORT: String(RELAY_PORT), HOST: '127.0.0.1' },
+  })
+  proc.stdout.once('data', () => resolve(proc))
+})
+const chrome = spawn(
+  CHROME,
+  [
+    '--headless=new',
+    '--disable-gpu',
+    '--no-sandbox',
+    '--disable-dev-shm-usage',
+    `--remote-debugging-port=${CDP_PORT}`,
+    `--user-data-dir=${join(tmpdir(), `t113-profile-${Date.now()}`)}`,
+    '--no-first-run',
+  ],
+  { stdio: 'ignore' }
+)
+for (let i = 0; i < 40; i++) {
+  try {
+    await fetch(`http://127.0.0.1:${CDP_PORT}/json/version`)
+    break
+  } catch {
+    await sleep(250)
+  }
+}
+
+let a, b
+
+await scenario('1. two origins converge through the composer, both directions', async () => {
+  a = await Tab.open(linkFor(ORIGINS[0]))
+  await a.ready()
+  b = await Tab.open(linkFor(ORIGINS[1]))
+  await b.ready()
+  await a.typeAndSend('hello from A')
+  const t1 = await b.until(
+    `[...document.querySelectorAll('.bubble')].some(el => el.textContent === 'hello from A')`,
+    15_000,
+    'B renders A’s message'
+  )
+  await b.typeAndSend('hello back from B')
+  await a.until(
+    `[...document.querySelectorAll('.bubble')].some(el => el.textContent === 'hello back from B')`,
+    15_000,
+    'A renders B’s message'
+  )
+  return `converged both ways (~${t1} ms first hop)`
+})
+
+await scenario('2. composer keeps focus and draft through peer traffic', async () => {
+  await b.eval(`document.querySelector('.composerInput').focus()`)
+  await b.call('Input.insertText', { text: 'half a thought…' })
+  await a.typeAndSend('noise 1')
+  await a.typeAndSend('noise 2')
+  await a.typeAndSend('noise 3')
+  await b.until(
+    `[...document.querySelectorAll('.bubble')].filter(el => el.textContent.startsWith('noise')).length === 3`,
+    15_000,
+    'B renders the noise'
+  )
+  const focused = await b.eval(`document.activeElement === document.querySelector('.composerInput')`)
+  const draft = await b.eval(`document.querySelector('.composerInput').value`)
+  if (!focused) throw new Error('composer lost focus during peer traffic')
+  if (draft !== 'half a thought…') throw new Error(`draft mangled: "${draft}"`)
+  return 'focus held, draft intact through 3 peer messages'
+})
+
+await scenario('3. reserved kinds invisible, unknown kinds labeled, nothing breaks', async () => {
+  await a.eval(`window.spool.wind({ kind: 'room:name', body: 'the lounge' })`)
+  await a.eval(`window.spool.wind({ kind: 'mixtape-track', body: 'an entry from some other client' })`)
+  await b.until(
+    `[...document.querySelectorAll('.systemLine')].some(el => el.textContent.includes('an entry from some other client'))`,
+    15_000,
+    'B renders the unknown-kind fallback'
+  )
+  const reservedVisible = await b.eval(`document.body.textContent.includes('the lounge')`)
+  if (reservedVisible) throw new Error('reserved room:* entry leaked into the feed')
+  const label = await b.eval(
+    `[...document.querySelectorAll('.kindLabel')].some(el => el.textContent === 'mixtape-track')`
+  )
+  if (!label) throw new Error('unknown kind rendered without its label')
+  return 'room:name hidden; mixtape-track shown as labeled fallback'
+})
+
+await scenario('4. mobile layout: 375×667, alignment, tiles, no sideways scroll', async () => {
+  const overflow = await a.eval(`document.documentElement.scrollWidth > document.documentElement.clientWidth`)
+  if (overflow) throw new Error('horizontal overflow at 375px')
+  const mineRight = await a.eval(`(() => {
+    const el = [...document.querySelectorAll('.bubble.mine')].pop()
+    if (!el) return false
+    const r = el.getBoundingClientRect()
+    return r.right > window.innerWidth / 2
+  })()`)
+  const themLeft = await b.eval(`(() => {
+    const el = [...document.querySelectorAll('.bubble.them')].pop()
+    if (!el) return false
+    const r = el.getBoundingClientRect()
+    return r.left < window.innerWidth / 2
+  })()`)
+  const tile = await b.eval(`document.querySelectorAll('.seatTile').length > 0`)
+  const composerVisible = await a.eval(`(() => {
+    const r = document.querySelector('.composer').getBoundingClientRect()
+    return r.bottom <= window.innerHeight + 1 && r.height >= 44
+  })()`)
+  if (!mineRight) throw new Error('own bubbles are not right-aligned')
+  if (!themLeft) throw new Error('peer bubbles are not left-aligned')
+  if (!tile) throw new Error('no seat tile rendered beside a peer group')
+  if (!composerVisible) throw new Error('composer not visible within the viewport')
+  if (a.errors.length || b.errors.length) throw new Error(`page errors: ${[...a.errors, ...b.errors].join(' | ')}`)
+  return 'aligned, tiled, no overflow, composer on-screen, 0 page errors'
+})
+
+await a?.close()
+await b?.close()
+
+console.log('\n| # | Scenario | Result | Measured |')
+console.log('|---|---|---|---|')
+for (const r of results) console.log(`| ${r.name.split('.')[0]} | ${r.name.slice(r.name.indexOf(' ') + 1)} | ${r.pass ? '✔' : '✘'} | ${r.detail} |`)
+
+chrome.kill('SIGKILL')
+relay.kill('SIGKILL')
+for (const s of servers) s.close()
+process.exit(results.every((r) => r.pass) ? 0 : 1)
