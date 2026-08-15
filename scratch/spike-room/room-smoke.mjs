@@ -49,7 +49,7 @@ const serveDist = (port) =>
 // ---------- minimal CDP Tab (verbatim idiom from torture-t021/t104) ----------
 
 class Tab {
-  static async open(url, { width = 375, height = 667 } = {}) {
+  static async open(url, { width = 375, height = 667, patch } = {}) {
     const info = await (await fetch(`http://127.0.0.1:${CDP_PORT}/json/new`, { method: 'PUT' })).json()
     const tab = new Tab()
     tab.id = info.id
@@ -77,6 +77,7 @@ class Tab {
       deviceScaleFactor: 2,
       mobile: true,
     })
+    if (patch) await tab.call('Page.addScriptToEvaluateOnNewDocument', { source: patch })
     await tab.call('Page.navigate', { url })
     return tab
   }
@@ -362,6 +363,91 @@ await scenario('6. concurrent renames of the same seat converge newest-wins ever
     throw new Error(`page errors: ${[...a.errors, ...b.errors, ...c.errors].join(' | ')}`)
   }
   return `all three devices agree on "${names[0]}" (newest-wins), DOM matches, 0 page errors`
+})
+
+// ---------- T-117: arrival ----------
+
+await scenario('7. cold open on a sleeping room: checking beat → content from the pocket', async () => {
+  const code2 = `sleepy-room-${String(Math.floor(Math.random() * 1000)).padStart(3, '0')}`
+  const key2 = randomBytes(32).toString('base64url')
+  const link2 = (o) => `http://localhost:${o}/#spool=${code2}&relay=${encodeURIComponent(`ws://localhost:${RELAY_PORT}/yjs`)}&k=${key2}`
+
+  // someone chatted here yesterday and left — the pocket holds the room
+  const w = await Tab.open(link2(ORIGINS[0]))
+  await w.ready()
+  await w.eval(`(async () => {
+    const seat = localStorage.getItem('spool-seat')
+    window.spool.wind({ kind: 'message', body: 'first', data: { seat } })
+    window.spool.wind({ kind: 'message', body: 'second', data: { seat } })
+    window.spool.wind({ kind: 'message', body: 'third', data: { seat } })
+    await window.spool.leave()
+  })()`)
+  await w.close()
+
+  // a fresh device opens with NOBODY online. The invariant (AC): at no
+  // rendered moment does a populated room show a bare empty feed — every
+  // frame has either the arrival overlay or content. (On a fast pocket the
+  // content can beat the overlay entirely — that's the ideal case, not a
+  // failure; the overlay narrates waiting, and there was none.)
+  const BARE_EMPTY_WATCH = `
+    window.__bareEmptyFrames = 0
+    window.__overlaySeen = false
+    const check = () => {
+      if (document.querySelector('.arrival')) window.__overlaySeen = true
+      const feed = document.querySelector('.feed')
+      if (feed && !document.querySelector('.bubble') && !document.querySelector('.arrival')) {
+        window.__bareEmptyFrames++
+      }
+    }
+    new MutationObserver(check).observe(document, { childList: true, subtree: true })
+  `
+  const d = await Tab.open(link2(ORIGINS[1]), { patch: BARE_EMPTY_WATCH })
+  await d.until(`document.querySelectorAll('.bubble').length === 3`, 15_000, 'pocket content renders')
+  const bare = await d.eval('window.__bareEmptyFrames')
+  const overlaySeen = await d.eval('window.__overlaySeen')
+  const phase = await d.eval(`window.spool.pocket?.phase`)
+  if (bare > 0) throw new Error(`${bare} rendered mutation(s) showed a bare empty feed with no overlay`)
+  if (phase !== 'applied') throw new Error(`pocket phase ${phase}, expected applied`)
+  if (d.errors.length) throw new Error(`page errors: ${d.errors.join(' | ')}`)
+  await d.close()
+  return `3 bubbles from the pocket, zero bare-empty frames (overlay ${overlaySeen ? 'narrated the wait' : 'not needed — content beat it'}), phase=applied`
+})
+
+await scenario('8. truly empty room: calm verdict, invite affordance, non-blocking naming', async () => {
+  const code3 = `empty-room-${String(Math.floor(Math.random() * 1000)).padStart(3, '0')}`
+  const key3 = randomBytes(32).toString('base64url')
+  const e = await Tab.open(
+    `http://localhost:${ORIGINS[2]}/#spool=${code3}&relay=${encodeURIComponent(`ws://localhost:${RELAY_PORT}/yjs`)}&k=${key3}`
+  )
+  await e.until(
+    `document.querySelector('.arrival')?.textContent.includes('nobody else here')`,
+    10_000,
+    'overlay reports nobody here'
+  )
+  await e.until(
+    `document.querySelector('.arrival')?.textContent.includes('really is empty')`,
+    10_000,
+    'overlay reaches the empty verdict'
+  )
+  await e.until(`!document.querySelector('.arrival')`, 10_000, 'overlay closes by itself')
+  const inviteThere = await e.eval(
+    `!!document.querySelector('.inviteBtn') && document.querySelector('.honestLine').textContent.includes('reads everything')`
+  )
+  if (!inviteThere) throw new Error('empty room lacks the invite affordance + honest sentence')
+  // the naming prompt is present but never a gate: the composer works right now
+  const promptThere = await e.eval(`!!document.querySelector('.namePrompt')`)
+  await e.typeAndSend('unnamed and talking anyway')
+  await e.until(
+    `[...document.querySelectorAll('.bubble')].some(el => el.textContent === 'unnamed and talking anyway')`,
+    10_000,
+    'unnamed seat can speak immediately'
+  )
+  await e.eval(`document.querySelector('.namePromptClose').click()`)
+  const promptGone = await e.eval(`!document.querySelector('.namePrompt')`)
+  if (!promptThere || !promptGone) throw new Error(`name prompt present=${promptThere}, dismissed=${promptGone}`)
+  if (e.errors.length) throw new Error(`page errors: ${e.errors.join(' | ')}`)
+  await e.close()
+  return 'nobody-here → really-empty → invite + honest sentence; naming prompt ignorable and dismissible'
 })
 
 await a?.close()

@@ -98,11 +98,14 @@ export const MessageList = ({
   records,
   mySeat,
   resolveName,
+  onInvite,
 }: {
   records: Rec[]
   mySeat: string
   /** the profile table, resolved at render — names apply retroactively (T-114) */
   resolveName: (seat: string) => string
+  /** copy the room link — the empty state's invite affordance (T-117) */
+  onInvite?: () => void
 }) => {
   // render counter for the scratch harnesses (T-116/T-126): a runaway
   // render loop is measurable instead of a mystery hang
@@ -228,7 +231,22 @@ export const MessageList = ({
             show earlier · {hiddenCount} more
           </button>
         ) : null}
-        {items.length === 0 ? <div className="feedEmpty">nothing here yet — say something.</div> : null}
+        {items.length === 0 ? (
+          <div className="feedEmpty">
+            <div>nothing here yet — say something.</div>
+            {onInvite ? (
+              <>
+                <button className="inviteBtn" onClick={onInvite}>
+                  ⤴ invite someone — copy the link
+                </button>
+                <div className="honestLine">
+                  whoever holds this link reads everything and writes anything — there is no partial
+                  history and no read-only.
+                </div>
+              </>
+            ) : null}
+          </div>
+        ) : null}
         {items.map((it) => (
           <div key={it.rec.id}>
             {it.dayBreak ? <div className="dayDivider">{it.dayBreak}</div> : null}

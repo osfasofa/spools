@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { Spool } from 'spools'
+import { Arrival } from './Arrival'
 import { Composer } from './Composer'
 import { MessageList } from './MessageList'
 import { mySeat, seatColor, seatSuffix, initialOf } from './seat'
@@ -143,8 +144,35 @@ const Settings = ({
 
 export const App = () => {
   const [author] = useState(() => localStorage.getItem('spool-author') || 'anonymous')
-  const { spool, entries, status, undecryptable, pocket, error } = useRoom(author)
+  const { spool, entries, status, undecryptable, pocket, peers, openedEmpty, error } = useRoom(author)
   const [view, setView] = useState<'room' | 'settings'>('room')
+
+  // the arrival overlay runs exactly once, and only when the room opened
+  // with no local entries — a reopen has its content instantly and needs no
+  // narration (T-117)
+  const [arrival, setArrival] = useState<'unknown' | 'active' | 'done'>('unknown')
+  useEffect(() => {
+    if (spool && arrival === 'unknown') setArrival(openedEmpty ? 'active' : 'done')
+  }, [spool, arrival, openedEmpty])
+
+  // non-blocking naming: join instantly as an unnamed seat; the prompt is a
+  // dismissible line, never a gate (§1: no onboarding)
+  const [namePromptDismissed, setNamePromptDismissed] = useState(
+    () => localStorage.getItem('room-nameprompt-dismissed') === '1'
+  )
+  const dismissNamePrompt = () => {
+    localStorage.setItem('room-nameprompt-dismissed', '1')
+    setNamePromptDismissed(true)
+  }
+
+  const [inviteCopied, setInviteCopied] = useState(false)
+  const invite = () => {
+    if (!spool) return
+    void navigator.clipboard.writeText(spool.share()).then(() => {
+      setInviteCopied(true)
+      setTimeout(() => setInviteCopied(false), 1600)
+    })
+  }
 
   // the profile table, recomputed behind the same feed subscription — names
   // resolve at render time, so renames apply retroactively by construction
@@ -216,8 +244,30 @@ export const App = () => {
         </div>
       ) : null}
 
-      <MessageList records={entries} mySeat={SEAT} resolveName={resolveName} />
+      <MessageList records={entries} mySeat={SEAT} resolveName={resolveName} onInvite={invite} />
+      {inviteCopied ? <div className="notice">link copied — hand it to someone you trust</div> : null}
+      {!profiles.get(SEAT) && !namePromptDismissed ? (
+        <div className="namePrompt">
+          <button className="namePromptText" onClick={() => setView('settings')}>
+            you're {seatSuffix(SEAT)} — set a name?
+          </button>
+          <button className="namePromptClose" onClick={dismissNamePrompt} aria-label="Dismiss">
+            ✕
+          </button>
+        </div>
+      ) : null}
       <Composer onSend={(body) => void spool.wind({ kind: 'message', body, data: { seat: SEAT } })} />
+      {arrival === 'active' || (arrival === 'unknown' && entries.length === 0) ? (
+        // 'unknown' + empty covers the one commit before the deciding effect
+        // runs — without it, a fast pocket paints one bare-empty frame
+        <Arrival
+          pocketPhase={pocket?.phase ?? null}
+          status={status}
+          peers={peers}
+          hasEntries={entries.length > 0}
+          onDone={() => setArrival('done')}
+        />
+      ) : null}
     </div>
   )
 }
