@@ -121,6 +121,15 @@ per-cursor cost; the numbers pick between (a) hold D4 with a hard throttle
 (advance on blur/idle only, floor ≥ the history min-gap) or (b) ephemeral
 awareness-only "seen", which would amend D3. T-121 is gated on that call.
 
+> **Resolved (T-110, Aug 2026): (b) ephemeral awareness-only — D3 amended,
+> D4's mechanism rejected.** Measurement made the estimate above an
+> *underestimate*: the body-rewrite cursor is quadratic (~2.7·n² B cumulative
+> — each rewrite's delete-set range never merges under the interleaved history
+> log and every later moment re-encodes the whole ds; ~2 000 advances spend
+> the entire 8 MiB cap). A flat third option (append-only `room:read`
+> entries, ~359 B/advance) was offered and declined. T-110's Notes hold the
+> tables; DESIGN_DOC §5's M11 mutable-state row records the decision.
+
 ### D5 — App-first; the SDK gains one line ✅
 
 The app uses the escape hatches: `spool.doc` where needed, a directly
