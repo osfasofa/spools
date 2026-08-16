@@ -143,6 +143,8 @@ Drafted at a brainstorm session, Aug 2026: the shipped system's public story boi
 
 Owner-directed, Aug 2026: lore leads (T-144) and leads *out loud* — folklore as oral tradition. A shared four-track tape: takes wound on as pointers (the §6 asset rule in anger), punch in/out stamped as told-time history, words riding the tape, varispeed/scrub with real physics, bakeable to a keepsake WAV, packable to one file, rewindable into playable memory. Zero protocol pressure by design. Prototyped in the loom room-precedent (the T-130 vessel-repo gate holds — graduation recorded in [apps/lore/DESIGN.md](../apps/lore/DESIGN.md) §10); brief amendment at [docs/vessels/lore.md](../docs/vessels/lore.md) §6.5. tape-vibes (the owner's OP-1 experiment) read end-to-end as prior art; lessons and refusals folded into the design doc.
 
+**Scripted pass complete, 16 Aug 2026 — the thesis held again: SPEC v1.1 never moved, and the reel's doc with two recorded takes is 3 KB.** Record → punch → cut → mend → words → bake → pack → telling → playable memory, all green under scripted Chromium; the campfire verified two-device against a local relay (live both ways, ghosts honest), and `apps/client` renders reels sanely. Remaining with the owner: the hardware rows in [apps/lore/TESTING.md](../apps/lore/TESTING.md) (real phones, real mic, live tab capture, screen readers) and the deploy that makes it a link worth handing.
+
 | Ticket | Title | Depends | Status |
 |---|---|---|---|
 | [T-150](T-150-lore-vocal-turn-docs.md) | The vocal turn: brief amendment, vessel design doc, M14 laid out | — | done |
