@@ -405,5 +405,17 @@ const LoreTape = (() => {
     else peaksCache.clear()
   }
 
-  return { init, draw, invalidatePeaks, get pxPerSec() { return pxPerSec } }
+  // where a client point lands on the tape — the drop target's question
+  const pointFor = (clientX, clientY) => {
+    const r = canvas.getBoundingClientRect()
+    const px = clientX - r.left
+    const py = clientY - r.top
+    const { top, laneH } = laneGeom()
+    return {
+      t: Math.max(0, tOf(px, opts.getPos())),
+      track: py >= top ? Math.min(LoreReel.TRACKS - 1, Math.max(0, Math.floor((py - top) / laneH))) : 0,
+    }
+  }
+
+  return { init, draw, invalidatePeaks, pointFor, get pxPerSec() { return pxPerSec } }
 })()

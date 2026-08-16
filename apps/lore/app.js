@@ -368,6 +368,100 @@ const unpackText = async (text) => {
   return { code, same, adopted, refused }
 }
 
+// ---- sourcing (T-158): bring sound in any honest way ----
+
+const importFiles = async (files, at, track) => {
+  let cursor = at
+  let brought = 0
+  for (const f of files) {
+    if (f.name.endsWith('.json') || f.type === 'application/json') {
+      try {
+        const r = await unpackText(await f.text())
+        toast(r.same ? `sound adopted (${r.adopted})` : `unpacked ${r.code} — open it from its link or the address bar`)
+        if (!r.same) {
+          setTimeout(() => {
+            location.hash = `#spool=${r.code}`
+            location.reload()
+          }, 1200)
+        }
+      } catch (err) {
+        toast(err.message)
+      }
+      continue
+    }
+    try {
+      const buf = await f.arrayBuffer()
+      const decoded = await LoreEngine.ensureCtx().decodeAudioData(buf.slice(0))
+      const audio = await LoreStore.put(f, { dur: decoded.duration, mime: f.type })
+      wind({
+        kind: 'take',
+        data: {
+          audio,
+          tape: { track, at: cursor, offset: 0, dur: decoded.duration, gain: 1, rate: 1 },
+          source: { type: 'file', name: f.name },
+        },
+      })
+      cursor += decoded.duration
+      brought++
+    } catch {
+      toast(`${f.name} would not decode — not an audio file this browser reads`)
+    }
+  }
+  if (brought) toast(`${brought} take${brought === 1 ? '' : 's'} brought onto track ${track + 1}`)
+}
+
+const importSheet = () => {
+  sheet((panel, close) => {
+    const s0 = el('div', 'sheetSection')
+    s0.appendChild(el('div', 'sectionLabel', 'bring sound in'))
+    const pickLabel = el('label', 'sheetBtn', 'choose audio files…')
+    const pick = el('input')
+    pick.type = 'file'
+    pick.accept = 'audio/*,.json,application/json'
+    pick.multiple = true
+    pick.className = 'visuallyHidden'
+    pickLabel.appendChild(pick)
+    pick.onchange = async () => {
+      const files = [...(pick.files || [])]
+      close()
+      if (files.length) await importFiles(files, LoreEngine.pos(), selectedTrack)
+    }
+    s0.appendChild(pickLabel)
+    s0.appendChild(el('div', 'caption', 'lands at the head on the armed track — or drop files straight onto a lane. a packed reel (.lore.json) unpacks.'))
+    panel.appendChild(s0)
+
+    const s1 = el('div', 'sheetSection')
+    s1.appendChild(el('div', 'sectionLabel', 'line in'))
+    const lineBtn = el('button', 'sheetBtn', '⦿ record what plays (a tab)')
+    lineBtn.onclick = async () => {
+      close()
+      try {
+        await LoreEngine.punchIn(selectedTrack, 'line')
+        toast('line in — punch out with rec or stop')
+      } catch (err) {
+        toast(err.message)
+      }
+    }
+    s1.appendChild(lineBtn)
+    s1.appendChild(el('div', 'caption', 'tapes have always taped what was playing. pick a tab, check "share tab audio" — it punches onto the armed track. name what it was in the caption if it matters. (phones don’t offer this; the mic hears the room instead.)'))
+    panel.appendChild(s1)
+  })
+}
+
+const wireDrop = () => {
+  const zone = document.querySelector('.tapeWrap')
+  zone.addEventListener('dragover', (e) => {
+    e.preventDefault()
+  })
+  zone.addEventListener('drop', (e) => {
+    e.preventDefault()
+    const files = [...(e.dataTransfer ? e.dataTransfer.files : [])]
+    if (!files.length) return
+    const p = LoreTape.pointFor(e.clientX, e.clientY)
+    importFiles(files, p.t, p.track)
+  })
+}
+
 // ---- settings sheet ----
 const settingsSheet = () => {
   sheet((panel, close) => {
@@ -704,6 +798,8 @@ async function main() {
   $('menuBtn').onclick = settingsSheet
   $('reelTitle').onclick = settingsSheet
   $('wordsBtn').onclick = wordsComposer
+  $('importBtn').onclick = importSheet
+  wireDrop()
   $('bakeBtn').onclick = () => {
     if (LoreEngine.recording()) {
       toast('finish the take first')
@@ -717,7 +813,7 @@ async function main() {
 
   // the service port: a labeled screw-panel for smoke scripts and the
   // curious, not an API — nothing in the UI depends on it
-  window.lore = { spool, wind, reel: () => reel, engine: LoreEngine, store: LoreStore, refresh, bakeTape, packReelText, unpackText }
+  window.lore = { spool, wind, reel: () => reel, engine: LoreEngine, store: LoreStore, refresh, bakeTape, packReelText, unpackText, importFiles }
 }
 
 main()

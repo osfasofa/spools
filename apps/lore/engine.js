@@ -318,22 +318,50 @@ const LoreEngine = (() => {
     return Math.min(1, Math.sqrt(sum / mic.data.length) * 3)
   }
 
-  const punchIn = async (track) => {
+  // line-in: capture what's playing (a tab, where the platform allows) —
+  // the honest underground move; tapes have always taped (DESIGN §11)
+  const ensureLine = async () => {
+    if (!navigator.mediaDevices.getDisplayMedia) throw new Error('this browser has no line-in')
+    const stream = await navigator.mediaDevices.getDisplayMedia({ audio: true, video: true })
+    const audioTracks = stream.getAudioTracks()
+    if (!audioTracks.length) {
+      stream.getTracks().forEach((t) => t.stop())
+      throw new Error('no audio came through — pick a tab and check "share tab audio"')
+    }
+    return { stream, audioStream: new MediaStream(audioTracks) }
+  }
+
+  const punchIn = async (track, kind = 'mic') => {
     if (recording) return
-    await ensureMic()
-    await ctx.resume()
+    let line = null
+    let recStream
+    if (kind === 'line') {
+      line = await ensureLine()
+      recStream = line.audioStream
+    } else {
+      await ensureMic()
+      recStream = mic.stream
+    }
+    await ensureCtx().resume()
     const mime = pickMime()
-    const rec = mime ? new MediaRecorder(mic.stream, { mimeType: mime }) : new MediaRecorder(mic.stream)
+    const rec = mime ? new MediaRecorder(recStream, { mimeType: mime }) : new MediaRecorder(recStream)
     const chunks = []
     rec.ondataavailable = (e) => {
       if (e.data && e.data.size) chunks.push(e.data)
     }
     if (!playing) play()
     integrate()
-    recording = { track, from: pos, speed, rec, chunks, wallIn: Date.now() }
+    recording = { track, from: pos, speed, rec, chunks, wallIn: Date.now(), kind, line }
     rec.onerror = () => {
+      if (line) line.stream.getTracks().forEach((t) => t.stop())
       recording = null
       if (opts.onError) opts.onError('the recorder failed — nothing was wound')
+    }
+    // the tab may stop sharing on its own (user ends it from the browser UI)
+    if (line) {
+      line.audioStream.getAudioTracks()[0].onended = () => {
+        if (recording && recording.kind === 'line') punchOut()
+      }
     }
     rec.start(250)
   }
@@ -346,6 +374,7 @@ const LoreEngine = (() => {
     const posOut = pos
     const wallOut = Date.now()
     r.rec.onstop = async () => {
+      if (r.line) r.line.stream.getTracks().forEach((t) => t.stop())
       try {
         const mime = r.rec.mimeType || 'audio/webm'
         const blob = new Blob(r.chunks, { type: mime })
@@ -363,7 +392,7 @@ const LoreEngine = (() => {
           audio: { sha256: audio.sha256, size: audio.size, mime: audio.mime, dur: audio.dur },
           tape: { track: r.track, at, offset: 0, dur: tapeSpan, gain: 1, rate: 1 / S },
           punch: { in: r.wallIn, out: wallOut, speed: S },
-          source: { type: 'mic' },
+          source: { type: r.kind || 'mic' },
         })
       } catch (err) {
         if (opts.onError) opts.onError(`that take was lost before it was wound (${err.message})`)

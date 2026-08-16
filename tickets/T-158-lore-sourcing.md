@@ -1,7 +1,7 @@
 ---
 id: T-158
 title: "sourcing — file import, drag-drop, line-in (capture what plays)"
-status: todo
+status: done
 milestone: M14
 depends: [T-152, T-154]
 ---
@@ -26,3 +26,5 @@ Any way to get sound onto the tape besides the mic: bring files, drop files, and
 ## Notes / open questions
 
 -
+- Verified headless: picker import lands at the head on the armed track with `source: {type:'file', name}`; the drop path (same importFiles) places at lane/time (track 3 @ 3.0s); a text file fails with the sentence, not a crash; line-in's punch path ran end-to-end under Chromium's fake display UI (real tab-capture with shared audio is a hardware row in TESTING.md). Multi-file import stacks takes head-to-tail from the drop point.
+- A `.lore.json` dropped or picked routes to T-157's unpack — one surface, two formats.
