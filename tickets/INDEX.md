@@ -150,7 +150,7 @@ Owner-directed, Aug 2026: lore leads (T-144) and leads *out loud* — folklore a
 | [T-152](T-152-lore-reel-store.md) | The reel store: blobs by sha-256, pointer resolution, peaks | T-151 | done |
 | [T-153](T-153-lore-record-punch.md) | Record: mic capture, punch in/out, takes wound as pointers | T-151, T-152 | done |
 | [T-154](T-154-lore-tape-playback.md) | The tape: four-track timeline, waveforms, JIT playback | T-151, T-152 | done |
-| [T-155](T-155-lore-transport-feel.md) | Transport feel: varispeed, audible scrub, rewind/FF | T-154 | todo |
+| [T-155](T-155-lore-transport-feel.md) | Transport feel: varispeed, audible scrub, rewind/FF | T-154 | done |
 | [T-156](T-156-lore-cut-and-text.md) | Cut + words on the tape: mends, sayings, glosses | T-154 | todo |
 | [T-157](T-157-lore-bake.md) | Bake: offline mixdown → WAV → `telling`; pack the reel | T-154 | todo |
 | [T-158](T-158-lore-sourcing.md) | Sourcing: file import, drag-drop, line-in | T-152, T-154 | todo |

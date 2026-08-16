@@ -304,6 +304,52 @@ async function main() {
   }
   holdWind($('rewBtn'), -1)
   holdWind($('ffBtn'), 1)
+
+  // the speed knob: 270° sweep, vertical drag, log taper, detent at 1×
+  const knob = $('speedKnob')
+  const knobPointer = $('knobPointer')
+  const LN_HALF = Math.log(0.5)
+  const LN_SPAN = Math.log(2) - Math.log(0.5)
+  const tOfSpeed = (s) => (Math.log(s) - LN_HALF) / LN_SPAN
+  const speedOfT = (t) => Math.exp(LN_HALF + Math.min(1, Math.max(0, t)) * LN_SPAN)
+  const showKnob = () => {
+    const s = LoreEngine.speed()
+    knobPointer.style.transform = `rotate(${-135 + tOfSpeed(s) * 270}deg)`
+    knob.setAttribute('aria-valuenow', s.toFixed(2))
+  }
+  const setKnob = (t) => {
+    let s = speedOfT(t)
+    if (Math.abs(s - 1) < 0.05) s = 1 // the detent
+    if (LoreEngine.recording()) return // locked while the head writes
+    LoreEngine.setSpeed(s)
+    showKnob()
+  }
+  let knobDrag = null
+  knob.addEventListener('pointerdown', (e) => {
+    knob.setPointerCapture(e.pointerId)
+    knobDrag = { y: e.clientY, t: tOfSpeed(LoreEngine.speed()) }
+  })
+  knob.addEventListener('pointermove', (e) => {
+    if (!knobDrag) return
+    setKnob(knobDrag.t + (knobDrag.y - e.clientY) / 150)
+  })
+  const knobUp = () => { knobDrag = null }
+  knob.addEventListener('pointerup', knobUp)
+  knob.addEventListener('pointercancel', knobUp)
+  knob.addEventListener('dblclick', () => setKnob(0.5)) // t=0.5 is exactly 1×
+  knob.addEventListener('wheel', (e) => {
+    e.preventDefault()
+    setKnob(tOfSpeed(LoreEngine.speed()) - e.deltaY * 0.0012)
+  }, { passive: false })
+  knob.addEventListener('keydown', (e) => {
+    const t = tOfSpeed(LoreEngine.speed())
+    if (e.key === 'ArrowUp' || e.key === 'ArrowRight') setKnob(t + 0.04)
+    else if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') setKnob(t - 0.04)
+    else if (e.key === 'Home') setKnob(0.5)
+    else return
+    e.preventDefault()
+  })
+  showKnob()
   $('gainSlider').oninput = (e) => {
     // shared mix: whole-value newest-wins (lore:mix); wound on release, not per tick
   }

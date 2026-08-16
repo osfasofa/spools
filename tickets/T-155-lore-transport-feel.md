@@ -1,7 +1,7 @@
 ---
 id: T-155
 title: "transport feel — varispeed knob, audible scrub, rewind/FF with sound"
-status: todo
+status: done
 milestone: M14
 depends: [T-154]
 ---
@@ -27,3 +27,5 @@ The reason it feels like tape: one speed knob with physics (one-pole slew, pitch
 ## Notes / open questions
 
 - tape-vibes' worklet held the tape; here the buffers stay on the main thread and no worklet exists — the slew lives on AudioParams (its one-pole, relocated).
+- Verified headless: ramp to 1.8× gains 1.733 tape-sec over 1.0 wall-sec (the one-pole's closed form, on the nose), no source restarts on speed moves; scrub fired grains both directions (0→6→10 across a fwd+back drag); rew held rate at exactly −8.00, pos clamped at 0, release decayed −0.29→0 with 14 more grains along the way; knob: 5×ArrowUp → 1.32, Home → 1.00, drag detent snaps within ±0.05.
+- The knob locks while recording (engine guard is the contract); the tape trick uses the knob's parked value at punch-in.

@@ -42,6 +42,7 @@ const LoreEngine = (() => {
   // ---- scrub/spool ----
   let lastGrainAt = 0
   let winding = 0 // -1 | 0 | 1 while rew/ff is held
+  let grainCount = 0 // service-port counter: proof the tape is audible under a hand
 
   const ensureCtx = () => {
     if (!ctx) {
@@ -205,6 +206,7 @@ const LoreEngine = (() => {
       src.connect(g)
       g.connect(trackGains[take.tape.track])
       try { src.start(t, Math.max(0, off), grainSrc) } catch { continue }
+      grainCount++
       src.onended = () => g.disconnect()
     }
   }
@@ -405,5 +407,6 @@ const LoreEngine = (() => {
     applyMix,
     // T-157 reaches in for the bake: same take math, offline context
     _buffers: buffers,
+    _grains: () => grainCount,
   }
 })()
