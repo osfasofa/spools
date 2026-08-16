@@ -1,7 +1,7 @@
 ---
 id: T-140
 title: "WHITEPAPER.md — the public story, from working code"
-status: todo
+status: done
 milestone: M13
 depends: []
 ---
@@ -28,13 +28,13 @@ sentence in §6, T-002's domain note, the M10 brief's K≈4 → 8 pointers).
 
 ## Tasks
 
-- [ ] Truth-ups the paper cites (separate commit, before the paper).
-- [ ] WHITEPAPER.md at the repo root — manifesto front, evidence body:
+- [x] Truth-ups the paper cites (separate commit, before the paper).
+- [x] WHITEPAPER.md at the repo root — manifesto front, evidence body:
       claim / what a spool is / what exists / how it works / what it's for /
       what it refuses / honest limits / what it can become / ethos / hold one.
-- [ ] README: link the paper (start-here line) and the two M13 planning
+- [x] README: link the paper (start-here line) and the two M13 planning
       docs.
-- [ ] Vocabulary audit: §2-conformant (spool/entry/wind/rewind/open/kind/
+- [x] Vocabulary audit: §2-conformant (spool/entry/wind/rewind/open/kind/
       stash/pocket/deposit); "vessel" used sparingly as the informal word
       for apps, not promoted to protocol vocabulary.
 

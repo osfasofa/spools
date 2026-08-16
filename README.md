@@ -4,6 +4,8 @@
 
 Spool is a small protocol, SDK, relay, and reference client for intimate, local-first, peer-to-peer shared documents. Two (or a few) people share a living thing — a mixtape, a chat, a list — with no central server that ever sees their content. Each person holds their own complete copy; copies sync live when people are online together, reconcile when they reconnect, and persist locally forever. Encrypted spools also survive the gap between you: the relay keeps a few **sealed copies in its pocket** — ciphertext it cannot read, under names it cannot guess — so the mixtape is there when your friend opens the link while you're asleep. The only way in is a link handed to you by a person.
 
+**Start here:** [WHITEPAPER.md](WHITEPAPER.md) — the whole story: what this is, what it refuses, and what it can become.
+
 ## This repo
 
 | Path | What |
@@ -21,6 +23,8 @@ Spool is a small protocol, SDK, relay, and reference client for intimate, local-
 - [`DESIGN_DOC.md`](DESIGN_DOC.md) — philosophy, architecture, vocabulary, decisions log. The *why*.
 - [`docs/SDK-API.md`](docs/SDK-API.md) — the SDK surface being built toward.
 - [`tickets/INDEX.md`](tickets/INDEX.md) — the working roadmap.
+- [`docs/ECOSYSTEM.md`](docs/ECOSYSTEM.md) — how apps get built: vessels in their own repos, on the published packages.
+- [`docs/RELEASING.md`](docs/RELEASING.md) — what versions mean; releases happen when npm would otherwise lie.
 
 ## Develop
 
