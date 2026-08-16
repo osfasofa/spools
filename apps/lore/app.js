@@ -24,6 +24,7 @@ const refresh = () => {
   reel = LoreReel.derive(spool)
   $('reelTitle').textContent = reel.title || spool.code
   document.title = reel.title ? `${reel.title} — lore` : 'lore'
+  LoreEngine.applyMix(reel.mixGains)
   renderGain()
 }
 
@@ -267,10 +268,42 @@ async function main() {
     },
   })
 
+  // the motor
+  LoreEngine.init({
+    getReel: () => reel,
+    onTake: (fields) => {
+      wind({ kind: 'take', data: fields })
+    },
+    onError: (msg) => toast(msg),
+  })
+
   // transport
-  $('playBtn').onclick = () => (LoreEngine.ready ? LoreEngine.play() : toast('the motor arrives with the next ticket'))
+  $('playBtn').onclick = () => LoreEngine.play()
   $('stopBtn').onclick = () => LoreEngine.stop()
-  $('recBtn').onclick = () => toast('recording lands in T-153')
+  $('recBtn').onclick = async () => {
+    if (LoreEngine.recording()) {
+      LoreEngine.punchOut()
+      return
+    }
+    try {
+      await LoreEngine.punchIn(selectedTrack)
+    } catch (err) {
+      toast(err && err.name === 'NotAllowedError'
+        ? 'the mic stays yours — lore records nothing without permission'
+        : `no way in to the mic (${err && err.message ? err.message : 'unknown'})`)
+    }
+  }
+  const holdWind = (btn, dir) => {
+    btn.addEventListener('pointerdown', (e) => {
+      btn.setPointerCapture(e.pointerId)
+      LoreEngine.windHold(dir)
+    })
+    const release = () => LoreEngine.windRelease()
+    btn.addEventListener('pointerup', release)
+    btn.addEventListener('pointercancel', release)
+  }
+  holdWind($('rewBtn'), -1)
+  holdWind($('ffBtn'), 1)
   $('gainSlider').oninput = (e) => {
     // shared mix: whole-value newest-wins (lore:mix); wound on release, not per tick
   }
@@ -284,6 +317,10 @@ async function main() {
 
   arrival()
   requestAnimationFrame(paint)
+
+  // the service port: a labeled screw-panel for smoke scripts and the
+  // curious, not an API — nothing in the UI depends on it
+  window.lore = { spool, wind, reel: () => reel, engine: LoreEngine, store: LoreStore, refresh }
 }
 
 main()

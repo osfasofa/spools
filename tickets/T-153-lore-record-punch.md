@@ -1,7 +1,7 @@
 ---
 id: T-153
 title: "record — mic capture, punch in/out, takes wound as pointers"
-status: todo
+status: doing
 milestone: M14
 depends: [T-151, T-152]
 ---

@@ -1,7 +1,7 @@
 ---
 id: T-154
 title: "the tape — four-track timeline, waveforms, JIT playback"
-status: todo
+status: done
 milestone: M14
 depends: [T-151, T-152]
 ---
@@ -28,3 +28,6 @@ The instrument's face and its motor: a mobile-first four-track canvas timeline w
 ## Notes / open questions
 
 -
+- Worked ahead of T-153 (playback is record's dependency — monitoring needs a motor); INDEX order preserved, statuses honest.
+- Verified headless: two seeded takes decode and schedule (2 buffers, ctx running), playhead tracks wall clock with exactly the τ=80 ms spin-up lag the one-pole predicts (constant, not accumulating), stop sags through rate 0.10, seek+replay clean, ghost pointer skipped without a crash and drawn dashed-∅. Screenshot in session scratch.
+- Deferred to T-160 rows: two-tab live sync against a local relay (this sandbox blocks the canonical one), 60 fps on real phone hardware, audible-mix verification via the bake (T-157 renders with the same scheduler, which is the point).
