@@ -138,6 +138,7 @@ Drafted at a brainstorm session, Aug 2026: the shipped system's public story boi
 | [T-143](T-143-homepage.md) | Publish the white paper to a homepage — **owner at keyboard** | T-140, T-130 | todo |
 | [T-144](T-144-lore-vessel.md) | lore leads the constellation — riff → brief, build order redirected | T-141 | done |
 | [T-145](T-145-forks-of-purpose.md) | Forks of purpose — the agent-workspace track, chartered beside the lane | T-141 | done |
+| [T-146](T-146-familiar-charter.md) | familiar riffed → the fork charter (docs/forks/familiar.md) | T-145 | done |
 
 ## Parked (no ticket until evidence demands one)
 
