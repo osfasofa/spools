@@ -25,6 +25,7 @@ const refresh = () => {
   $('reelTitle').textContent = reel.title || spool.code
   document.title = reel.title ? `${reel.title} — lore` : 'lore'
   LoreEngine.applyMix(reel.mixGains)
+  LoreEngine.reschedule()
   renderGain()
 }
 
@@ -68,6 +69,215 @@ const renderTracks = () => {
 const renderGain = () => {
   $('gainLabel').textContent = `track ${selectedTrack + 1} level`
   $('gainSlider').value = String(reel.mixGains[selectedTrack])
+}
+
+// ---- the blade and the pen (T-156) ----
+
+// placement edits are append-only: a full replacement block, newest wins
+const mendTake = (take, patch) => {
+  wind({ kind: 'mend', parent: take.id, data: { tape: Object.assign({}, take.tape, patch) } })
+}
+
+const cutTake = (take) => {
+  const pos = LoreEngine.pos()
+  const t = take.tape
+  if (pos < t.at + 0.05 || pos > t.at + t.dur - 0.05) {
+    toast('park the head inside the take to cut it')
+    return false
+  }
+  const leftDur = pos - t.at
+  // two winds sharing the blob, adjacent windows; the original becomes memory
+  wind({
+    kind: 'take',
+    body: take.caption || undefined,
+    data: {
+      audio: take.audio,
+      tape: { track: t.track, at: t.at, offset: t.offset, dur: leftDur, gain: t.gain, rate: t.rate },
+      origin: { take: take.id },
+      source: take.source,
+    },
+  })
+  wind({
+    kind: 'take',
+    data: {
+      audio: take.audio,
+      tape: { track: t.track, at: pos, offset: t.offset + leftDur * t.rate, dur: t.dur - leftDur, gain: t.gain, rate: t.rate },
+      origin: { take: take.id },
+      source: take.source,
+    },
+  })
+  take.entry.delete()
+  return true
+}
+
+const glossSection = (entry, glosses, close) => {
+  const s = el('div', 'sheetSection')
+  s.appendChild(el('div', 'sectionLabel', 'glosses — said by those who were there'))
+  for (const g of glosses) {
+    const line = el('div', 'caption')
+    line.textContent = `${LoreReel.tellerName(reel, g)} ${LoreUtil.seatSuffix((g.data && g.data.seat) || '')}: ${g.body}`
+    s.appendChild(line)
+  }
+  const row = el('div', 'sheetRow')
+  const input = el('input', 'sheetInput')
+  input.placeholder = 'add a gloss — context, correction, dispute'
+  input.maxLength = 400
+  const btn = el('button', 'sheetBtn', 'gloss')
+  btn.onclick = () => {
+    const v = input.value.trim()
+    if (!v) return
+    wind({ kind: 'gloss', parent: entry.id, body: v })
+    close()
+  }
+  row.append(input, btn)
+  s.appendChild(row)
+  return s
+}
+
+const takeSheet = (take) => {
+  selectedId = take.id
+  sheet((panel, close) => {
+    const closeAnd = () => {
+      selectedId = null
+      close()
+    }
+    // who and when, as testimony
+    const s0 = el('div', 'sheetSection')
+    const teller = LoreReel.tellerName(reel, take.entry)
+    const src = take.source ? take.source.type : 'unknown'
+    const meta = take.punch
+      ? `punched ${LoreUtil.clock(take.punch.in)} → ${LoreUtil.clock(take.punch.out)} @ ×${take.punch.speed.toFixed(2)}`
+      : `brought in (${src}${take.source && take.source.name ? `: ${take.source.name}` : ''})`
+    s0.appendChild(el('div', 'sectionLabel', `take · track ${take.tape.track + 1} · ${take.tape.dur.toFixed(1)}s`))
+    s0.appendChild(el('div', 'caption', `${teller} · ${meta}${take.mended ? ' · mended' : ''}${take.origin ? ' · born of a cut' : ''}`))
+    panel.appendChild(s0)
+
+    // the caption (the take's own words)
+    const s1 = el('div', 'sheetSection')
+    const capRow = el('div', 'sheetRow')
+    const cap = el('input', 'sheetInput')
+    cap.placeholder = 'caption this take'
+    cap.value = take.caption
+    cap.maxLength = 200
+    const capBtn = el('button', 'sheetBtn', 'set')
+    capBtn.onclick = () => {
+      take.entry.body = cap.value.trim()
+      closeAnd()
+    }
+    capRow.append(cap, capBtn)
+    s1.appendChild(capRow)
+    panel.appendChild(s1)
+
+    // the blade and the nudge
+    const s2 = el('div', 'sheetSection')
+    s2.appendChild(el('div', 'sectionLabel', 'the tape'))
+    const row = el('div', 'sheetRow')
+    const cutBtn = el('button', 'sheetBtn', '✂ cut at head')
+    cutBtn.onclick = () => {
+      if (cutTake(take)) closeAnd()
+    }
+    const back = el('button', 'sheetBtn', '−0.1s')
+    back.onclick = () => {
+      mendTake(take, { at: Math.max(0, take.tape.at - 0.1) })
+      closeAnd()
+    }
+    const fwd = el('button', 'sheetBtn', '+0.1s')
+    fwd.onclick = () => {
+      mendTake(take, { at: take.tape.at + 0.1 })
+      closeAnd()
+    }
+    row.append(cutBtn, back, fwd)
+    s2.appendChild(row)
+    const row2 = el('div', 'sheetRow')
+    const quiet = el('button', 'sheetBtn', 'quieter')
+    quiet.onclick = () => {
+      mendTake(take, { gain: Math.max(0, +(take.tape.gain - 0.15).toFixed(2)) })
+      closeAnd()
+    }
+    const loud = el('button', 'sheetBtn', 'louder')
+    loud.onclick = () => {
+      mendTake(take, { gain: Math.min(2, +(take.tape.gain + 0.15).toFixed(2)) })
+      closeAnd()
+    }
+    row2.append(quiet, loud, el('div', 'caption', `level ${take.tape.gain.toFixed(2)} — hold a take to move it`))
+    s2.appendChild(row2)
+    panel.appendChild(s2)
+
+    panel.appendChild(glossSection(take.entry, take.glosses, closeAnd))
+
+    // unwinding is soft — memory keeps it
+    const s3 = el('div', 'sheetSection')
+    const del = el('button', 'sheetBtn danger', 'unwind this take')
+    del.onclick = () => {
+      take.entry.delete()
+      toast('unwound — the telling still remembers it')
+      closeAnd()
+    }
+    s3.appendChild(del)
+    panel.appendChild(s3)
+  })
+}
+
+const sayingSheet = (s) => {
+  selectedId = s.id
+  sheet((panel, close) => {
+    const closeAnd = () => {
+      selectedId = null
+      close()
+    }
+    const s0 = el('div', 'sheetSection')
+    s0.appendChild(el('div', 'sectionLabel', `saying · ${LoreReel.tellerName(reel, s.entry)} · at ${LoreUtil.tapeTime(s.at).main}`))
+    const row = el('div', 'sheetRow')
+    const input = el('input', 'sheetInput')
+    input.value = s.body
+    input.maxLength = 400
+    const set = el('button', 'sheetBtn', 'set')
+    set.onclick = () => {
+      const v = input.value.trim()
+      if (v) s.entry.body = v
+      closeAnd()
+    }
+    row.append(input, set)
+    s0.appendChild(row)
+    const row2 = el('div', 'sheetRow')
+    const move = el('button', 'sheetBtn', 'move to head')
+    move.onclick = () => {
+      wind({ kind: 'mend', parent: s.id, data: { tape: { at: LoreEngine.pos() } } })
+      closeAnd()
+    }
+    const del = el('button', 'sheetBtn danger', 'unwind')
+    del.onclick = () => {
+      s.entry.delete()
+      closeAnd()
+    }
+    row2.append(move, del)
+    s0.appendChild(row2)
+    panel.appendChild(s0)
+    panel.appendChild(glossSection(s.entry, s.glosses, closeAnd))
+  })
+}
+
+const wordsComposer = () => {
+  sheet((panel, close) => {
+    const s0 = el('div', 'sheetSection')
+    s0.appendChild(el('div', 'sectionLabel', `words on the tape · at ${LoreUtil.tapeTime(LoreEngine.pos()).main}`))
+    const input = el('textarea', 'sheetInput')
+    input.placeholder = 'a title, a toast, the rule of the house…'
+    input.rows = 3
+    input.maxLength = 400
+    s0.appendChild(input)
+    const row = el('div', 'sheetRow')
+    const pin = el('button', 'sheetBtn primary', 'pin at head')
+    pin.onclick = () => {
+      const v = input.value.trim()
+      if (!v) return
+      wind({ kind: 'saying', body: v, data: { tape: { at: LoreEngine.pos() } } })
+      close()
+    }
+    row.append(pin)
+    s0.appendChild(row)
+    panel.appendChild(s0)
+  })
 }
 
 // ---- settings sheet ----
@@ -260,12 +470,9 @@ async function main() {
     peaksFor: (audio) => LoreStore.peaks(audio, LoreEngine.ensureCtx()),
     scrubTo: (pos, vel) => LoreEngine.scrubTo(pos, vel),
     scrubEnd: () => LoreEngine.scrubEnd(),
-    onTakeTap: (take) => {
-      selectedId = selectedId === take.id ? null : take.id
-    },
-    onSayingTap: (s) => {
-      selectedId = selectedId === s.id ? null : s.id
-    },
+    onTakeTap: (take) => takeSheet(take),
+    onSayingTap: (s) => sayingSheet(s),
+    onTakeMove: (take, at, track) => mendTake(take, { at: +at.toFixed(3), track }),
   })
 
   // the motor
@@ -360,6 +567,7 @@ async function main() {
   }
   $('menuBtn').onclick = settingsSheet
   $('reelTitle').onclick = settingsSheet
+  $('wordsBtn').onclick = wordsComposer
 
   arrival()
   requestAnimationFrame(paint)

@@ -54,11 +54,13 @@ const LoreReel = (() => {
     const glossesFor = new Map()
     for (const e of live) {
       if (e.kind === 'mend' && e.parent) {
-        const t = tapeOf(e.data && e.data.tape)
-        if (!t) continue
+        // a mend is valid if it names a position; sayings mend with {at}
+        // alone, takes with a full placement block
+        const at = e.data && e.data.tape ? num(e.data.tape.at) : null
+        if (at === null) continue
         const prev = mendsFor.get(e.parent)
         // newest surviving mend wins (byTime order makes the last one newest)
-        if (!prev || byTime(prev, e) < 0) mendsFor.set(e.parent, Object.assign({ _mend: e }, e))
+        if (!prev || byTime(prev, e) < 0) mendsFor.set(e.parent, e)
       } else if (e.kind === 'gloss' && e.parent) {
         if (!glossesFor.has(e.parent)) glossesFor.set(e.parent, [])
         glossesFor.get(e.parent).push(e)
@@ -81,15 +83,16 @@ const LoreReel = (() => {
           const wound = tapeOf(d.tape)
           if (!audio || !wound) break
           const mend = mendsFor.get(e.id)
+          const mended = mend ? tapeOf(mend.data.tape) : null
           takes.push({
             id: e.id,
             author: e.author,
             createdAt: e.createdAt,
             caption: e.body || '',
             audio,
-            tape: mend ? tapeOf(mend.data.tape) : wound,
+            tape: mended || wound,
             wound, // the placement as first told — the telling shows drift
-            mended: !!mend,
+            mended: !!mended,
             punch: d.punch && num(d.punch.in) !== null ? d.punch : undefined,
             source: d.source && typeof d.source.type === 'string' ? d.source : undefined,
             origin: d.origin && typeof d.origin.take === 'string' ? d.origin : undefined,

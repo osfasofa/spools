@@ -1,7 +1,7 @@
 ---
 id: T-156
 title: "cut + words on the tape — mends, sayings, glosses"
-status: todo
+status: done
 milestone: M14
 depends: [T-154]
 ---
@@ -27,3 +27,6 @@ The blade and the pen: cut a take at the playhead, move/trim what's there (appen
 ## Notes / open questions
 
 -
+- Verified headless, driven through the real UI: cut at head 2.0 on a 0.5–4.5 take → left {at 0.5, dur 1.5, off 0} + right {at 2.0, dur 2.5, off 1.5}, one blob in the store (shared), original tombstoned with caption carried to the left child; hold-450ms lift-drag moved the right half to track 4 @3.5 s as exactly one `mend` with the original wind untouched (woundAt 2.0/track 0 still legible — the telling can show drift); saying pinned via the composer; gloss threaded via the sheet. Doc kinds now: take/mend/saying/gloss.
+- Restore-after-cut leaves the children standing beside the restored original (both play) — recorded as the honest asymmetry; the telling + unwind covers it, no reaper logic.
+- Cross-app degrade-sanely check against apps/client moved to T-160 (same-origin serve of both apps).

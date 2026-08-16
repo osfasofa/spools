@@ -503,6 +503,12 @@ button {
   border-color: var(--ac);
 }
 
+textarea.sheetInput {
+  resize: none;
+  min-height: 76px;
+  line-height: 1.45;
+}
+
 .sheetBtn {
   background: none;
   border: 1px solid var(--ln);

@@ -405,6 +405,11 @@ const LoreEngine = (() => {
     punchIn,
     punchOut,
     applyMix,
+    // entries changed mid-roll (a mend, a cut): drop live sources and let the
+    // next tick refill from the fresh reel — one frame of silence, honest
+    reschedule: () => {
+      if (playing || rate > 0.002) hardStop()
+    },
     // T-157 reaches in for the bake: same take math, offline context
     _buffers: buffers,
     _grains: () => grainCount,

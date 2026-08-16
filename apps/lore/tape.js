@@ -216,6 +216,25 @@ const LoreTape = (() => {
       ctx.strokeRect(x, y, bw, laneH - 6)
     }
 
+    // a lifted take rides above the tape until it lands
+    if (lift) {
+      const x = xOf(lift.at, pos)
+      const bw = lift.take.tape.dur * pxPerSec
+      const y = top + lift.track * laneH + 3
+      ctx.setLineDash([5, 4])
+      ctx.strokeStyle = tk.ac
+      ctx.lineWidth = 2
+      ctx.globalAlpha = 0.9
+      ctx.beginPath()
+      ctx.roundRect(x, y, Math.max(bw, 2), laneH - 6, 3)
+      ctx.stroke()
+      ctx.globalAlpha = 0.12
+      ctx.fillStyle = tk.ac
+      ctx.fill()
+      ctx.globalAlpha = 1
+      ctx.setLineDash([])
+    }
+
     // sayings ride above the tracks
     ctx.font = "9px 'JetBrains Mono', ui-monospace, monospace"
     for (const s of reel.sayings) {
@@ -255,6 +274,8 @@ const LoreTape = (() => {
 
   const pointers = new Map()
   let drag = null // { x0, t0, moved, lastX, lastT, pinch0 }
+  let lift = null // { take, grab, at, track } — a held take being moved
+  let liftTimer = null
 
   const hitTest = (px, py) => {
     const pos = opts.getPos()
@@ -283,7 +304,20 @@ const LoreTape = (() => {
     pointers.set(e.pointerId, { x: e.offsetX, y: e.offsetY })
     if (pointers.size === 1) {
       drag = { x0: e.offsetX, y0: e.offsetY, t0: performance.now(), moved: false, lastX: e.offsetX, lastT: performance.now() }
+      // a held-still press on a take lifts it off the tape (move gesture)
+      const hit = hitTest(e.offsetX, e.offsetY)
+      clearTimeout(liftTimer)
+      if (hit && hit.take && opts.onTakeMove) {
+        liftTimer = setTimeout(() => {
+          if (drag && !drag.moved && pointers.size === 1 && !opts.isMemory?.()) {
+            lift = { take: hit.take, grab: tOf(drag.x0, opts.getPos()) - hit.take.tape.at, at: hit.take.tape.at, track: hit.take.tape.track }
+            if (navigator.vibrate) navigator.vibrate(12)
+          }
+        }, 450)
+      }
     } else if (pointers.size === 2) {
+      clearTimeout(liftTimer)
+      lift = null
       const [a, b] = [...pointers.values()]
       drag = { pinch0: Math.abs(a.x - b.x) || 1, ppsAtPinch: pxPerSec, moved: true }
     }
@@ -299,9 +333,21 @@ const LoreTape = (() => {
       pxPerSec = Math.min(400, Math.max(4, drag.ppsAtPinch * (d / drag.pinch0)))
       return
     }
+    if (lift) {
+      const t = tOf(e.offsetX, opts.getPos())
+      lift.at = Math.max(0, t - lift.grab)
+      const { top, laneH } = laneGeom()
+      if (e.offsetY >= top) {
+        lift.track = Math.min(LoreReel.TRACKS - 1, Math.max(0, Math.floor((e.offsetY - top) / laneH)))
+      }
+      return
+    }
     const now = performance.now()
     const dx = e.offsetX - drag.lastX
-    if (Math.abs(e.offsetX - drag.x0) > 8) drag.moved = true
+    if (Math.abs(e.offsetX - drag.x0) > 8) {
+      if (!drag.moved) clearTimeout(liftTimer)
+      drag.moved = true
+    }
     if (drag.moved && dx !== 0) {
       const dPos = -dx / pxPerSec
       const dt = Math.max(1, now - drag.lastT) / 1000
@@ -313,6 +359,16 @@ const LoreTape = (() => {
 
   const onUp = (e) => {
     pointers.delete(e.pointerId)
+    clearTimeout(liftTimer)
+    if (lift) {
+      const l = lift
+      lift = null
+      drag = null
+      if (Math.abs(l.at - l.take.tape.at) > 0.01 || l.track !== l.take.tape.track) {
+        opts.onTakeMove(l.take, l.at, l.track)
+      }
+      return
+    }
     if (drag && !drag.pinch0 && !drag.moved && performance.now() - drag.t0 < 450) {
       const hit = hitTest(e.offsetX, e.offsetY)
       if (hit && hit.take && opts.onTakeTap) opts.onTakeTap(hit.take)
