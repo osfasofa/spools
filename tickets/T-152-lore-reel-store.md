@@ -1,7 +1,7 @@
 ---
 id: T-152
 title: "the reel store — IndexedDB blobs by sha-256, pointer resolution, peaks"
-status: todo
+status: done
 milestone: M14
 depends: [T-151]
 ---
@@ -26,3 +26,4 @@ The storage system under the pointers: content-addressed blobs on the device, re
 ## Notes / open questions
 
 -
+- Verified in Chromium via scripted page: dedup by content hash, byte-identical round trip, wrong-hash `url` refused *and* not adopted, peaks (200 buckets on a 0.5 s tone, max 0.61) computed once and served from idb across reload, usage counting. Decode LRU capped at 16 buffers; reversed-buffer cache capped at 6 (T-155's customer).

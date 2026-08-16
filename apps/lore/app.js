@@ -3,7 +3,7 @@
    ignored on purpose: repainting from spool.entries can never drift — the
    naive-client guarantee, chosen deliberately for the thing that must not
    lie about where sound sits). */
-/* global spools, LoreTheme, LoreUtil, LoreReel, LoreEngine, LoreTape */
+/* global spools, LoreTheme, LoreUtil, LoreReel, LoreEngine, LoreTape, LoreStore */
 const { $, toast, sheet, el } = LoreUtil
 
 const author = localStorage.getItem('spool-author') || 'anonymous'
@@ -200,6 +200,7 @@ const arrival = () => {
 
 // ---- boot ----
 async function main() {
+  await LoreStore.init().catch(() => toast('this browser gave lore no local storage — the reel will not survive a refresh'))
   const handed = location.hash.includes('spool=')
   try {
     spool = handed
@@ -254,8 +255,8 @@ async function main() {
     isPlaying: () => LoreEngine.playing(),
     getRecording: () => LoreEngine.recording(),
     getSelected: () => selectedId,
-    hasBlob: () => false, // T-152 answers honestly
-    peaksFor: null, // T-152 provides
+    hasBlob: (sha) => LoreStore.hasSync(sha),
+    peaksFor: (audio) => LoreStore.peaks(audio, LoreEngine.ensureCtx()),
     scrubTo: (pos, vel) => LoreEngine.scrubTo(pos, vel),
     scrubEnd: () => LoreEngine.scrubEnd(),
     onTakeTap: (take) => {

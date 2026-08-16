@@ -3,7 +3,15 @@
    its controls once. */
 /* exported LoreEngine */
 const LoreEngine = (() => {
+  let ctx = null
+  // creating a context is allowed before any gesture; only *running* needs
+  // one — decode/peaks work on a suspended context, so the store can use it
+  const ensureCtx = () => {
+    if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)()
+    return ctx
+  }
   return {
+    ensureCtx,
     ready: false,
     pos: () => 0,
     rate: () => 0,
