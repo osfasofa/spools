@@ -1,7 +1,7 @@
 ---
 id: T-141
 title: "docs/ECOSYSTEM.md — vessels in their own repos"
-status: todo
+status: done
 milestone: M13
 depends: [T-140]
 ---
@@ -27,7 +27,7 @@ pocket — a vessel started against it would poison the npm-only rule).
 
 ## Tasks
 
-- [ ] docs/ECOSYSTEM.md: the model (loom vs vessels), the feedback loop,
+- [x] docs/ECOSYSTEM.md: the model (loom vs vessels), the feedback loop,
       the portfolio table (each candidate with the human story + what it
       uniquely proves + size), a proposed build order, the good-citizen
       constitution, naming, and the T-130 sequencing gate.
