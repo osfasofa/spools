@@ -1,6 +1,6 @@
 {
   "name": "spools-relay",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Dumb byte relay + WebRTC signaling for spools. Never sees your content.",
   "license": "MIT",
   "repository": {
@@ -20,7 +20,8 @@
   },
   "scripts": {
     "start": "node server.js",
-    "test": "node --test test/*.test.js"
+    "test": "node --test test/*.test.js",
+    "prepublishOnly": "pnpm test"
   },
   "engines": {
     "node": ">=18"

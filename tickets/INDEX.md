@@ -124,7 +124,7 @@ Pure execution, no open design questions. Drafted at M11 close (what's on npm no
 
 | Ticket | Title | Depends | Status |
 |---|---|---|---|
-| [T-130](T-130-npm-release.md) | npm release: real SDK 0.1.0, relay 0.2.0 (T-124 knobs), keeper first publish | — | todo |
+| [T-130](T-130-npm-release.md) | npm release: real SDK 0.1.0, relay 0.2.0 (T-124 knobs), keeper first publish | — | doing |
 
 ## M13 — the telling (white paper + ecosystem plan)
 

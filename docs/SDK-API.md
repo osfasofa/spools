@@ -1,6 +1,8 @@
 # `spools` SDK — API design note
 
 > **Status: design, not spec.** The protocol spec is written last, from working code (DESIGN_DOC §4). This note is the target we build toward; revise it when the code teaches us something. Decisions referenced here are logged in DESIGN_DOC §5.
+>
+> As of `spools@0.1.0`: the surface documented here is the package's contract. Anything `index.ts` exports beyond it (`SpoolEngine`, the encrypted-persistence and transport classes, the magic constants…) is scaffolding — real escape hatches, kept exported on purpose, but they may move in any 0.x (settled at T-130, RELEASING.md decision 2).
 
 The API should feel like handing someone a tape, not configuring a network. Object words (make/open/hand), not session words (start/join/connect).
 
