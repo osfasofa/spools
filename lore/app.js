@@ -1,0 +1,964 @@
+/* lore — the shell. Opens or starts a reel, wires the machine's controls to
+   the engine, and rerenders from the reel model on every entry event (diff
+   ignored on purpose: repainting from spool.entries can never drift — the
+   naive-client guarantee, chosen deliberately for the thing that must not
+   lie about where sound sits). */
+/* global spools, LoreTheme, LoreUtil, LoreReel, LoreEngine, LoreTape, LoreStore */
+const { $, toast, sheet, el } = LoreUtil
+
+const author = localStorage.getItem('spool-author') || 'anonymous'
+const seat = LoreUtil.mySeat()
+
+let spool = null
+let reel = LoreReel.derive({ entries: [] })
+let selectedTrack = 0
+let selectedId = null // take/saying picked on the tape (T-156 gives it a sheet)
+let memory = null // { ts, reel } — rewound; the tape plays the past, writes nothing
+
+const currentReel = () => (memory ? memory.reel : reel)
+
+// wind with the seat stamped into data — the profile-table convention
+const wind = (input) => {
+  if (memory) {
+    toast('memory is read-only — come back to now first')
+    return null
+  }
+  const data = Object.assign({ seat }, input.data)
+  return spool.wind(Object.assign({}, input, { data }))
+}
+
+const refresh = () => {
+  reel = LoreReel.derive(spool)
+  $('reelTitle').textContent = reel.title || spool.code
+  document.title = reel.title ? `${reel.title} — lore` : 'lore'
+  LoreEngine.applyMix(reel.mixGains)
+  LoreEngine.reschedule()
+  renderGain()
+}
+
+// ---- the LCD + tape paint loop ----
+const paint = () => {
+  const t = LoreUtil.tapeTime(LoreEngine.pos())
+  $('counterMain').textContent = t.main
+  $('counterTenths').textContent = t.tenths
+  $('speedReadout').textContent = `×${LoreEngine.speed().toFixed(2)}`
+  const rec = LoreEngine.recording()
+  const mode = memory ? 'memory' : rec ? 'rec' : LoreEngine.playing() ? 'play' : 'stopped'
+  const modeEl = $('lcdMode')
+  modeEl.textContent = mode
+  modeEl.classList.toggle('rec', !!rec)
+  $('playBtn').setAttribute('aria-pressed', String(LoreEngine.playing() && !rec))
+  $('recLed').classList.toggle('on', !!rec)
+  LoreTape.draw()
+  requestAnimationFrame(paint)
+}
+
+// ---- tracks ----
+const renderTracks = () => {
+  const row = $('trackRow')
+  row.textContent = ''
+  for (let i = 0; i < LoreReel.TRACKS; i++) {
+    const b = el('button', 'trackBtn')
+    b.setAttribute('aria-pressed', String(i === selectedTrack))
+    b.setAttribute('aria-label', `track ${i + 1}${i === selectedTrack ? ', armed' : ''}`)
+    const sw = el('span', 'swatch')
+    sw.style.background = `var(--t${i})`
+    b.append(sw, document.createTextNode(String(i + 1)))
+    b.onclick = () => {
+      selectedTrack = i
+      renderTracks()
+      renderGain()
+    }
+    row.appendChild(b)
+  }
+}
+
+const renderGain = () => {
+  $('gainLabel').textContent = `track ${selectedTrack + 1} level`
+  $('gainSlider').value = String(reel.mixGains[selectedTrack])
+}
+
+// ---- the blade and the pen (T-156) ----
+
+// placement edits are append-only: a full replacement block, newest wins
+const mendTake = (take, patch) => {
+  wind({ kind: 'mend', parent: take.id, data: { tape: Object.assign({}, take.tape, patch) } })
+}
+
+const cutTake = (take) => {
+  const pos = LoreEngine.pos()
+  const t = take.tape
+  if (pos < t.at + 0.05 || pos > t.at + t.dur - 0.05) {
+    toast('park the head inside the take to cut it')
+    return false
+  }
+  const leftDur = pos - t.at
+  // two winds sharing the blob, adjacent windows; the original becomes memory
+  wind({
+    kind: 'take',
+    body: take.caption || undefined,
+    data: {
+      audio: take.audio,
+      tape: { track: t.track, at: t.at, offset: t.offset, dur: leftDur, gain: t.gain, rate: t.rate },
+      origin: { take: take.id },
+      source: take.source,
+    },
+  })
+  wind({
+    kind: 'take',
+    data: {
+      audio: take.audio,
+      tape: { track: t.track, at: pos, offset: t.offset + leftDur * t.rate, dur: t.dur - leftDur, gain: t.gain, rate: t.rate },
+      origin: { take: take.id },
+      source: take.source,
+    },
+  })
+  take.entry.delete()
+  return true
+}
+
+const glossSection = (entry, glosses, close) => {
+  const s = el('div', 'sheetSection')
+  s.appendChild(el('div', 'sectionLabel', 'glosses — said by those who were there'))
+  for (const g of glosses) {
+    const line = el('div', 'caption')
+    line.textContent = `${LoreReel.tellerName(reel, g)} ${LoreUtil.seatSuffix((g.data && g.data.seat) || '')}: ${g.body}`
+    s.appendChild(line)
+  }
+  const row = el('div', 'sheetRow')
+  const input = el('input', 'sheetInput')
+  input.placeholder = 'add a gloss — context, correction, dispute'
+  input.maxLength = 400
+  const btn = el('button', 'sheetBtn', 'gloss')
+  btn.onclick = () => {
+    const v = input.value.trim()
+    if (!v) return
+    wind({ kind: 'gloss', parent: entry.id, body: v })
+    close()
+  }
+  row.append(input, btn)
+  s.appendChild(row)
+  return s
+}
+
+const takeSheet = (take) => {
+  selectedId = take.id
+  sheet((panel, close) => {
+    const closeAnd = () => {
+      selectedId = null
+      close()
+    }
+    // who and when, as testimony
+    const s0 = el('div', 'sheetSection')
+    const teller = LoreReel.tellerName(reel, take.entry)
+    const src = take.source ? take.source.type : 'unknown'
+    const meta = take.punch
+      ? `punched ${LoreUtil.clock(take.punch.in)} → ${LoreUtil.clock(take.punch.out)} @ ×${take.punch.speed.toFixed(2)}`
+      : `brought in (${src}${take.source && take.source.name ? `: ${take.source.name}` : ''})`
+    s0.appendChild(el('div', 'sectionLabel', `take · track ${take.tape.track + 1} · ${take.tape.dur.toFixed(1)}s`))
+    s0.appendChild(el('div', 'caption', `${teller} · ${meta}${take.mended ? ' · mended' : ''}${take.origin ? ' · born of a cut' : ''}`))
+    panel.appendChild(s0)
+
+    // the caption (the take's own words)
+    const s1 = el('div', 'sheetSection')
+    const capRow = el('div', 'sheetRow')
+    const cap = el('input', 'sheetInput')
+    cap.placeholder = 'caption this take'
+    cap.value = take.caption
+    cap.maxLength = 200
+    const capBtn = el('button', 'sheetBtn', 'set')
+    capBtn.onclick = () => {
+      take.entry.body = cap.value.trim()
+      closeAnd()
+    }
+    capRow.append(cap, capBtn)
+    s1.appendChild(capRow)
+    panel.appendChild(s1)
+
+    // the blade and the nudge
+    const s2 = el('div', 'sheetSection')
+    s2.appendChild(el('div', 'sectionLabel', 'the tape'))
+    const row = el('div', 'sheetRow')
+    const cutBtn = el('button', 'sheetBtn', '✂ cut at head')
+    cutBtn.onclick = () => {
+      if (cutTake(take)) closeAnd()
+    }
+    const back = el('button', 'sheetBtn', '−0.1s')
+    back.onclick = () => {
+      mendTake(take, { at: Math.max(0, take.tape.at - 0.1) })
+      closeAnd()
+    }
+    const fwd = el('button', 'sheetBtn', '+0.1s')
+    fwd.onclick = () => {
+      mendTake(take, { at: take.tape.at + 0.1 })
+      closeAnd()
+    }
+    row.append(cutBtn, back, fwd)
+    s2.appendChild(row)
+    const row2 = el('div', 'sheetRow')
+    const quiet = el('button', 'sheetBtn', 'quieter')
+    quiet.onclick = () => {
+      mendTake(take, { gain: Math.max(0, +(take.tape.gain - 0.15).toFixed(2)) })
+      closeAnd()
+    }
+    const loud = el('button', 'sheetBtn', 'louder')
+    loud.onclick = () => {
+      mendTake(take, { gain: Math.min(2, +(take.tape.gain + 0.15).toFixed(2)) })
+      closeAnd()
+    }
+    row2.append(quiet, loud, el('div', 'caption', `level ${take.tape.gain.toFixed(2)} — hold a take to move it`))
+    s2.appendChild(row2)
+    panel.appendChild(s2)
+
+    panel.appendChild(glossSection(take.entry, take.glosses, closeAnd))
+
+    // unwinding is soft — memory keeps it
+    const s3 = el('div', 'sheetSection')
+    const del = el('button', 'sheetBtn danger', 'unwind this take')
+    del.onclick = () => {
+      take.entry.delete()
+      toast('unwound — the telling still remembers it')
+      closeAnd()
+    }
+    s3.appendChild(del)
+    panel.appendChild(s3)
+  })
+}
+
+const sayingSheet = (s) => {
+  selectedId = s.id
+  sheet((panel, close) => {
+    const closeAnd = () => {
+      selectedId = null
+      close()
+    }
+    const s0 = el('div', 'sheetSection')
+    s0.appendChild(el('div', 'sectionLabel', `saying · ${LoreReel.tellerName(reel, s.entry)} · at ${LoreUtil.tapeTime(s.at).main}`))
+    const row = el('div', 'sheetRow')
+    const input = el('input', 'sheetInput')
+    input.value = s.body
+    input.maxLength = 400
+    const set = el('button', 'sheetBtn', 'set')
+    set.onclick = () => {
+      const v = input.value.trim()
+      if (v) s.entry.body = v
+      closeAnd()
+    }
+    row.append(input, set)
+    s0.appendChild(row)
+    const row2 = el('div', 'sheetRow')
+    const move = el('button', 'sheetBtn', 'move to head')
+    move.onclick = () => {
+      wind({ kind: 'mend', parent: s.id, data: { tape: { at: LoreEngine.pos() } } })
+      closeAnd()
+    }
+    const del = el('button', 'sheetBtn danger', 'unwind')
+    del.onclick = () => {
+      s.entry.delete()
+      closeAnd()
+    }
+    row2.append(move, del)
+    s0.appendChild(row2)
+    panel.appendChild(s0)
+    panel.appendChild(glossSection(s.entry, s.glosses, closeAnd))
+  })
+}
+
+const wordsComposer = () => {
+  sheet((panel, close) => {
+    const s0 = el('div', 'sheetSection')
+    s0.appendChild(el('div', 'sectionLabel', `words on the tape · at ${LoreUtil.tapeTime(LoreEngine.pos()).main}`))
+    const input = el('textarea', 'sheetInput')
+    input.placeholder = 'a title, a toast, the rule of the house…'
+    input.rows = 3
+    input.maxLength = 400
+    s0.appendChild(input)
+    const row = el('div', 'sheetRow')
+    const pin = el('button', 'sheetBtn primary', 'pin at head')
+    pin.onclick = () => {
+      const v = input.value.trim()
+      if (!v) return
+      wind({ kind: 'saying', body: v, data: { tape: { at: LoreEngine.pos() } } })
+      close()
+    }
+    row.append(pin)
+    s0.appendChild(row)
+    panel.appendChild(s0)
+  })
+}
+
+// ---- keepsakes (T-157): the bake and the packed reel ----
+
+const blobToB64 = (blob) => new Promise((resolve, reject) => {
+  const r = new FileReader()
+  r.onload = () => resolve(String(r.result).split(',')[1])
+  r.onerror = () => reject(r.error)
+  r.readAsDataURL(blob)
+})
+const b64ToBlob = (b64, mime) => fetch(`data:${mime};base64,${b64}`).then((r) => r.blob())
+
+const reelName = () => (reel.title || spool.code).replace(/[^\w-]+/g, '-').toLowerCase()
+
+const bakeTape = async () => {
+  if (!reel.takes.length) {
+    toast('nothing on the tape yet')
+    return null
+  }
+  toast('baking…')
+  const { rendered, baked, ghosts, dur } = await LoreEngine.bake(reel)
+  const wav = LoreUtil.wavEncode(rendered)
+  const audio = await LoreStore.put(wav, { dur })
+  wind({
+    kind: 'telling',
+    data: { audio, baked: { at: Date.now(), dur, takes: reel.takes.map((t) => t.id) } },
+  })
+  LoreUtil.download(wav, `${reelName()}-bake-${LoreUtil.fileStamp()}.wav`)
+  toast(ghosts
+    ? `baked ${baked} take${baked === 1 ? '' : 's'} — ${ghosts} you don't hold stayed out`
+    : `baked — ${baked} take${baked === 1 ? '' : 's'}, one tape`)
+  return { audio, baked, ghosts }
+}
+
+// every unique pointer on the reel, takes and tellings alike
+const reelPointers = () => {
+  const seen = new Map()
+  for (const t of reel.takes) seen.set(t.audio.sha256, t.audio)
+  for (const t of reel.tellings) seen.set(t.audio.sha256, t.audio)
+  return [...seen.values()]
+}
+
+const packSizeEstimate = () => {
+  const bytes = reelPointers().reduce((n, a) => n + (a.size || 0), 0)
+  return Math.round(bytes * 1.34 + spool.export().length)
+}
+
+const packReelText = async () => {
+  const blobs = {}
+  let missing = 0
+  for (const audio of reelPointers()) {
+    const blob = await LoreStore.resolve(audio)
+    if (!blob) {
+      missing++
+      continue
+    }
+    blobs[audio.sha256] = { mime: audio.mime, b64: await blobToB64(blob) }
+  }
+  const text = JSON.stringify({
+    format: 'lore-reel',
+    version: 1,
+    packedAt: Date.now(),
+    spool: JSON.parse(spool.export()),
+    blobs,
+  })
+  return { text, missing }
+}
+
+const unpackText = async (text) => {
+  let parsed
+  try {
+    parsed = JSON.parse(text)
+  } catch {
+    throw new Error('that file is not a packed reel')
+  }
+  if (parsed.format !== 'lore-reel' || !parsed.spool) throw new Error('that file is not a packed reel')
+  let adopted = 0
+  let refused = 0
+  for (const [sha, b] of Object.entries(parsed.blobs || {})) {
+    const blob = await b64ToBlob(b.b64, b.mime || 'application/octet-stream')
+    const stored = await LoreStore.put(blob)
+    if (stored.sha256 === sha) adopted++
+    else refused++ // stored under its true hash; the claimed name was a lie
+  }
+  const code = parsed.spool.code
+  const same = code === spool.code
+  if (!same) await spools.importSpool(JSON.stringify(parsed.spool))
+  return { code, same, adopted, refused }
+}
+
+// ---- sourcing (T-158): bring sound in any honest way ----
+
+const importFiles = async (files, at, track) => {
+  let cursor = at
+  let brought = 0
+  for (const f of files) {
+    if (f.name.endsWith('.json') || f.type === 'application/json') {
+      try {
+        const r = await unpackText(await f.text())
+        toast(r.same ? `sound adopted (${r.adopted})` : `unpacked ${r.code} — open it from its link or the address bar`)
+        if (!r.same) {
+          setTimeout(() => {
+            location.hash = `#spool=${r.code}`
+            location.reload()
+          }, 1200)
+        }
+      } catch (err) {
+        toast(err.message)
+      }
+      continue
+    }
+    try {
+      const buf = await f.arrayBuffer()
+      const decoded = await LoreEngine.ensureCtx().decodeAudioData(buf.slice(0))
+      const audio = await LoreStore.put(f, { dur: decoded.duration, mime: f.type })
+      wind({
+        kind: 'take',
+        data: {
+          audio,
+          tape: { track, at: cursor, offset: 0, dur: decoded.duration, gain: 1, rate: 1 },
+          source: { type: 'file', name: f.name },
+        },
+      })
+      cursor += decoded.duration
+      brought++
+    } catch {
+      toast(`${f.name} would not decode — not an audio file this browser reads`)
+    }
+  }
+  if (brought) toast(`${brought} take${brought === 1 ? '' : 's'} brought onto track ${track + 1}`)
+}
+
+const importSheet = () => {
+  sheet((panel, close) => {
+    const s0 = el('div', 'sheetSection')
+    s0.appendChild(el('div', 'sectionLabel', 'bring sound in'))
+    const pickLabel = el('label', 'sheetBtn', 'choose audio files…')
+    const pick = el('input')
+    pick.type = 'file'
+    pick.accept = 'audio/*,.json,application/json'
+    pick.multiple = true
+    pick.className = 'visuallyHidden'
+    pickLabel.appendChild(pick)
+    pick.onchange = async () => {
+      const files = [...(pick.files || [])]
+      close()
+      if (files.length) await importFiles(files, LoreEngine.pos(), selectedTrack)
+    }
+    s0.appendChild(pickLabel)
+    s0.appendChild(el('div', 'caption', 'lands at the head on the armed track — or drop files straight onto a lane. a packed reel (.lore.json) unpacks.'))
+    panel.appendChild(s0)
+
+    const s1 = el('div', 'sheetSection')
+    s1.appendChild(el('div', 'sectionLabel', 'line in'))
+    const lineBtn = el('button', 'sheetBtn', '⦿ record what plays (a tab)')
+    lineBtn.onclick = async () => {
+      close()
+      try {
+        await LoreEngine.punchIn(selectedTrack, 'line')
+        toast('line in — punch out with rec or stop')
+      } catch (err) {
+        toast(err.message)
+      }
+    }
+    s1.appendChild(lineBtn)
+    s1.appendChild(el('div', 'caption', 'tapes have always taped what was playing. pick a tab, check "share tab audio" — it punches onto the armed track. name what it was in the caption if it matters. (phones don’t offer this; the mic hears the room instead.)'))
+    panel.appendChild(s1)
+  })
+}
+
+const wireDrop = () => {
+  const zone = document.querySelector('.tapeWrap')
+  zone.addEventListener('dragover', (e) => {
+    e.preventDefault()
+  })
+  zone.addEventListener('drop', (e) => {
+    e.preventDefault()
+    const files = [...(e.dataTransfer ? e.dataTransfer.files : [])]
+    if (!files.length) return
+    const p = LoreTape.pointFor(e.clientX, e.clientY)
+    importFiles(files, p.t, p.track)
+  })
+}
+
+// ---- the telling (T-159): told-time, and memory you can listen to ----
+
+const describeEntry = (e, names) => {
+  const d = e.data || {}
+  const who = LoreReel.tellerName({ names }, e)
+  switch (e.kind) {
+    case 'take': {
+      const t = d.tape || {}
+      const src = d.source && d.source.type
+      const how = d.punch
+        ? `punched in ${LoreUtil.clock(d.punch.in)}, out ${LoreUtil.clock(d.punch.out)}${d.punch.speed !== 1 ? ` @ ×${d.punch.speed.toFixed(2)}` : ''}`
+        : src === 'file'
+          ? `brought ${d.source.name || 'a file'} in`
+          : src === 'line'
+            ? 'taped what was playing'
+            : 'wound a take'
+      return { who, what: `${how} — track ${(t.track ?? 0) + 1}, ${(t.dur || 0).toFixed(1)}s${d.origin ? ' (born of a cut)' : ''}`, quote: e.body || '' }
+    }
+    case 'mend': {
+      const t = d.tape || {}
+      return { who, what: t.dur !== undefined ? `mended a take — track ${(t.track ?? 0) + 1} @ ${LoreUtil.tapeTime(t.at || 0).main}, level ${(t.gain ?? 1).toFixed(2)}` : `moved words to ${LoreUtil.tapeTime(t.at || 0).main}` }
+    }
+    case 'saying':
+      return { who, what: `pinned words at ${LoreUtil.tapeTime(d.tape && d.tape.at ? d.tape.at : 0).main}`, quote: e.body || '' }
+    case 'gloss':
+      return { who, what: 'glossed', quote: e.body || '' }
+    case 'telling':
+      return { who, what: `baked the tape — ${(d.baked && d.baked.dur ? d.baked.dur : 0).toFixed(1)}s, ${(d.baked && d.baked.takes ? d.baked.takes.length : 0)} takes`, quote: e.body || '' }
+    case 'lore:reel':
+      return { who, what: d.title ? `named the reel "${d.title}"` : 'set the reel' }
+    case 'lore:mix':
+      return { who, what: 'set the mix' }
+    case 'lore:teller':
+      return { who, what: `named ${d.seat === seat ? 'themselves' : 'a teller'} "${d.name}"` }
+    default:
+      return { who, what: e.kind, quote: e.body || '' }
+  }
+}
+
+const tellingSheet = () => {
+  $('tellingBtn').setAttribute('aria-pressed', 'true')
+  sheet((panel, close) => {
+    const s0 = el('div', 'sheetSection')
+    s0.appendChild(el('div', 'sectionLabel', 'the telling — what happened to this reel, in order'))
+    const list = el('div', 'tellingList')
+    const all = [...spool.entries, ...spool.deleted].sort(LoreReel.byTime)
+    if (!all.length) list.appendChild(el('div', 'caption', 'nothing has been told yet.'))
+    let lastDay = ''
+    for (const e of all) {
+      const day = LoreUtil.day(e.createdAt)
+      if (day !== lastDay) {
+        lastDay = day
+        list.appendChild(el('div', 'sectionLabel', day))
+      }
+      const row = el('div', 'logRow')
+      if (e.deletedAt) row.classList.add('gone')
+      row.appendChild(el('span', 'logStamp', LoreUtil.clock(e.createdAt)))
+      const body = el('div', 'logBody')
+      const desc = describeEntry(e, reel.names)
+      const whoEl = el('span', 'who', desc.who + ' ')
+      const seatId = e.data && e.data.seat
+      if (seatId) whoEl.style.color = LoreUtil.seatColor(seatId)
+      body.appendChild(whoEl)
+      body.appendChild(el('span', 'what', desc.what + (e.deletedAt ? ' · unwound' : '')))
+      if (desc.quote) body.appendChild(el('span', 'quote', `“${desc.quote}”`))
+      row.appendChild(body)
+      const kindChip = el('span', 'logKind', e.kind)
+      row.appendChild(kindChip)
+      list.appendChild(row)
+    }
+    s0.appendChild(list)
+    panel.appendChild(s0)
+
+    const s1 = el('div', 'sheetSection')
+    s1.appendChild(el('div', 'sectionLabel', 'memory'))
+    const momentCount = spool.history.length
+    const rewBtn = el('button', 'sheetBtn', momentCount ? `⏪ rewind the reel (${momentCount} moment${momentCount === 1 ? '' : 's'})` : 'no moments recorded yet')
+    rewBtn.disabled = !momentCount
+    rewBtn.onclick = () => {
+      close()
+      enterMemory()
+    }
+    s1.appendChild(rewBtn)
+    s1.appendChild(el('div', 'caption', 'the reel as it was — and it still plays. every sound this device holds, holds its place in the past.'))
+    panel.appendChild(s1)
+  })
+  // sheet teardown isn't observable; reflect the toggle when anything closes it
+  const untoggle = () => $('tellingBtn').setAttribute('aria-pressed', 'false')
+  setTimeout(() => document.addEventListener('pointerdown', function once() {
+    document.removeEventListener('pointerdown', once)
+    setTimeout(untoggle, 400)
+  }), 0)
+}
+
+const showMemoryAt = (ts) => {
+  const moments = spool.history
+  const resolved = moments.filter((m) => m <= ts).pop()
+  if (resolved === undefined) return
+  if (memory && memory.ts === resolved) return
+  try {
+    const snaps = spool.rewind(resolved)
+    memory = { ts: resolved, reel: LoreReel.derive({ entries: snaps.filter((s) => s.deletedAt == null) }) }
+    const i = moments.lastIndexOf(resolved)
+    $('memoryLabel').textContent = `${new Date(resolved).toLocaleString()} — moment ${i + 1}/${moments.length}`
+    LoreEngine.stop()
+    LoreEngine.reschedule()
+  } catch (err) {
+    toast(err.message)
+  }
+}
+
+const enterMemory = () => {
+  const moments = spool.history
+  if (!moments.length) return
+  const scrub = $('memoryScrub')
+  scrub.min = String(moments[0])
+  scrub.max = String(moments[moments.length - 1])
+  scrub.value = scrub.max
+  $('rewindBar').hidden = false
+  document.body.classList.add('rewinding')
+  LoreUtil.closeSheet()
+  showMemoryAt(Number(scrub.max))
+}
+
+const exitMemory = () => {
+  memory = null
+  $('rewindBar').hidden = true
+  document.body.classList.remove('rewinding')
+  LoreEngine.stop()
+  LoreEngine.reschedule()
+}
+
+// ---- settings sheet ----
+const settingsSheet = () => {
+  sheet((panel, close) => {
+    // the reel
+    const s1 = el('div', 'sheetSection')
+    s1.appendChild(el('div', 'sectionLabel', 'this reel'))
+    const titleRow = el('div', 'sheetRow')
+    const titleInput = el('input', 'sheetInput')
+    titleInput.placeholder = 'name the reel'
+    titleInput.value = reel.title || ''
+    titleInput.maxLength = 60
+    const titleBtn = el('button', 'sheetBtn', 'set')
+    titleBtn.onclick = () => {
+      const v = titleInput.value.trim()
+      if (v && v !== reel.title) {
+        wind({ kind: 'lore:reel', data: { title: v } })
+        toast('the reel has a name')
+      }
+      close()
+    }
+    titleRow.append(titleInput, titleBtn)
+    s1.appendChild(titleRow)
+    const linkRow = el('div', 'sheetRow')
+    const link = el('div', 'linkText', spool.share())
+    const copy = el('button', 'sheetBtn', 'copy link')
+    copy.onclick = async () => {
+      try {
+        await navigator.clipboard.writeText(spool.share())
+        toast('link copied — the link is the key')
+      } catch {
+        toast('copy failed — the link is in the address bar')
+      }
+    }
+    linkRow.append(link, copy)
+    s1.appendChild(linkRow)
+    panel.appendChild(s1)
+
+    // you
+    const s2 = el('div', 'sheetSection')
+    s2.appendChild(el('div', 'sectionLabel', 'you'))
+    const nameRow = el('div', 'sheetRow')
+    const nameInput = el('input', 'sheetInput')
+    nameInput.placeholder = 'your name'
+    nameInput.value = author === 'anonymous' ? '' : author
+    nameInput.maxLength = 40
+    const nameBtn = el('button', 'sheetBtn', 'set (reloads)')
+    nameBtn.onclick = () => {
+      localStorage.setItem('spool-author', nameInput.value.trim() || 'anonymous')
+      location.reload()
+    }
+    nameRow.append(nameInput, nameBtn)
+    s2.appendChild(nameRow)
+    const seatLine = el('div', 'caption', `this device signs as ${author} ${LoreUtil.seatSuffix(seat)} — testimony, not proof`)
+    s2.appendChild(seatLine)
+    panel.appendChild(s2)
+
+    // skin
+    const s3 = el('div', 'sheetSection')
+    s3.appendChild(el('div', 'sectionLabel', 'skin'))
+    const grid = el('div', 'themeGrid')
+    for (const name of Object.keys(LoreTheme.THEMES)) {
+      const t = LoreTheme.THEMES[name]
+      const card = el('button', 'themeCard')
+      if (name === LoreTheme.current()) card.classList.add('active')
+      const dots = el('div', 'themeDots')
+      for (const c of [t.bg, t.ac, t.tx]) {
+        const d = el('span')
+        d.style.background = c
+        d.style.border = `1px solid ${t.ln}`
+        dots.appendChild(d)
+      }
+      card.append(dots, document.createTextNode(name))
+      card.onclick = () => {
+        LoreTheme.apply(name)
+        LoreTape.invalidatePeaks()
+        settingsSheet() // repaint the grid's active ring
+      }
+      grid.appendChild(card)
+    }
+    s3.appendChild(grid)
+    panel.appendChild(s3)
+
+    // keepsakes: the reel ends in files, not accounts
+    const s4 = el('div', 'sheetSection')
+    s4.appendChild(el('div', 'sectionLabel', 'keepsakes'))
+    const kRow = el('div', 'sheetRow')
+    const bakeB = el('button', 'sheetBtn', '⏺ bake the tape (.wav)')
+    bakeB.onclick = async () => {
+      close()
+      await bakeTape()
+    }
+    const packB = el('button', 'sheetBtn', `pack the reel (~${LoreUtil.bytesLabel(packSizeEstimate())})`)
+    packB.onclick = async () => {
+      close()
+      toast('packing…')
+      const { text, missing } = await packReelText()
+      LoreUtil.download(new Blob([text], { type: 'application/json' }), `${reelName()}-${LoreUtil.fileStamp()}.lore.json`)
+      toast(missing ? `packed — ${missing} ghost${missing === 1 ? '' : 's'} could not come along` : 'packed — the whole reel in one file')
+    }
+    kRow.append(bakeB, packB)
+    s4.appendChild(kRow)
+    const unpackRow = el('div', 'sheetRow')
+    const unpackLabel = el('label', 'sheetBtn', 'unpack a reel…')
+    const unpackInput = el('input')
+    unpackInput.type = 'file'
+    unpackInput.accept = '.json,application/json'
+    unpackInput.className = 'visuallyHidden'
+    unpackLabel.appendChild(unpackInput)
+    unpackInput.onchange = async () => {
+      const f = unpackInput.files && unpackInput.files[0]
+      if (!f) return
+      try {
+        const r = await unpackText(await f.text())
+        if (r.same) {
+          toast(`sound adopted (${r.adopted}) — this reel is already open`)
+          close()
+        } else {
+          toast(`unpacked ${r.code} — opening it`)
+          setTimeout(() => {
+            location.hash = `#spool=${r.code}`
+            location.reload()
+          }, 900)
+        }
+      } catch (err) {
+        toast(err.message)
+      }
+    }
+    unpackRow.append(unpackLabel)
+    const stLine = el('div', 'caption', '…')
+    LoreStore.usage().then((u) => {
+      stLine.textContent = `this device holds ${u.blobs} sound${u.blobs === 1 ? '' : 's'} (${LoreUtil.bytesLabel(u.bytes)}) — voice runs ~15 MB/hour`
+    })
+    unpackRow.append(stLine)
+    s4.appendChild(unpackRow)
+    panel.appendChild(s4)
+
+    // the fine print
+    const s5 = el('div', 'sheetSection')
+    s5.appendChild(el('div', 'sectionLabel', 'the fine print'))
+    const fine = el('div', 'finePrint')
+    fine.textContent = 'nobody keeps this but you and the people you hand it to. the reel syncs; the sound travels by being handed — a bake, a packed reel, a link. anyone with the link can wind, mend, and name. lore lives by being retold — hold it with intent, or let it go.'
+    s5.appendChild(fine)
+    panel.appendChild(s5)
+  })
+}
+
+// ---- arrival (first run on this device) ----
+const arrival = () => {
+  if (localStorage.getItem('lore-arrived')) return
+  const over = el('div', 'arrival')
+  const lines = el('div', 'arrivalLines')
+  const LINES = [
+    'this is a reel — a tape a few people hold together.',
+    'wind your voice on. punch in, punch out. cut it, bake it.',
+    'hand the link. it lives by being retold.',
+  ]
+  let i = 0
+  const cursor = el('span', 'arrivalCursor')
+  lines.appendChild(cursor)
+  over.appendChild(lines)
+  over.appendChild(el('div', 'arrivalSkip', 'tap to begin'))
+  const tick = setInterval(() => {
+    if (i >= LINES.length) {
+      clearInterval(tick)
+      return
+    }
+    const line = el('div', 'arrivalLine', LINES[i++])
+    lines.insertBefore(line, cursor)
+  }, 700)
+  over.onclick = () => {
+    clearInterval(tick)
+    localStorage.setItem('lore-arrived', '1')
+    over.remove()
+  }
+  document.body.appendChild(over)
+}
+
+// ---- boot ----
+async function main() {
+  await LoreStore.init().catch(() => toast('this browser gave lore no local storage — the reel will not survive a refresh'))
+  const handed = location.hash.includes('spool=')
+  try {
+    spool = handed
+      ? await spools.openSpool(location.href, { author })
+      : await spools.newSpool({ author })
+  } catch (err) {
+    toast(err && err.message ? err.message : 'that link would not open')
+    throw err
+  }
+  if (!handed) history.replaceState(null, '', spool.share())
+
+  $('statusDot').classList.toggle('connected', spool.status === 'connected')
+  spool.on('status', (s) => {
+    $('statusDot').classList.toggle('connected', s === 'connected')
+  })
+
+  // the pocket beat (house sentence, T-104 lineage)
+  let pocketFade = null
+  const showPocket = (p) => {
+    if (!p) return
+    clearTimeout(pocketFade)
+    const line = $('notice')
+    if (p.depositError) {
+      line.textContent = p.depositError === 'too-big'
+        ? 'pocket: reel too big to deposit — live-only'
+        : 'pocket: relay full — live-only'
+      line.classList.add('warn')
+    } else if (p.phase === 'checking') {
+      line.textContent = 'checking the pocket…'
+      line.classList.remove('warn')
+    } else if (p.phase === 'applied') {
+      line.textContent = `${p.applied} sealed cop${p.applied === 1 ? 'y' : 'ies'} from the pocket`
+      line.classList.remove('warn')
+      pocketFade = setTimeout(() => {
+        line.textContent = ''
+      }, 4000)
+    } else {
+      line.textContent = ''
+    }
+  }
+  showPocket(spool.pocket)
+  spool.on('pocket', showPocket)
+
+  spool.on('entry', () => refresh())
+  refresh()
+  renderTracks()
+
+  // the tape
+  LoreTape.init($('tape'), {
+    getPos: () => LoreEngine.pos(),
+    getReel: () => currentReel(),
+    isPlaying: () => LoreEngine.playing(),
+    isMemory: () => !!memory,
+    getRecording: () => LoreEngine.recording(),
+    getSelected: () => selectedId,
+    hasBlob: (sha) => LoreStore.hasSync(sha),
+    peaksFor: (audio) => LoreStore.peaks(audio, LoreEngine.ensureCtx()),
+    scrubTo: (pos, vel) => LoreEngine.scrubTo(pos, vel),
+    scrubEnd: () => LoreEngine.scrubEnd(),
+    onTakeTap: (take) => (memory ? toast('memory — listen, but come back to now to touch it') : takeSheet(take)),
+    onSayingTap: (s) => (memory ? toast('memory — listen, but come back to now to touch it') : sayingSheet(s)),
+    onTakeMove: (take, at, track) => mendTake(take, { at: +at.toFixed(3), track }),
+  })
+
+  // memory chrome
+  $('memoryScrub').addEventListener('input', (e) => showMemoryAt(Number(e.target.value)))
+  $('backToNow').onclick = exitMemory
+  $('tellingBtn').onclick = tellingSheet
+
+  // the motor (in memory mode it plays the past — same math, older truth)
+  LoreEngine.init({
+    getReel: () => currentReel(),
+    onTake: (fields) => {
+      wind({ kind: 'take', data: fields })
+    },
+    onError: (msg) => toast(msg),
+  })
+
+  // transport
+  $('playBtn').onclick = () => LoreEngine.play()
+  $('stopBtn').onclick = () => LoreEngine.stop()
+  $('recBtn').onclick = async () => {
+    if (LoreEngine.recording()) {
+      LoreEngine.punchOut()
+      return
+    }
+    try {
+      await LoreEngine.punchIn(selectedTrack)
+    } catch (err) {
+      toast(err && err.name === 'NotAllowedError'
+        ? 'the mic stays yours — lore records nothing without permission'
+        : `no way in to the mic (${err && err.message ? err.message : 'unknown'})`)
+    }
+  }
+  const holdWind = (btn, dir) => {
+    btn.addEventListener('pointerdown', (e) => {
+      btn.setPointerCapture(e.pointerId)
+      LoreEngine.windHold(dir)
+    })
+    const release = () => LoreEngine.windRelease()
+    btn.addEventListener('pointerup', release)
+    btn.addEventListener('pointercancel', release)
+  }
+  holdWind($('rewBtn'), -1)
+  holdWind($('ffBtn'), 1)
+
+  // the speed knob: 270° sweep, vertical drag, log taper, detent at 1×
+  const knob = $('speedKnob')
+  const knobPointer = $('knobPointer')
+  const LN_HALF = Math.log(0.5)
+  const LN_SPAN = Math.log(2) - Math.log(0.5)
+  const tOfSpeed = (s) => (Math.log(s) - LN_HALF) / LN_SPAN
+  const speedOfT = (t) => Math.exp(LN_HALF + Math.min(1, Math.max(0, t)) * LN_SPAN)
+  const showKnob = () => {
+    const s = LoreEngine.speed()
+    knobPointer.style.transform = `rotate(${-135 + tOfSpeed(s) * 270}deg)`
+    knob.setAttribute('aria-valuenow', s.toFixed(2))
+  }
+  const setKnob = (t) => {
+    let s = speedOfT(t)
+    if (Math.abs(s - 1) < 0.05) s = 1 // the detent
+    if (LoreEngine.recording()) return // locked while the head writes
+    LoreEngine.setSpeed(s)
+    showKnob()
+  }
+  let knobDrag = null
+  knob.addEventListener('pointerdown', (e) => {
+    knob.setPointerCapture(e.pointerId)
+    knobDrag = { y: e.clientY, t: tOfSpeed(LoreEngine.speed()) }
+  })
+  knob.addEventListener('pointermove', (e) => {
+    if (!knobDrag) return
+    setKnob(knobDrag.t + (knobDrag.y - e.clientY) / 150)
+  })
+  const knobUp = () => { knobDrag = null }
+  knob.addEventListener('pointerup', knobUp)
+  knob.addEventListener('pointercancel', knobUp)
+  knob.addEventListener('dblclick', () => setKnob(0.5)) // t=0.5 is exactly 1×
+  knob.addEventListener('wheel', (e) => {
+    e.preventDefault()
+    setKnob(tOfSpeed(LoreEngine.speed()) - e.deltaY * 0.0012)
+  }, { passive: false })
+  knob.addEventListener('keydown', (e) => {
+    const t = tOfSpeed(LoreEngine.speed())
+    if (e.key === 'ArrowUp' || e.key === 'ArrowRight') setKnob(t + 0.04)
+    else if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') setKnob(t - 0.04)
+    else if (e.key === 'Home') setKnob(0.5)
+    else return
+    e.preventDefault()
+  })
+  showKnob()
+  $('gainSlider').oninput = (e) => {
+    // shared mix: whole-value newest-wins (lore:mix); wound on release, not per tick
+  }
+  $('gainSlider').onchange = (e) => {
+    const gains = reel.mixGains.slice()
+    gains[selectedTrack] = Number(e.target.value)
+    wind({ kind: 'lore:mix', data: { tracks: gains.map((g) => ({ gain: g })) } })
+  }
+  $('menuBtn').onclick = settingsSheet
+  $('reelTitle').onclick = settingsSheet
+  $('wordsBtn').onclick = wordsComposer
+  $('importBtn').onclick = importSheet
+  wireDrop()
+  $('bakeBtn').onclick = () => {
+    if (LoreEngine.recording()) {
+      toast('finish the take first')
+      return
+    }
+    bakeTape()
+  }
+
+  arrival()
+  requestAnimationFrame(paint)
+
+  // the service port: a labeled screw-panel for smoke scripts and the
+  // curious, not an API — nothing in the UI depends on it
+  window.lore = { spool, wind, reel: () => reel, engine: LoreEngine, store: LoreStore, refresh, bakeTape, packReelText, unpackText, importFiles }
+}
+
+main()
