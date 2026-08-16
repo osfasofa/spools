@@ -60,7 +60,7 @@ Version proposal — sign-off at publish time, not protocol-shaping:
       `index.ts`'s wider one). Cheapest before any external vessel repo
       exists. Keeper `engines >=22` vs relay `>=18` confirmed intended or
       harmonized in the same pass.
-- [ ] Publish, owner at keyboard: `npm publish` ×3 in dependency-safe order
+- [x] Publish, owner at keyboard: `npm publish` ×3 in dependency-safe order
       (**relay, SDK, keeper** — the keeper's `"spools": "workspace:^"` is
       rewritten to `^0.1.0` at pack time, so `spools@0.1.0` must exist on
       the registry before the keeper lands or `npm i spools-keeper` breaks
@@ -110,7 +110,15 @@ Version proposal — sign-off at publish time, not protocol-shaping:
     itself on the lifecycle scripts' PATH. Guards now call `npm run build` /
     `npm test` — npm ships beside node and always resolves. Verified by
     reproducing the failure under a pnpm-less PATH, then dry-run publishing
-    all three packages green under that same PATH.
+    all three packages green under that same PATH. (The owner unblocked
+    live with a one-time `corepack enable`; the guard fix stays for
+    machines without it.)
+- **Shipped, 2026-08-16:** `spools@0.1.0`, `spools-relay@0.2.0`,
+  `spools-keeper@0.1.0` — all three verified live via `npm view`. Second
+  wall at the keyboard, recorded for next time: `404 Not Found - PUT` from
+  the registry is npm's way of saying *not logged in* (writes hide auth
+  failures as 404 to avoid leaking package existence); `npm login` with the
+  security key resolved it. Publish order relay → SDK → keeper held.
 - T-002's deprioritization note stands in spirit: none of this is urgent —
   it's here so the release is a checklist, not a design session, whenever
   the mood strikes.
