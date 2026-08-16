@@ -1,7 +1,7 @@
 ---
 id: T-151
 title: "apps/lore scaffold — static shell, vendored SDK, reel plumbing"
-status: todo
+status: done
 milestone: M14
 depends: [T-150]
 ---
@@ -25,4 +25,7 @@ The vessel's bones: a no-build static app that opens or creates a reel spool, sh
 
 ## Notes / open questions
 
--
+- Verified headless (390×844, fake-media Chromium): reel minted, link into the URL bar, arrival beat, field skin reads properly TE. Screenshots in session scratch.
+- `tape.js` landed at scaffold already carrying the full canvas renderer + gestures (lanes, ruler, take blocks, ghosts, sayings, fixed head at 38%, drag-scrub hooks, pinch/wheel zoom) — it renders an empty reel today; T-154 wires it to real playback rather than rewriting it. Recorded as a deliberate scope-borrow, not drift.
+- This sandbox's proxy blocks the canonical relay (wss) and Google Fonts; both degrade cleanly (offline-first open, ui-monospace fallback). Status-dot behavior against a *reachable* relay goes on the T-160 checklist.
+- Fixed 4 tracks; arming UI is selection-only until T-153 gives it a meaning.

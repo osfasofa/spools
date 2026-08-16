@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="dark light">
+  <title>lore</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%230a0a0a'/%3E%3Ccircle cx='5' cy='8' r='2.6' fill='none' stroke='%23ff6a2b' stroke-width='1.4'/%3E%3Ccircle cx='11' cy='8' r='2.6' fill='none' stroke='%23ff6a2b' stroke-width='1.4'/%3E%3Cline x1='5' y1='10.6' x2='11' y2='10.6' stroke='%23ff6a2b' stroke-width='1.2'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <!-- the skin lands before first paint; theme.js is tiny and blocking on purpose -->
+  <script src="theme.js"></script>
+  <script>LoreTheme.apply(LoreTheme.current())</script>
+</head>
+<body>
+  <div class="machine">
+    <header class="header">
+      <span class="wordmark">lore</span>
+      <button id="reelTitle" class="reelTitle" aria-label="reel name and settings">…</button>
+      <span id="statusDot" class="statusDot" aria-hidden="true"></span>
+      <button id="menuBtn" class="headerBtn" aria-label="settings">⋯</button>
+    </header>
+    <div id="notice" class="notice" role="status"></div>
+
+    <div class="lcd">
+      <div class="counter" aria-label="tape counter"><span id="counterMain">00:00</span><span id="counterTenths" class="tenths">.0</span></div>
+      <div class="lcdRight">
+        <span id="speedReadout" class="speedReadout">×1.00</span>
+        <span id="lcdMode" class="lcdMode">stopped</span>
+      </div>
+    </div>
+
+    <div class="tapeWrap">
+      <canvas id="tape" aria-label="the tape — four tracks; drag to scrub, pinch to zoom"></canvas>
+    </div>
+
+    <div id="trackRow" class="trackRow" role="group" aria-label="tracks"></div>
+    <div class="gainRow">
+      <span id="gainLabel">track 1 level</span>
+      <input id="gainSlider" type="range" min="0" max="2" step="0.05" value="1" aria-label="track level">
+    </div>
+
+    <div class="transport">
+      <button id="rewBtn" class="tBtn" aria-label="rewind">◂◂</button>
+      <button id="playBtn" class="tBtn" aria-label="play" aria-pressed="false">▶</button>
+      <button id="stopBtn" class="tBtn" aria-label="stop">■</button>
+      <button id="ffBtn" class="tBtn" aria-label="fast forward">▸▸</button>
+      <button id="recBtn" class="tBtn recBtn" aria-label="record"><span id="recLed" class="led"></span>rec</button>
+      <div class="knobWrap">
+        <div id="speedKnob" class="knob" role="slider" aria-label="tape speed" aria-valuemin="0.5" aria-valuemax="2" aria-valuenow="1" tabindex="0">
+          <div class="pointerLine" id="knobPointer"></div>
+        </div>
+        <span class="knobLabel">speed</span>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button id="wordsBtn" class="aBtn">+ words</button>
+      <button id="importBtn" class="aBtn">import</button>
+      <button id="bakeBtn" class="aBtn">bake</button>
+      <button id="tellingBtn" class="aBtn" aria-pressed="false">the telling</button>
+    </div>
+  </div>
+
+  <!-- classic scripts, not modules: this folder must work from anywhere,
+       USB stick included. vendor/spools.js defines `spools` (one Yjs
+       instance, one file — the apps/client vendoring pattern). -->
+  <script src="vendor/spools.js"></script>
+  <script src="util.js"></script>
+  <script src="reel.js"></script>
+  <script src="engine.js"></script>
+  <script src="tape.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -146,7 +146,7 @@ Owner-directed, Aug 2026: lore leads (T-144) and leads *out loud* — folklore a
 | Ticket | Title | Depends | Status |
 |---|---|---|---|
 | [T-150](T-150-lore-vocal-turn-docs.md) | The vocal turn: brief amendment, vessel design doc, M14 laid out | — | done |
-| [T-151](T-151-lore-scaffold.md) | Scaffold: static shell, vendored SDK, reel plumbing | T-150 | todo |
+| [T-151](T-151-lore-scaffold.md) | Scaffold: static shell, vendored SDK, reel plumbing | T-150 | done |
 | [T-152](T-152-lore-reel-store.md) | The reel store: blobs by sha-256, pointer resolution, peaks | T-151 | todo |
 | [T-153](T-153-lore-record-punch.md) | Record: mic capture, punch in/out, takes wound as pointers | T-151, T-152 | todo |
 | [T-154](T-154-lore-tape-playback.md) | The tape: four-track timeline, waveforms, JIT playback | T-151, T-152 | todo |
