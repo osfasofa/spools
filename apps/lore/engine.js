@@ -372,6 +372,48 @@ const LoreEngine = (() => {
     try { r.rec.stop() } catch { /* already stopped */ }
   }
 
+  // ---- the bake: the same placement math against an offline context at
+  // unity speed — mixdown matches monitoring by construction (the tape-vibes
+  // export bug, inverted into a rule). Ghosts are left out and counted. ----
+  const bake = async (reel) => {
+    const sr = 44100
+    const len = Math.max(1, reel.length + 0.3)
+    const off = new OfflineAudioContext(2, Math.ceil(len * sr), sr)
+    const m = off.createGain()
+    m.gain.value = 0.9
+    m.connect(off.destination)
+    const tg = reel.mixGains.map((gv) => {
+      const g = off.createGain()
+      g.gain.value = gv
+      g.connect(m)
+      return g
+    })
+    let baked = 0
+    let ghosts = 0
+    for (const take of reel.takes) {
+      let buf = buffers.get(take.audio.sha256)
+      if (!buf) {
+        try {
+          buf = await LoreStore.decode(take.audio, ensureCtx())
+        } catch {
+          ghosts++
+          continue
+        }
+      }
+      const src = off.createBufferSource()
+      src.buffer = buf
+      src.playbackRate.value = take.tape.rate
+      const g = off.createGain()
+      g.gain.value = take.tape.gain
+      src.connect(g)
+      g.connect(tg[take.tape.track])
+      src.start(take.tape.at, Math.max(0, take.tape.offset), take.tape.dur * take.tape.rate)
+      baked++
+    }
+    const rendered = await off.startRendering()
+    return { rendered, baked, ghosts, dur: len }
+  }
+
   const applyMix = (gains) => {
     if (!ctx) return
     gains.forEach((g, i) => trackGains[i].gain.setTargetAtTime(g, ctx.currentTime, 0.03))
@@ -405,6 +447,7 @@ const LoreEngine = (() => {
     punchIn,
     punchOut,
     applyMix,
+    bake,
     // entries changed mid-roll (a mend, a cut): drop live sources and let the
     // next tick refill from the fresh reel — one frame of silence, honest
     reschedule: () => {

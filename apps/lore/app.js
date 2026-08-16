@@ -280,6 +280,94 @@ const wordsComposer = () => {
   })
 }
 
+// ---- keepsakes (T-157): the bake and the packed reel ----
+
+const blobToB64 = (blob) => new Promise((resolve, reject) => {
+  const r = new FileReader()
+  r.onload = () => resolve(String(r.result).split(',')[1])
+  r.onerror = () => reject(r.error)
+  r.readAsDataURL(blob)
+})
+const b64ToBlob = (b64, mime) => fetch(`data:${mime};base64,${b64}`).then((r) => r.blob())
+
+const reelName = () => (reel.title || spool.code).replace(/[^\w-]+/g, '-').toLowerCase()
+
+const bakeTape = async () => {
+  if (!reel.takes.length) {
+    toast('nothing on the tape yet')
+    return null
+  }
+  toast('baking…')
+  const { rendered, baked, ghosts, dur } = await LoreEngine.bake(reel)
+  const wav = LoreUtil.wavEncode(rendered)
+  const audio = await LoreStore.put(wav, { dur })
+  wind({
+    kind: 'telling',
+    data: { audio, baked: { at: Date.now(), dur, takes: reel.takes.map((t) => t.id) } },
+  })
+  LoreUtil.download(wav, `${reelName()}-bake-${LoreUtil.fileStamp()}.wav`)
+  toast(ghosts
+    ? `baked ${baked} take${baked === 1 ? '' : 's'} — ${ghosts} you don't hold stayed out`
+    : `baked — ${baked} take${baked === 1 ? '' : 's'}, one tape`)
+  return { audio, baked, ghosts }
+}
+
+// every unique pointer on the reel, takes and tellings alike
+const reelPointers = () => {
+  const seen = new Map()
+  for (const t of reel.takes) seen.set(t.audio.sha256, t.audio)
+  for (const t of reel.tellings) seen.set(t.audio.sha256, t.audio)
+  return [...seen.values()]
+}
+
+const packSizeEstimate = () => {
+  const bytes = reelPointers().reduce((n, a) => n + (a.size || 0), 0)
+  return Math.round(bytes * 1.34 + spool.export().length)
+}
+
+const packReelText = async () => {
+  const blobs = {}
+  let missing = 0
+  for (const audio of reelPointers()) {
+    const blob = await LoreStore.resolve(audio)
+    if (!blob) {
+      missing++
+      continue
+    }
+    blobs[audio.sha256] = { mime: audio.mime, b64: await blobToB64(blob) }
+  }
+  const text = JSON.stringify({
+    format: 'lore-reel',
+    version: 1,
+    packedAt: Date.now(),
+    spool: JSON.parse(spool.export()),
+    blobs,
+  })
+  return { text, missing }
+}
+
+const unpackText = async (text) => {
+  let parsed
+  try {
+    parsed = JSON.parse(text)
+  } catch {
+    throw new Error('that file is not a packed reel')
+  }
+  if (parsed.format !== 'lore-reel' || !parsed.spool) throw new Error('that file is not a packed reel')
+  let adopted = 0
+  let refused = 0
+  for (const [sha, b] of Object.entries(parsed.blobs || {})) {
+    const blob = await b64ToBlob(b.b64, b.mime || 'application/octet-stream')
+    const stored = await LoreStore.put(blob)
+    if (stored.sha256 === sha) adopted++
+    else refused++ // stored under its true hash; the claimed name was a lie
+  }
+  const code = parsed.spool.code
+  const same = code === spool.code
+  if (!same) await spools.importSpool(JSON.stringify(parsed.spool))
+  return { code, same, adopted, refused }
+}
+
 // ---- settings sheet ----
 const settingsSheet = () => {
   sheet((panel, close) => {
@@ -362,10 +450,58 @@ const settingsSheet = () => {
     s3.appendChild(grid)
     panel.appendChild(s3)
 
-    // keepsakes — wired by T-157
+    // keepsakes: the reel ends in files, not accounts
     const s4 = el('div', 'sheetSection')
     s4.appendChild(el('div', 'sectionLabel', 'keepsakes'))
-    s4.appendChild(el('div', 'caption', 'bake and pack land here soon — the reel ends in files, not accounts.'))
+    const kRow = el('div', 'sheetRow')
+    const bakeB = el('button', 'sheetBtn', '⏺ bake the tape (.wav)')
+    bakeB.onclick = async () => {
+      close()
+      await bakeTape()
+    }
+    const packB = el('button', 'sheetBtn', `pack the reel (~${LoreUtil.bytesLabel(packSizeEstimate())})`)
+    packB.onclick = async () => {
+      close()
+      toast('packing…')
+      const { text, missing } = await packReelText()
+      LoreUtil.download(new Blob([text], { type: 'application/json' }), `${reelName()}-${LoreUtil.fileStamp()}.lore.json`)
+      toast(missing ? `packed — ${missing} ghost${missing === 1 ? '' : 's'} could not come along` : 'packed — the whole reel in one file')
+    }
+    kRow.append(bakeB, packB)
+    s4.appendChild(kRow)
+    const unpackRow = el('div', 'sheetRow')
+    const unpackLabel = el('label', 'sheetBtn', 'unpack a reel…')
+    const unpackInput = el('input')
+    unpackInput.type = 'file'
+    unpackInput.accept = '.json,application/json'
+    unpackInput.className = 'visuallyHidden'
+    unpackLabel.appendChild(unpackInput)
+    unpackInput.onchange = async () => {
+      const f = unpackInput.files && unpackInput.files[0]
+      if (!f) return
+      try {
+        const r = await unpackText(await f.text())
+        if (r.same) {
+          toast(`sound adopted (${r.adopted}) — this reel is already open`)
+          close()
+        } else {
+          toast(`unpacked ${r.code} — opening it`)
+          setTimeout(() => {
+            location.hash = `#spool=${r.code}`
+            location.reload()
+          }, 900)
+        }
+      } catch (err) {
+        toast(err.message)
+      }
+    }
+    unpackRow.append(unpackLabel)
+    const stLine = el('div', 'caption', '…')
+    LoreStore.usage().then((u) => {
+      stLine.textContent = `this device holds ${u.blobs} sound${u.blobs === 1 ? '' : 's'} (${LoreUtil.bytesLabel(u.bytes)}) — voice runs ~15 MB/hour`
+    })
+    unpackRow.append(stLine)
+    s4.appendChild(unpackRow)
     panel.appendChild(s4)
 
     // the fine print
@@ -568,13 +704,20 @@ async function main() {
   $('menuBtn').onclick = settingsSheet
   $('reelTitle').onclick = settingsSheet
   $('wordsBtn').onclick = wordsComposer
+  $('bakeBtn').onclick = () => {
+    if (LoreEngine.recording()) {
+      toast('finish the take first')
+      return
+    }
+    bakeTape()
+  }
 
   arrival()
   requestAnimationFrame(paint)
 
   // the service port: a labeled screw-panel for smoke scripts and the
   // curious, not an API — nothing in the UI depends on it
-  window.lore = { spool, wind, reel: () => reel, engine: LoreEngine, store: LoreStore, refresh }
+  window.lore = { spool, wind, reel: () => reel, engine: LoreEngine, store: LoreStore, refresh, bakeTape, packReelText, unpackText }
 }
 
 main()

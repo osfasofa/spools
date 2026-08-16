@@ -105,5 +105,58 @@ const LoreUtil = (() => {
     return n
   }
 
-  return { $, mySeat, seatColor, seatSuffix, tapeTime, clock, day, bytesLabel, toast, sheet, closeSheet, el }
+  // ---- WAV (16-bit stereo PCM) — adapted from tape-vibes app.ts:299,
+  // with the revoke race fixed by deferring it past the click ----
+  const wavEncode = (buffer) => {
+    const n = buffer.length
+    const left = buffer.getChannelData(0)
+    const right = buffer.numberOfChannels > 1 ? buffer.getChannelData(1) : left
+    const dataSize = n * 4 // 2 channels × int16
+    const out = new ArrayBuffer(44 + dataSize)
+    const v = new DataView(out)
+    const ws = (o, s) => {
+      for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i))
+    }
+    ws(0, 'RIFF')
+    v.setUint32(4, 36 + dataSize, true)
+    ws(8, 'WAVE')
+    ws(12, 'fmt ')
+    v.setUint32(16, 16, true)
+    v.setUint16(20, 1, true) // PCM
+    v.setUint16(22, 2, true)
+    v.setUint32(24, buffer.sampleRate, true)
+    v.setUint32(28, buffer.sampleRate * 4, true)
+    v.setUint16(32, 4, true)
+    v.setUint16(34, 16, true)
+    ws(36, 'data')
+    v.setUint32(40, dataSize, true)
+    let o = 44
+    for (let i = 0; i < n; i++) {
+      const l = Math.max(-1, Math.min(1, left[i]))
+      const r = Math.max(-1, Math.min(1, right[i]))
+      v.setInt16(o, l * 0x7fff, true)
+      v.setInt16(o + 2, r * 0x7fff, true)
+      o += 4
+    }
+    return new Blob([out], { type: 'audio/wav' })
+  }
+
+  const download = (blob, filename) => {
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 10000)
+  }
+
+  const fileStamp = () => {
+    const d = new Date()
+    const p = (x) => String(x).padStart(2, '0')
+    return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}`
+  }
+
+  return { $, mySeat, seatColor, seatSuffix, tapeTime, clock, day, bytesLabel, toast, sheet, closeSheet, el, wavEncode, download, fileStamp }
 })()

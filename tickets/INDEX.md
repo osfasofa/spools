@@ -152,7 +152,7 @@ Owner-directed, Aug 2026: lore leads (T-144) and leads *out loud* — folklore a
 | [T-154](T-154-lore-tape-playback.md) | The tape: four-track timeline, waveforms, JIT playback | T-151, T-152 | done |
 | [T-155](T-155-lore-transport-feel.md) | Transport feel: varispeed, audible scrub, rewind/FF | T-154 | done |
 | [T-156](T-156-lore-cut-and-text.md) | Cut + words on the tape: mends, sayings, glosses | T-154 | done |
-| [T-157](T-157-lore-bake.md) | Bake: offline mixdown → WAV → `telling`; pack the reel | T-154 | todo |
+| [T-157](T-157-lore-bake.md) | Bake: offline mixdown → WAV → `telling`; pack the reel | T-154 | done |
 | [T-158](T-158-lore-sourcing.md) | Sourcing: file import, drag-drop, line-in | T-152, T-154 | todo |
 | [T-159](T-159-lore-telling-rewind.md) | The telling: told-time log + rewind you can listen to | T-154, T-156 | todo |
 | [T-160](T-160-lore-torture-polish.md) | Torture + polish: TESTING.md, honesty, smoke pass, deploy | T-153…T-159 | todo |
