@@ -1,7 +1,7 @@
 ---
 id: T-153
 title: "record — mic capture, punch in/out, takes wound as pointers"
-status: doing
+status: done
 milestone: M14
 depends: [T-151, T-152]
 ---
@@ -27,3 +27,6 @@ The core gesture: arm a track, punch in at the playhead, talk, punch out — a `
 ## Notes / open questions
 
 - Capture-start latency lands in placement (v1 asterisk, DESIGN §6); a `mend` nudge is the escape hatch.
+- Verified with Chromium's fake mic: two punches on two tracks land as `take` entries — opus/webm pointers, end-anchored placement (capture latency ~54 ms shortened the head, tail exact), wall-clock punch stamps, `source: mic`, blobs held; both survive reload and redraw from the peaks cache.
+- The proof of the asset rule in one number: the spool export with two recorded takes is 3,071 bytes while the audio sits at 25 KB in the reel store. The doc is the story, not the sound.
+- Meter reads 0 between the fake device's beeps — meter UI polish rides T-160; the analyser path is live.
