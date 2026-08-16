@@ -6,15 +6,14 @@
 # Builds fresh (T-105's lesson: a stale committed dist shipped once), then:
 #  1. copies apps/room/dist into gh-pages/room/ of THIS repo via a throwaway
 #     worktree (the mixtape at the branch root is never touched), and
-#  2. force-pushes dist + CNAME to the dedicated public artifact repo behind
-#     chat.spools.lol (CHAT_REPO overrides the default; skipped gracefully
-#     until that repo exists). Artifact history is worthless — force is fine.
+#  2. hands the finished dist to Vercel (project spools-chat, linked via
+#     apps/room/.vercel) behind chat.spools.lol — prebuilt static, no remote
+#     build, so the pnpm workspace never matters to the host.
 #
 # Live at: https://osfasofa.github.io/spools/room/  and  https://chat.spools.lol/
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-CHAT_REPO="${CHAT_REPO:-https://github.com/osfasofa/spools-chat.git}"
 CHAT_DOMAIN="${CHAT_DOMAIN:-chat.spools.lol}"
 
 (cd apps/room && mise x -- corepack pnpm build)
@@ -39,19 +38,18 @@ cp -R apps/room/dist "$WT/room"
 )
 echo "deployed: https://osfasofa.github.io/spools/room/"
 
-# ---- the pretty-domain artifact repo (room at ROOT, CNAME shipped) ----
-if git ls-remote "$CHAT_REPO" >/dev/null 2>&1; then
+# ---- the pretty domain (chat.spools.lol → Vercel, prebuilt static) ----
+# The project link lives in apps/room/.vercel (untracked); Vercel never
+# builds anything — we hand it the finished dist, so the pnpm workspace
+# stays our problem, not theirs.
+if [ -f apps/room/.vercel/project.json ]; then
   TD="$(mktemp -d)"
   cp -R apps/room/dist/. "$TD/"
-  printf '%s\n' "$CHAT_DOMAIN" > "$TD/CNAME"   # must ship every deploy or Pages forgets the domain
-  touch "$TD/.nojekyll"
-  git -C "$TD" init -q -b gh-pages
-  git -C "$TD" add -A
-  git -C "$TD" -c user.name="$(git config user.name)" -c user.email="$(git config user.email)" \
-    commit -qm "room client deploy $(date +%Y-%m-%d)"
-  git -C "$TD" push -qf "$CHAT_REPO" gh-pages
+  cp -R apps/room/.vercel "$TD/.vercel"
+  mise x -- vercel deploy --cwd "$TD" --prod --yes >/dev/null 2>&1 \
+    && echo "deployed: https://$CHAT_DOMAIN/ (vercel: spools-chat)" \
+    || echo "WARN: vercel deploy failed — run: mise x -- vercel deploy --cwd apps/room/dist --prod"
   rm -rf "$TD"
-  echo "deployed: https://$CHAT_DOMAIN/"
 else
-  echo "note: $CHAT_REPO not reachable yet — chat.spools.lol deploy skipped (create the repo, then re-run)"
+  echo "note: apps/room/.vercel/project.json missing — vercel deploy skipped (run vercel link)"
 fi
