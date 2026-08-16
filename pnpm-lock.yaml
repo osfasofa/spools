@@ -10,6 +10,8 @@ importers:
 
   apps/client: {}
 
+  apps/lore: {}
+
   apps/mixtape:
     dependencies:
       react:

@@ -663,6 +663,10 @@ textarea.sheetInput {
 
 /* ---------- rewind bar ---------- */
 
+.rewindBar[hidden] {
+  display: none; /* author display beats the hidden attribute; make hidden win */
+}
+
 .rewindBar {
   display: flex;
   flex-direction: column;
