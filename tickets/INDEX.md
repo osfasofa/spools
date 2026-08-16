@@ -126,6 +126,19 @@ Pure execution, no open design questions. Drafted at M11 close (what's on npm no
 |---|---|---|---|
 | [T-130](T-130-npm-release.md) | npm release: real SDK 0.1.0, relay 0.2.0 (T-124 knobs), keeper first publish | — | todo |
 
+## M13 — the telling (white paper + ecosystem plan)
+
+Drafted at a brainstorm session, Aug 2026: the shipped system's public story boiled into WHITEPAPER.md; the standing plan for vessels (apps in their own repos, on the published packages — docs/ECOSYSTEM.md); the release policy T-130 executes (docs/RELEASING.md). Nothing here is protocol-shaping — the two decisions that smell protocol-adjacent (yjs peering, the export-surface line) are parked in docs/RELEASING.md for **sign-off at T-130**, and vessel repos are hard-gated on T-130 shipping. T-143 is owner-gated and sequenced after T-130 so the paper's quick-start is honest.
+
+| Ticket | Title | Depends | Status |
+|---|---|---|---|
+| [T-140](T-140-whitepaper.md) | WHITEPAPER.md — the public story, from working code | — | done |
+| [T-141](T-141-ecosystem-plan.md) | docs/ECOSYSTEM.md — vessels in their own repos | T-140 | done |
+| [T-142](T-142-release-structure.md) | docs/RELEASING.md — release policy + T-130 amendments | — | done |
+| [T-143](T-143-homepage.md) | Publish the white paper to a homepage — **owner at keyboard** | T-140, T-130 | todo |
+| [T-144](T-144-lore-vessel.md) | lore leads the constellation — riff → brief, build order redirected | T-141 | done |
+| [T-145](T-145-forks-of-purpose.md) | Forks of purpose — the agent-workspace track, chartered beside the lane | T-141 | done |
+
 ## Parked (no ticket until evidence demands one)
 
 - Structured `data` field for immutable kinds — T-030 records the verdict.
