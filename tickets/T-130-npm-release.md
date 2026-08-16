@@ -48,10 +48,25 @@ Version proposal — sign-off at publish time, not protocol-shaping:
       `npx spools-relay` starts and serves health; the SDK imports and
       `newSpool({ persist: false })` works in Node; keeper starts against a
       link.
+- [ ] `packages/spools-keeper`: add the LICENSE file (the preflight above
+      requires it; today it's a package.json field only — the other two
+      packages ship the file).
+- [ ] SDK README: rewrite the `Status: 0.0.x` line for 0.1.0, same honest
+      register; 0.x semantics per docs/RELEASING.md (minor = breaking
+      lane, the SPEC is the stable thing).
+- [ ] Settle with the owner at publish (trade-offs in docs/RELEASING.md,
+      **sign-off**): `yjs`/`y-protocols` → `peerDependencies`, and where
+      the documented-vs-advanced export line sits (SDK-API's surface vs
+      `index.ts`'s wider one). Cheapest before any external vessel repo
+      exists. Keeper `engines >=22` vs relay `>=18` confirmed intended or
+      harmonized in the same pass.
 - [ ] Publish, owner at keyboard: `npm publish` ×3 in dependency-safe order
-      (relay, keeper, SDK — none actually depend on each other, but the
-      relay first means the SDK README's default-relay story is never ahead
-      of reality).
+      (**relay, SDK, keeper** — the keeper's `"spools": "workspace:^"` is
+      rewritten to `^0.1.0` at pack time, so `spools@0.1.0` must exist on
+      the registry before the keeper lands or `npm i spools-keeper` breaks
+      in the gap; relay first still keeps the SDK README's default-relay
+      story honest — the original "none actually depend on each other" was
+      wrong for the keeper, see docs/RELEASING.md).
 - [ ] Post-publish: `npm view` sanity ×3; a git tag per package
       (`spools@0.1.0` etc.); INDEX + this ticket's Notes record the shipped
       versions.
@@ -69,3 +84,10 @@ Version proposal — sign-off at publish time, not protocol-shaping:
 - T-002's deprioritization note stands in spirit: none of this is urgent —
   it's here so the release is a checklist, not a design session, whenever
   the mood strikes.
+- M13 (T-142, Aug 2026) wrote the standing policy this ticket executes:
+  [docs/RELEASING.md](../docs/RELEASING.md) — the "npm matches what's true"
+  trigger, version semantics, the publish liturgy with the corrected
+  order, and the sign-off decisions above. One new pressure since the
+  drafting: the ecosystem plan (docs/ECOSYSTEM.md) hard-gates every vessel
+  repo on this ticket shipping, so "whenever the mood strikes" now has a
+  queue behind it.

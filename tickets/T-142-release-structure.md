@@ -1,7 +1,7 @@
 ---
 id: T-142
 title: "docs/RELEASING.md — release policy + T-130 amendments"
-status: todo
+status: done
 milestone: M13
 depends: []
 ---
@@ -33,12 +33,12 @@ Session findings while grounding the ecosystem plan (Aug 2026):
 
 ## Tasks
 
-- [ ] docs/RELEASING.md: the one rule, version semantics (0.x minor =
+- [x] docs/RELEASING.md: the one rule, version semantics (0.x minor =
       breaking lane; SPEC is the stable thing), package table, publish
       liturgy with corrected order, consumption contract, sign-off
       decisions with trade-offs + recommendations, rejected alternatives
       (changesets, CI auto-publish, cadence).
-- [ ] T-130: fix the publish-order bullet; add tasks for the keeper
+- [x] T-130: fix the publish-order bullet; add tasks for the keeper
       LICENSE, the SDK README status-line rewrite, and the
       settle-with-owner items (yjs/y-protocols peering, export-surface
       line, engines); Notes point at RELEASING.md.
