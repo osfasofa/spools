@@ -14,7 +14,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-CHAT_REPO="${CHAT_REPO:-https://github.com/osfasofa/chat.git}"
+CHAT_REPO="${CHAT_REPO:-https://github.com/osfasofa/spools-chat.git}"
 CHAT_DOMAIN="${CHAT_DOMAIN:-chat.spools.lol}"
 
 (cd apps/room && mise x -- corepack pnpm build)
