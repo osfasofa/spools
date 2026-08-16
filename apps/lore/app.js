@@ -13,9 +13,16 @@ let spool = null
 let reel = LoreReel.derive({ entries: [] })
 let selectedTrack = 0
 let selectedId = null // take/saying picked on the tape (T-156 gives it a sheet)
+let memory = null // { ts, reel } — rewound; the tape plays the past, writes nothing
+
+const currentReel = () => (memory ? memory.reel : reel)
 
 // wind with the seat stamped into data — the profile-table convention
 const wind = (input) => {
+  if (memory) {
+    toast('memory is read-only — come back to now first')
+    return null
+  }
   const data = Object.assign({ seat }, input.data)
   return spool.wind(Object.assign({}, input, { data }))
 }
@@ -36,7 +43,7 @@ const paint = () => {
   $('counterTenths').textContent = t.tenths
   $('speedReadout').textContent = `×${LoreEngine.speed().toFixed(2)}`
   const rec = LoreEngine.recording()
-  const mode = rec ? 'rec' : LoreEngine.playing() ? 'play' : 'stopped'
+  const mode = memory ? 'memory' : rec ? 'rec' : LoreEngine.playing() ? 'play' : 'stopped'
   const modeEl = $('lcdMode')
   modeEl.textContent = mode
   modeEl.classList.toggle('rec', !!rec)
@@ -462,6 +469,138 @@ const wireDrop = () => {
   })
 }
 
+// ---- the telling (T-159): told-time, and memory you can listen to ----
+
+const describeEntry = (e, names) => {
+  const d = e.data || {}
+  const who = LoreReel.tellerName({ names }, e)
+  switch (e.kind) {
+    case 'take': {
+      const t = d.tape || {}
+      const src = d.source && d.source.type
+      const how = d.punch
+        ? `punched in ${LoreUtil.clock(d.punch.in)}, out ${LoreUtil.clock(d.punch.out)}${d.punch.speed !== 1 ? ` @ ×${d.punch.speed.toFixed(2)}` : ''}`
+        : src === 'file'
+          ? `brought ${d.source.name || 'a file'} in`
+          : src === 'line'
+            ? 'taped what was playing'
+            : 'wound a take'
+      return { who, what: `${how} — track ${(t.track ?? 0) + 1}, ${(t.dur || 0).toFixed(1)}s${d.origin ? ' (born of a cut)' : ''}`, quote: e.body || '' }
+    }
+    case 'mend': {
+      const t = d.tape || {}
+      return { who, what: t.dur !== undefined ? `mended a take — track ${(t.track ?? 0) + 1} @ ${LoreUtil.tapeTime(t.at || 0).main}, level ${(t.gain ?? 1).toFixed(2)}` : `moved words to ${LoreUtil.tapeTime(t.at || 0).main}` }
+    }
+    case 'saying':
+      return { who, what: `pinned words at ${LoreUtil.tapeTime(d.tape && d.tape.at ? d.tape.at : 0).main}`, quote: e.body || '' }
+    case 'gloss':
+      return { who, what: 'glossed', quote: e.body || '' }
+    case 'telling':
+      return { who, what: `baked the tape — ${(d.baked && d.baked.dur ? d.baked.dur : 0).toFixed(1)}s, ${(d.baked && d.baked.takes ? d.baked.takes.length : 0)} takes`, quote: e.body || '' }
+    case 'lore:reel':
+      return { who, what: d.title ? `named the reel "${d.title}"` : 'set the reel' }
+    case 'lore:mix':
+      return { who, what: 'set the mix' }
+    case 'lore:teller':
+      return { who, what: `named ${d.seat === seat ? 'themselves' : 'a teller'} "${d.name}"` }
+    default:
+      return { who, what: e.kind, quote: e.body || '' }
+  }
+}
+
+const tellingSheet = () => {
+  $('tellingBtn').setAttribute('aria-pressed', 'true')
+  sheet((panel, close) => {
+    const s0 = el('div', 'sheetSection')
+    s0.appendChild(el('div', 'sectionLabel', 'the telling — what happened to this reel, in order'))
+    const list = el('div', 'tellingList')
+    const all = [...spool.entries, ...spool.deleted].sort(LoreReel.byTime)
+    if (!all.length) list.appendChild(el('div', 'caption', 'nothing has been told yet.'))
+    let lastDay = ''
+    for (const e of all) {
+      const day = LoreUtil.day(e.createdAt)
+      if (day !== lastDay) {
+        lastDay = day
+        list.appendChild(el('div', 'sectionLabel', day))
+      }
+      const row = el('div', 'logRow')
+      if (e.deletedAt) row.classList.add('gone')
+      row.appendChild(el('span', 'logStamp', LoreUtil.clock(e.createdAt)))
+      const body = el('div', 'logBody')
+      const desc = describeEntry(e, reel.names)
+      const whoEl = el('span', 'who', desc.who + ' ')
+      const seatId = e.data && e.data.seat
+      if (seatId) whoEl.style.color = LoreUtil.seatColor(seatId)
+      body.appendChild(whoEl)
+      body.appendChild(el('span', 'what', desc.what + (e.deletedAt ? ' · unwound' : '')))
+      if (desc.quote) body.appendChild(el('span', 'quote', `“${desc.quote}”`))
+      row.appendChild(body)
+      const kindChip = el('span', 'logKind', e.kind)
+      row.appendChild(kindChip)
+      list.appendChild(row)
+    }
+    s0.appendChild(list)
+    panel.appendChild(s0)
+
+    const s1 = el('div', 'sheetSection')
+    s1.appendChild(el('div', 'sectionLabel', 'memory'))
+    const momentCount = spool.history.length
+    const rewBtn = el('button', 'sheetBtn', momentCount ? `⏪ rewind the reel (${momentCount} moment${momentCount === 1 ? '' : 's'})` : 'no moments recorded yet')
+    rewBtn.disabled = !momentCount
+    rewBtn.onclick = () => {
+      close()
+      enterMemory()
+    }
+    s1.appendChild(rewBtn)
+    s1.appendChild(el('div', 'caption', 'the reel as it was — and it still plays. every sound this device holds, holds its place in the past.'))
+    panel.appendChild(s1)
+  })
+  // sheet teardown isn't observable; reflect the toggle when anything closes it
+  const untoggle = () => $('tellingBtn').setAttribute('aria-pressed', 'false')
+  setTimeout(() => document.addEventListener('pointerdown', function once() {
+    document.removeEventListener('pointerdown', once)
+    setTimeout(untoggle, 400)
+  }), 0)
+}
+
+const showMemoryAt = (ts) => {
+  const moments = spool.history
+  const resolved = moments.filter((m) => m <= ts).pop()
+  if (resolved === undefined) return
+  if (memory && memory.ts === resolved) return
+  try {
+    const snaps = spool.rewind(resolved)
+    memory = { ts: resolved, reel: LoreReel.derive({ entries: snaps.filter((s) => s.deletedAt == null) }) }
+    const i = moments.lastIndexOf(resolved)
+    $('memoryLabel').textContent = `${new Date(resolved).toLocaleString()} — moment ${i + 1}/${moments.length}`
+    LoreEngine.stop()
+    LoreEngine.reschedule()
+  } catch (err) {
+    toast(err.message)
+  }
+}
+
+const enterMemory = () => {
+  const moments = spool.history
+  if (!moments.length) return
+  const scrub = $('memoryScrub')
+  scrub.min = String(moments[0])
+  scrub.max = String(moments[moments.length - 1])
+  scrub.value = scrub.max
+  $('rewindBar').hidden = false
+  document.body.classList.add('rewinding')
+  LoreUtil.closeSheet()
+  showMemoryAt(Number(scrub.max))
+}
+
+const exitMemory = () => {
+  memory = null
+  $('rewindBar').hidden = true
+  document.body.classList.remove('rewinding')
+  LoreEngine.stop()
+  LoreEngine.reschedule()
+}
+
 // ---- settings sheet ----
 const settingsSheet = () => {
   sheet((panel, close) => {
@@ -692,22 +831,28 @@ async function main() {
   // the tape
   LoreTape.init($('tape'), {
     getPos: () => LoreEngine.pos(),
-    getReel: () => reel,
+    getReel: () => currentReel(),
     isPlaying: () => LoreEngine.playing(),
+    isMemory: () => !!memory,
     getRecording: () => LoreEngine.recording(),
     getSelected: () => selectedId,
     hasBlob: (sha) => LoreStore.hasSync(sha),
     peaksFor: (audio) => LoreStore.peaks(audio, LoreEngine.ensureCtx()),
     scrubTo: (pos, vel) => LoreEngine.scrubTo(pos, vel),
     scrubEnd: () => LoreEngine.scrubEnd(),
-    onTakeTap: (take) => takeSheet(take),
-    onSayingTap: (s) => sayingSheet(s),
+    onTakeTap: (take) => (memory ? toast('memory — listen, but come back to now to touch it') : takeSheet(take)),
+    onSayingTap: (s) => (memory ? toast('memory — listen, but come back to now to touch it') : sayingSheet(s)),
     onTakeMove: (take, at, track) => mendTake(take, { at: +at.toFixed(3), track }),
   })
 
-  // the motor
+  // memory chrome
+  $('memoryScrub').addEventListener('input', (e) => showMemoryAt(Number(e.target.value)))
+  $('backToNow').onclick = exitMemory
+  $('tellingBtn').onclick = tellingSheet
+
+  // the motor (in memory mode it plays the past — same math, older truth)
   LoreEngine.init({
-    getReel: () => reel,
+    getReel: () => currentReel(),
     onTake: (fields) => {
       wind({ kind: 'take', data: fields })
     },

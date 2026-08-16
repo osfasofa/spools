@@ -36,6 +36,14 @@
       <canvas id="tape" aria-label="the tape — four tracks; drag to scrub, pinch to zoom"></canvas>
     </div>
 
+    <div id="rewindBar" class="rewindBar" hidden>
+      <input id="memoryScrub" type="range" step="any" aria-label="rewind through the reel's memory">
+      <div class="rewindMeta">
+        <span id="memoryLabel">memory</span>
+        <button id="backToNow" class="sheetBtn">⏵ back to now</button>
+      </div>
+    </div>
+
     <div id="trackRow" class="trackRow" role="group" aria-label="tracks"></div>
     <div class="gainRow">
       <span id="gainLabel">track 1 level</span>
