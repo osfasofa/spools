@@ -49,6 +49,11 @@ word changing.
 - Repo name is the owner's call (candidates above); creation waits for the
   name and for T-130 (the fork consumes `spools@0.1.0` from the registry
   like any stranger).
+- **Named (Aug 2026, owner): `pfam`.** Candidates `familiar`/`scribe`/
+  `logbook` passed over. Diligence recorded in ECOSYSTEM.md: npm name
+  free (404, probably never needed — it's an app, not a package); faint
+  Pfam protein-database collision noted and dismissed. Repo
+  `osfasofa/pfam` is born after T-130; only the name is claimed here.
 - First spike sketch, recorded so the fork repo starts warm: an agent
   holds a spool link for one task; winds `finding`/`question`/`decision`
   entries as it works; the human opens the link on a phone, steers by
