@@ -118,6 +118,14 @@ Signed off Aug 2026 (decisions D1–D5); design record: [docs/M11-room-brief.md]
 | [T-126](T-126-room-torture.md) | Room torture checklist (3+ devices, races, midnight, scale) | MVP set | done |
 | [T-127](T-127-m11-docs.md) | Brief/§5/SPEC amendment — **last**, from working code | everything | done |
 
+## M12 — Release
+
+Pure execution, no open design questions. Drafted at M11 close (what's on npm no longer matches what's true); **owner at keyboard for the publish itself**, everything else preppable. Not urgent by standing decision (T-002's "don't treat the squatting clock as pressure").
+
+| Ticket | Title | Depends | Status |
+|---|---|---|---|
+| [T-130](T-130-npm-release.md) | npm release: real SDK 0.1.0, relay 0.2.0 (T-124 knobs), keeper first publish | — | todo |
+
 ## Parked (no ticket until evidence demands one)
 
 - Structured `data` field for immutable kinds — T-030 records the verdict.
