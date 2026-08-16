@@ -60,6 +60,12 @@ Everything the white paper refuses, plus the vessel's own line: **no wiki-ness**
 - First genuine `splice` evidence, delivered through the gate.
 - And the emotional thesis itself: that software can treat loss as a form of meaning — which, if it lands, is the sharpest proof of §1 any vessel could offer. It also quietly generalizes the portfolio: a baby book is a child's lore; a memorial is lore held after someone; an interview across weeks is lore in the making. Those stay worthy sibling vessels — different tones deserve their own doors — but lore is the genus.
 
+## 6.5 The vocal turn (owner-directed, Aug 2026 — second redirect)
+
+The owner's follow-up riff, recorded before it cooled: folklore is an **oral** tradition — lore v1 leads with sound. Not a text corpus with attachments: **a shared four-track tape**. Takes are wound onto a reel as pointers (the §6 asset rule, obeyed from birth: hash + optional URL in `data`, never bytes); punches in and out are stamped as told-time history; text rides the tape as sayings and glosses; the whole reel bakes down to a fixed track — and a bake is wound back as a `telling`, which is what a bake *is*. Two timelines, both already in the machine: the tape (where sound sits) and the telling (when it was told), with `rewind` underneath making the reel's past *playable*. Everything in §§1–6 stands — same claim, same refusals (plus the tape's own: no DAW-ness, no time-stretch), same register, spoken aloud.
+
+The full design lives with the vessel: [apps/lore/DESIGN.md](../../apps/lore/DESIGN.md) (prototyped in the loom by owner direction, room-precedent; graduates to its own repo when T-130 ships — the gate holds, recorded there in §10). Build record: M14, tickets T-150…T-160.
+
 ## 7. Open riff threads (parked here, decided in the vessel repo)
 
 - The app's name: working name **lore**; deploy pattern says `lore.spools.lol`. Sentence test, current champion: *"Wind a tale onto the spool. Hand someone the lore."*

@@ -139,6 +139,24 @@ Drafted at a brainstorm session, Aug 2026: the shipped system's public story boi
 | [T-144](T-144-lore-vessel.md) | lore leads the constellation — riff → brief, build order redirected | T-141 | done |
 | [T-145](T-145-forks-of-purpose.md) | Forks of purpose — the agent-workspace track, chartered beside the lane | T-141 | done |
 
+## M14 — lore: the vocal turn (vessel prototype in the loom)
+
+Owner-directed, Aug 2026: lore leads (T-144) and leads *out loud* — folklore as oral tradition. A shared four-track tape: takes wound on as pointers (the §6 asset rule in anger), punch in/out stamped as told-time history, words riding the tape, varispeed/scrub with real physics, bakeable to a keepsake WAV, packable to one file, rewindable into playable memory. Zero protocol pressure by design. Prototyped in the loom room-precedent (the T-130 vessel-repo gate holds — graduation recorded in [apps/lore/DESIGN.md](../apps/lore/DESIGN.md) §10); brief amendment at [docs/vessels/lore.md](../docs/vessels/lore.md) §6.5. tape-vibes (the owner's OP-1 experiment) read end-to-end as prior art; lessons and refusals folded into the design doc.
+
+| Ticket | Title | Depends | Status |
+|---|---|---|---|
+| [T-150](T-150-lore-vocal-turn-docs.md) | The vocal turn: brief amendment, vessel design doc, M14 laid out | — | done |
+| [T-151](T-151-lore-scaffold.md) | Scaffold: static shell, vendored SDK, reel plumbing | T-150 | todo |
+| [T-152](T-152-lore-reel-store.md) | The reel store: blobs by sha-256, pointer resolution, peaks | T-151 | todo |
+| [T-153](T-153-lore-record-punch.md) | Record: mic capture, punch in/out, takes wound as pointers | T-151, T-152 | todo |
+| [T-154](T-154-lore-tape-playback.md) | The tape: four-track timeline, waveforms, JIT playback | T-151, T-152 | todo |
+| [T-155](T-155-lore-transport-feel.md) | Transport feel: varispeed, audible scrub, rewind/FF | T-154 | todo |
+| [T-156](T-156-lore-cut-and-text.md) | Cut + words on the tape: mends, sayings, glosses | T-154 | todo |
+| [T-157](T-157-lore-bake.md) | Bake: offline mixdown → WAV → `telling`; pack the reel | T-154 | todo |
+| [T-158](T-158-lore-sourcing.md) | Sourcing: file import, drag-drop, line-in | T-152, T-154 | todo |
+| [T-159](T-159-lore-telling-rewind.md) | The telling: told-time log + rewind you can listen to | T-154, T-156 | todo |
+| [T-160](T-160-lore-torture-polish.md) | Torture + polish: TESTING.md, honesty, smoke pass, deploy | T-153…T-159 | todo |
+
 ## Parked (no ticket until evidence demands one)
 
 - Structured `data` field for immutable kinds — T-030 records the verdict.
