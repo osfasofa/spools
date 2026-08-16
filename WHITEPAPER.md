@@ -93,6 +93,7 @@ The protocol doesn't care what a spool holds; the `kind` field and the renderer 
 
 - **A mixtape for someone.** Wound over weeks, opened at midnight, kept forever. The founding gesture.
 - **A room for a few.** The family chat that isn't on anyone's platform; the group of five that doesn't want to be a "workspace."
+- **A body of lore.** The stories, sayings, and in-jokes a group actually keeps — told in variants, argued over by the people who were there, traded hand to hand as links, and held with intent or honestly lost. Folklore has always had exactly two fates; this is the rare software that agrees.
 - **A baby book** between parents and far-away grandparents — `rewind` is literally *watch them grow*, and the export is the artifact you hand your kid at eighteen.
 - **A memorial spool** — a family winds memories and stories for someone who died; the export is the keepsake. No feed, no likes, no company between you and grief.
 - **A care circle** — three siblings coordinating a parent's medications, visits, observations. Exactly the data nobody wants in a SaaS; the relay never sees a word of it.
@@ -116,7 +117,7 @@ Every refusal below is load-bearing. They are why the promises above can be shor
 - **No ghost presence.** Who's here, who's typing, who has seen what: ephemeral, sealed, dead with the tab. **Ephemera must never persist.** Nobody learns what you read while they were away.
 - **No key rotation, no key recovery.** The link is the key. Rotation is a new spool. Losing the link *is* losing the spool, the way losing a paper letter is losing the letter — the design accepts the physics of objects rather than reintroducing an authority who could also be compelled.
 - **No assets in the document.** A spool carries at most a URL and a content hash; the artifact stays small enough to hold.
-- **Not an agent workbench.** The shape happens to fit machine tenants — the SDK runs in Node, a link is a perfect per-task capability, `rewind` is an audit log — and someone will eventually notice. But this project's lane is people. Software agents in spools would be a fork of *purpose*, built by someone else, on their own conscience; it is not on this roadmap.
+- **Not an agent workbench.** The shape happens to fit machine tenants — the SDK runs in Node, a link is a perfect per-task capability, `rewind` is an audit log — and someone will eventually notice. But this project's lane is people. Software agents in spools are a fork of *purpose* — if that gets explored, it happens under another name, in another repo, on its own conscience; this roadmap stays people.
 
 The competitive line is one sentence: Matrix, ActivityPub, and Nostr federate strangers; **Spool connects friends.**
 

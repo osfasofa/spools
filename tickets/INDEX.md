@@ -136,6 +136,8 @@ Drafted at a brainstorm session, Aug 2026: the shipped system's public story boi
 | [T-141](T-141-ecosystem-plan.md) | docs/ECOSYSTEM.md — vessels in their own repos | T-140 | done |
 | [T-142](T-142-release-structure.md) | docs/RELEASING.md — release policy + T-130 amendments | — | done |
 | [T-143](T-143-homepage.md) | Publish the white paper to a homepage — **owner at keyboard** | T-140, T-130 | todo |
+| [T-144](T-144-lore-vessel.md) | lore leads the constellation — riff → brief, build order redirected | T-141 | done |
+| [T-145](T-145-forks-of-purpose.md) | Forks of purpose — the agent-workspace track, chartered beside the lane | T-141 | done |
 
 ## Parked (no ticket until evidence demands one)
 

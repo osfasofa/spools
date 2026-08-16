@@ -46,6 +46,12 @@ pocket — a vessel started against it would poison the npm-only rule).
   correspondence chess; quiet pad deliberately fourth because it's the
   vessel most likely to force the yjs-peering packaging decision, which
   should land at T-130, not mid-vessel.
+- **Superseded (Aug 2026, owner — T-144):** the order now leads with
+  **lore** ([docs/vessels/lore.md](../docs/vessels/lore.md)) — the
+  folklore vessel absorbs the baby book's thesis (a child's lore) and
+  oral history's rhythm; baby book and memorial stay in the portfolio as
+  sibling vessels. Off-grid and chess hold their slots; quiet pad stays
+  fourth.
 - The room stays in this repo (the SDK's lab animal); extraction is a
   later, cheap decision if it earns a product life.
 - Parked in the doc, no ticket: `create-spool-vessel` scaffold (lean no),
