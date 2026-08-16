@@ -1,6 +1,0 @@
-{
-  "name": "lore",
-  "version": "0.0.0",
-  "private": true,
-  "description": "lore — the tape. Folklore as vocal tradition on spools: a shared four-track reel. Pure static files — no build step, deploys by dropping the folder."
-}
