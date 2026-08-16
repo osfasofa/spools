@@ -21,7 +21,7 @@
   "scripts": {
     "start": "node server.js",
     "test": "node --test test/*.test.js",
-    "prepublishOnly": "pnpm test"
+    "prepublishOnly": "npm test"
   },
   "engines": {
     "node": ">=18"

@@ -19,7 +19,7 @@
   "scripts": {
     "start": "node keeper.js",
     "test": "node --test test/*.test.js",
-    "prepublishOnly": "pnpm test"
+    "prepublishOnly": "npm test"
   },
   "engines": {
     "node": ">=22"

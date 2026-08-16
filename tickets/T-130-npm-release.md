@@ -103,6 +103,14 @@ Version proposal — sign-off at publish time, not protocol-shaping:
   - Relay README knob table verified against `server.js` (K=8, 24 PUTs/min,
     60 d, 8 MiB, 1 GiB) — already true, no edit needed. CHANGELOG.md ×3
     written (repo-side; not added to `files`).
+  - **Publish-hour follow-up (same day):** the guards as first written
+    (`pnpm test`) failed on the publish machine — `sh: pnpm: command not
+    found`. Lesson: when corepack launches pnpm without `corepack enable`'s
+    global shims (this repo's documented setup), pnpm does **not** put
+    itself on the lifecycle scripts' PATH. Guards now call `npm run build` /
+    `npm test` — npm ships beside node and always resolves. Verified by
+    reproducing the failure under a pnpm-less PATH, then dry-run publishing
+    all three packages green under that same PATH.
 - T-002's deprioritization note stands in spirit: none of this is urgent —
   it's here so the release is a checklist, not a design session, whenever
   the mood strikes.
