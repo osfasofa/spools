@@ -142,6 +142,8 @@ Drafted at a brainstorm session, Aug 2026: the shipped system's public story boi
 | [T-147](T-147-offgrid-brief.md) | off-grid kit riffed → the vessel brief (docs/vessels/off-grid.md) | T-144 | done |
 | [T-148](T-148-chess-brief.md) | correspondence chess riffed → the vessel brief (docs/vessels/chess.md) | T-144 | done |
 
+**Shelved, 16 Aug 2026 — pick up here.** The brainstorm phase rests with the shelf full: [WHITEPAPER.md](../WHITEPAPER.md) (owner-liked; publishing is T-143), the standing policies ([docs/ECOSYSTEM.md](../docs/ECOSYSTEM.md), [docs/RELEASING.md](../docs/RELEASING.md)), and four charters ready to become repos — [lore](../docs/vessels/lore.md), [familiar](../docs/forks/familiar.md), [off-grid](../docs/vessels/off-grid.md), [chess](../docs/vessels/chess.md). T-130 was running in a parallel instance when this was written; once it lands, the unblocked moves are: birth `osfasofa/lore` from its brief and `osfasofa/familiar` from its charter (parallel by design; familiar's v0 is a ~100-line Node script watched from the room client), then T-143 puts the white paper at a homepage. Bench riffs queued for the next brainstorm, sketches folded into the ECOSYSTEM portfolio rows: **wake** (memorial — the ending done well), **carbon** (quiet pad — the copy exists by the act of writing), and the **care circle** (the keeper as the family's continuity). T-143 remains this milestone's one open ticket.
+
 ## Parked (no ticket until evidence demands one)
 
 - Structured `data` field for immutable kinds — T-030 records the verdict.
