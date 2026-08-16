@@ -1,7 +1,7 @@
 ---
 id: T-130
 title: "npm release: the real SDK + current relay + first keeper"
-status: todo
+status: doing
 milestone: M12
 depends: []
 ---
@@ -36,25 +36,25 @@ Version proposal — sign-off at publish time, not protocol-shaping:
 
 ## Tasks
 
-- [ ] Preflight each package: `npm pack --dry-run` contents review (dist
+- [x] Preflight each package: `npm pack --dry-run` contents review (dist
       only for the SDK, no scratch/tests), `files`/`exports`/`types` fields,
       `repository` URLs, LICENSE present, README accurate against what
       ships (the SDK README should say the one-paragraph story + point at
       SPEC.md and SDK-API.md; the relay README already carries the honesty
       sections — verify the knob table matches the code).
-- [ ] `prepublishOnly` scripts: SDK = build + test; relay = test; keeper =
+- [x] `prepublishOnly` scripts: SDK = build + test; relay = test; keeper =
       test (keep them boring — no new tooling).
-- [ ] Fresh-machine smoke: `npm pack` tarballs installed into a scratch dir;
+- [x] Fresh-machine smoke: `npm pack` tarballs installed into a scratch dir;
       `npx spools-relay` starts and serves health; the SDK imports and
       `newSpool({ persist: false })` works in Node; keeper starts against a
       link.
-- [ ] `packages/spools-keeper`: add the LICENSE file (the preflight above
+- [x] `packages/spools-keeper`: add the LICENSE file (the preflight above
       requires it; today it's a package.json field only — the other two
       packages ship the file).
-- [ ] SDK README: rewrite the `Status: 0.0.x` line for 0.1.0, same honest
+- [x] SDK README: rewrite the `Status: 0.0.x` line for 0.1.0, same honest
       register; 0.x semantics per docs/RELEASING.md (minor = breaking
       lane, the SPEC is the stable thing).
-- [ ] Settle with the owner at publish (trade-offs in docs/RELEASING.md,
+- [x] Settle with the owner at publish (trade-offs in docs/RELEASING.md,
       **sign-off**): `yjs`/`y-protocols` → `peerDependencies`, and where
       the documented-vs-advanced export line sits (SDK-API's surface vs
       `index.ts`'s wider one). Cheapest before any external vessel repo
@@ -81,6 +81,28 @@ Version proposal — sign-off at publish time, not protocol-shaping:
 
 ## Notes / open questions
 
+- **2026-08-16, prep session (headless):** everything up to the publish
+  command is done and verified; only the hardware-key steps remain.
+  - Sign-offs collected from the owner, all as RELEASING.md recommended
+    (settlement recorded there): peers at 0.1.0 (`yjs`/`y-protocols`, kept
+    as devDeps so the workspace builds); export line drawn in prose (one
+    sentence in the SDK README + SDK-API.md); engines divergence kept and
+    documented — it **is** load-bearing: `engine.ts` falls back to the
+    global `WebSocket` when no polyfill is passed, the keeper passes none,
+    and Node's native WebSocket is only stable from 22, while the relay's
+    `ws`-based `>=18` is genuine. Versions confirmed 0.1.0 / 0.2.0 / 0.1.0.
+  - **Surprise, publish-mechanics:** bare `npm publish` cannot ship the
+    keeper — npm doesn't understand `workspace:^` and would publish it
+    verbatim (broken). `pnpm pack` rewrites it to `^0.1.0` (verified in the
+    tarball). Publish all three with `pnpm publish` for one liturgy.
+  - Fresh-dir smoke (tarballs npm-installed, Node 22): relay serves health;
+    SDK `newSpool({ persist: false })` wound an entry and shared a link;
+    keeper joined by that link, converged ("1 entries held"), and SIGTERM
+    produced a valid `spool-export` v1 file. npm ≥7 auto-installed the
+    yjs/y-protocols peers — the peering story holds on a clean machine.
+  - Relay README knob table verified against `server.js` (K=8, 24 PUTs/min,
+    60 d, 8 MiB, 1 GiB) — already true, no edit needed. CHANGELOG.md ×3
+    written (repo-side; not added to `files`).
 - T-002's deprioritization note stands in spirit: none of this is urgent —
   it's here so the release is a checklist, not a design session, whenever
   the mood strikes.

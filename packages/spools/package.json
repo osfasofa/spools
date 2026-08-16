@@ -1,6 +1,6 @@
 {
   "name": "spools",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Intimate, local-first, P2P shared documents. An artifact that can change, that's passed around.",
   "license": "MIT",
   "repository": {
@@ -22,14 +22,17 @@
   ],
   "scripts": {
     "build": "tsup && tsc -p tsconfig.build.json",
-    "test": "vitest run"
+    "test": "vitest run",
+    "prepublishOnly": "pnpm build && pnpm test"
   },
   "dependencies": {
     "tweetnacl": "^1.0.3",
     "y-indexeddb": "^9.0.12",
-    "y-protocols": "^1.0.7",
     "y-webrtc": "^10.3.0",
-    "y-websocket": "^3.1.0",
+    "y-websocket": "^3.1.0"
+  },
+  "peerDependencies": {
+    "y-protocols": "^1.0.7",
     "yjs": "^13.6.32"
   },
   "devDependencies": {
@@ -38,6 +41,8 @@
     "tsup": "^8.5.1",
     "typescript": "^7.0.2",
     "vitest": "^4.1.10",
-    "ws": "^8.21.3"
+    "ws": "^8.21.3",
+    "y-protocols": "^1.0.7",
+    "yjs": "^13.6.32"
   }
 }

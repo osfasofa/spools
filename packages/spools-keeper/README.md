@@ -43,3 +43,9 @@ debounce; the peers still hold everything, and the next sync heals it.
 
 Connection state, entry counts, the spool code, and the key's short
 fingerprint. Never content, never the key, never the full link.
+
+---
+
+Node ≥ 22 — the keeper rides Node's native `WebSocket` (the SDK uses the
+global when no polyfill is handed in), so no transport dependency ships.
+The relay's `>=18` doesn't apply here; that's a deliberate divergence.
