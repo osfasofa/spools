@@ -13,7 +13,7 @@ Spool is a small protocol, SDK, relay, and reference client for intimate, local-
 | [`packages/spools-keeper`](packages/spools-keeper) | A headless always-on peer — your hardware, your key, nobody's server. |
 | [`apps/client`](apps/client) | The reference client — pure static files, no build step. |
 | [`apps/mixtape`](apps/mixtape) | The mixtape client — the nice one (Vite + React, on the SDK). |
-| [`apps/room`](apps/room) | The room — a Messenger-class group chat, live at [osfasofa.github.io/spools/room](https://osfasofa.github.io/spools/room/). Runs entirely on **SPEC v1.1 as-is**: seats, nicknames, reactions, replies, presence, and read markers are all app conventions — the protocol never moved. |
+| [`apps/room`](apps/room) | The room — a Messenger-class group chat, live at [chat.spools.lol](https://chat.spools.lol/) (also [osfasofa.github.io/spools/room](https://osfasofa.github.io/spools/room/)). Runs entirely on **SPEC v1.1 as-is**: seats, nicknames, reactions, replies, presence, and read markers are all app conventions — the protocol never moved. |
 
 ## Where things are decided
 
