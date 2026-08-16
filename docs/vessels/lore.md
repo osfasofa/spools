@@ -64,7 +64,7 @@ Everything the white paper refuses, plus the vessel's own line: **no wiki-ness**
 
 The owner's follow-up riff, recorded before it cooled: folklore is an **oral** tradition — lore v1 leads with sound. Not a text corpus with attachments: **a shared four-track tape**. Takes are wound onto a reel as pointers (the §6 asset rule, obeyed from birth: hash + optional URL in `data`, never bytes); punches in and out are stamped as told-time history; text rides the tape as sayings and glosses; the whole reel bakes down to a fixed track — and a bake is wound back as a `telling`, which is what a bake *is*. Two timelines, both already in the machine: the tape (where sound sits) and the telling (when it was told), with `rewind` underneath making the reel's past *playable*. Everything in §§1–6 stands — same claim, same refusals (plus the tape's own: no DAW-ness, no time-stretch), same register, spoken aloud.
 
-The full design lives with the vessel: [apps/lore/DESIGN.md](../../apps/lore/DESIGN.md) (prototyped in the loom by owner direction, room-precedent; graduates to its own repo when T-130 ships — the gate holds, recorded there in §10). Build record: M14, tickets T-150…T-160.
+The full design lives with the vessel: [apps/lore/DESIGN.md](../../apps/lore/DESIGN.md) (prototyped in the loom by owner direction, room-precedent). Build record: M14, tickets T-150…T-160. **Born, Aug 2026:** the owner called the vessel out early — `osfasofa/lore` (private), full M14 history subtree-split out, this brief migrated with it as its BRIEF.md. The npm half of the graduation still waits on T-130; the loom keeps this prototype at `apps/lore` until its own private-era cleanup.
 
 ## 7. Open riff threads (parked here, decided in the vessel repo)
 
