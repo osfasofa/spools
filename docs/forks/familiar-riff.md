@@ -1,6 +1,6 @@
-# Agents on the web of spools — the pfam riff
+# Agents on the web of spools — the familiar riff
 
-*Research riff, August 2026 — the second movement of [spools-of-spools](../spools-of-spools.md): what happens when agents use these networks. This is **fork-of-purpose material** (ECOSYSTEM.md; T-145): pfam's lane, not the loom's. Following the lore.md precedent, it lives here until `osfasofa/pfam` is born (gated on T-130), then migrates with it — except §8, the loom-relevant residue, which stays as evidence at the gate, ranked no higher than any stranger's. **It decides nothing**, starts no repo, and the white paper's refusal stands verbatim: this roadmap stays people. Numbers are measured: `scratch/riff-spools-of-spools/agents-spike.mjs`, on the shipped `spools@0.1.0` build.*
+*Research riff, August 2026 — the second movement of [spools-of-spools](../spools-of-spools.md): what happens when agents use these networks. This is **fork-of-purpose material** (ECOSYSTEM.md; T-145): familiar's lane, not the loom's. (Naming note: the fork was chartered as `pfam` and the owner corrected the name to **`familiar`** — ECOSYSTEM.md and T-145's notes carry the supersession record; this doc was written during the correction and uses the right name throughout.) Following the lore.md precedent, it lives here until `osfasofa/familiar` is born — the T-130 gate is **satisfied** (shipped 16 Aug 2026, registry-verified; see T-130's notes), so birth is unblocked, kickoff at T-150 — then migrates with it, except §8, the loom-relevant residue, which stays as evidence at the gate, ranked no higher than any stranger's. **It decides nothing**, starts no repo, and the white paper's refusal stands verbatim: this roadmap stays people. Numbers are measured: `scratch/riff-spools-of-spools/agents-spike.mjs`, on the shipped `spools@0.1.0` build.*
 
 ---
 
@@ -16,7 +16,7 @@ Three shipped facts make the arrival practical, not theoretical:
 
 ## 1. What an agent is here (the lane's answer, kept)
 
-Is an agent a member? The lane already answered for the loom: **no — an agent is something a person brings**, in-lane exactly as far as a keeper is: an instrument of one human's intent, wearing that human's trust, inside spools that human legitimately holds. pfam exists so that a richer answer ("the agent as a working peer") can be explored *under another name* without the brands blurring — that structure survives this riff untouched.
+Is an agent a member? The lane already answered for the loom: **no — an agent is something a person brings**, in-lane exactly as far as a keeper is: an instrument of one human's intent, wearing that human's trust, inside spools that human legitimately holds. familiar exists so that a richer answer ("the agent as a working peer") can be explored *under another name* without the brands blurring — that structure survives this riff untouched.
 
 But the species-blindness has one consequence that can't wait for the fork, because it lands inside shared human spools today: **the protocol can't tell, therefore the people must.** When you bring an agent into a spool you share with someone, your agent reads their words — the link's total power, exercised by a process. There is no enforceable bot flag (any flag is self-declared, like `author`; an unflagged agent writes indistinguishable updates), so disclosure is culture or it is nothing:
 
@@ -33,7 +33,7 @@ The first riff's reference grades were ceremony for humans. For agents they hard
 
 ## 3. The desk — dispatch by CRDT (measured)
 
-The pfam sketch networked: a human–agent pair shares a hub — call it the desk — and every task is a leaf spool wound onto it. The desk is the human's dashboard and the agent's job queue, *the same spool*: assignment is winding a `task` entry (or a leaf's link); pickup is an ordinary `entry` event; steering is threading replies; the audit trail is the doc itself. There is no API between the human and the agent — there is a shared artifact, which is the whole thesis wearing work clothes.
+The familiar sketch networked: a human–agent pair shares a hub — call it the desk — and every task is a leaf spool wound onto it. The desk is the human's dashboard and the agent's job queue, *the same spool*: assignment is winding a `task` entry (or a leaf's link); pickup is an ordinary `entry` event; steering is threading replies; the audit trail is the doc itself. There is no API between the human and the agent — there is a shared artifact, which is the whole thesis wearing work clothes.
 
 The spike pressure-tested the two mechanics agents actually need from this:
 
@@ -67,16 +67,16 @@ Priced honestly: this is memory at *intimate scale* — hundreds of KB of testim
 
 ## 7. Agent-to-agent — the gradient, drawn once
 
-- **Human ↔ agent** — pfam's core. The desk, the leaves, the record. Chartered.
+- **Human ↔ agent** — familiar's core. The desk, the leaves, the record. Chartered.
 - **(Human + agent) ↔ (human + agent)** — *our agents talk*: two friends each grant their agent a shared logistics spool; the agents coordinate the trip's spreadsheet-shaped tedium; the humans peek, overrule, and take the credit. Still anchored — every capability traces to a person who handed a link inside a friendship — and quietly the most charming shape in the riff: the side channel where your familiar and mine compare notes, *because we let them.*
-- **Mission swarms** — orchestrator holds the hub, workers hold leaves, findings flow up by retelling, §2's scoping does containment, §3's claims do dispatch. One storey up from the desk; the same conventions; pfam decides how far up it goes.
-- **Unanchored agent meshes** — agents trading spools among themselves with no human holding any root: past even pfam's lane (its charter is a person steering work, not an agent society), a fork of the fork if anyone ever wants it, and nothing in this riff should be cited to bless it. The gradient's rule is the lane's rule at every rung: **every link in the graph was handed down from a person's hand — the question is only how many hops ago, and the answer must never be "unknowably many."**
+- **Mission swarms** — orchestrator holds the hub, workers hold leaves, findings flow up by retelling, §2's scoping does containment, §3's claims do dispatch. One storey up from the desk; the same conventions; familiar decides how far up it goes.
+- **Unanchored agent meshes** — agents trading spools among themselves with no human holding any root: past even familiar's lane (its charter is a person steering work, not an agent society), a fork of the fork if anyone ever wants it, and nothing in this riff should be cited to bless it. The gradient's rule is the lane's rule at every rung: **every link in the graph was handed down from a person's hand — the question is only how many hops ago, and the answer must never be "unknowably many."**
 
 ## 8. What stays in the loom (evidence at the gates — the residue that doesn't migrate)
 
 Agents need *nothing* from the protocol or the SDK today — both spikes ran on shipped surface, and that should be recorded as the finding it is: the thesis held again, against a population it was never written for. But agents are the most likely **first real claimants** of two ladders the design doc banked years early, and the gate should know a claimant is coming:
 
-- **The `sig` field (§6 seat ladder).** Crypto attribution was deferred because humans at intimate scale don't need proof — but agents are natural signers (they never forget a key, and "which process wound this?" is an operational question, not a social one). The seat-id-as-future-pubkey opacity rule was written for exactly this arrival. When pfam wants verifiable agent testimony, it arrives additively, as banked — evidence files from the fork at stranger's rank.
+- **The `sig` field (§6 seat ladder).** Crypto attribution was deferred because humans at intimate scale don't need proof — but agents are natural signers (they never forget a key, and "which process wound this?" is an operational question, not a social one). The seat-id-as-future-pubkey opacity rule was written for exactly this arrival. When familiar wants verifiable agent testimony, it arrives additively, as banked — evidence files from the fork at stranger's rank.
 - **Read-only keys (§6 permissions ladder, rung 3).** The summarizer that should read the room and never write; the auditor agent that must not be able to touch what it audits. Humans never really demanded this; agents will, because *structurally cannot write* is worth more than *instructed not to* for the same reason sealed references beat traversal policies. Rung 3 breaks "one link, one key," which is why it's a rung and not a patch — nothing moves without sign-off, but the gate should expect the knock to come from the fork, not from a vessel.
 - **What the loom refuses regardless**, so it's on the record beside the flags: no agent-shaped SDK surface without second-client evidence (nothing so far — the shipped surface sufficed twice); no bot flags in the protocol (unenforceable, therefore dishonest); no agent directories, marketplaces, or platforms (a directory is a feed wearing a trenchcoat, whoever's in it); and the white paper's sentence untouched — the roadmap stays people, and the fork stays another name.
 
@@ -85,11 +85,11 @@ Agents need *nothing* from the protocol or the SDK today — both spikes ran on 
 | rung | what | where |
 |---|---|---|
 | **already true** | agent = seat; link = credential; keeper = agent zero; desk/claims/wake-up (measured); leaf-scoping; memory-as-spools; gardener/courier as client code | any Node process, today, zero changes |
-| **charter (pfam repo, at birth)** | disclosure ceremony + never-cosplay; append-only/digest/season/asset-rule write discipline; traversal consent; the counterfeit sentence; how far up the swarm storey goes | migrates with this doc |
+| **charter (familiar repo, at birth)** | disclosure ceremony + never-cosplay; append-only/digest/season/asset-rule write discipline; traversal consent; the counterfeit sentence; how far up the swarm storey goes | migrates with this doc |
 | **evidence at the loom's gates** | `sig` (first natural signer), read-only keys (first structural demand) — §8, stranger's rank | stays here |
 | **refused** | bot flags, agent directories, agent-shaped protocol surface, unanchored meshes | everywhere |
 
-The industry is presently building, from scratch and at great expense: task queues for agents, memory stores for agents, permission systems for agents, audit logs for agents, and dashboards where humans watch agents work. Spool contains all five — **queue = a collection; memory = spools; permissions = link grades; audit = rewind; dashboard = the same spool, opened by a person** — not because it aimed at agents but because it aimed at something harder: a shared thing, held jointly, that remembers, and that never needed a server to be trusted. The infrastructure for agents turns out to be the infrastructure for intimacy, unchanged. That's either the deepest confirmation the design has received or a very elaborate coincidence — and the honest way to find out is the way this project always finds out: pfam builds on the published packages like a stranger, the loom holds its lane, and the evidence queues at the gate.
+The industry is presently building, from scratch and at great expense: task queues for agents, memory stores for agents, permission systems for agents, audit logs for agents, and dashboards where humans watch agents work. Spool contains all five — **queue = a collection; memory = spools; permissions = link grades; audit = rewind; dashboard = the same spool, opened by a person** — not because it aimed at agents but because it aimed at something harder: a shared thing, held jointly, that remembers, and that never needed a server to be trusted. The infrastructure for agents turns out to be the infrastructure for intimacy, unchanged. That's either the deepest confirmation the design has received or a very elaborate coincidence — and the honest way to find out is the way this project always finds out: familiar builds on the published packages like a stranger, the loom holds its lane, and the evidence queues at the gate.
 
 ---
 

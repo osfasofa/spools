@@ -122,9 +122,11 @@ Signed off Aug 2026 (decisions D1–D5); design record: [docs/M11-room-brief.md]
 
 Pure execution, no open design questions. Drafted at M11 close (what's on npm no longer matches what's true); **owner at keyboard for the publish itself**, everything else preppable. Not urgent by standing decision (T-002's "don't treat the squatting clock as pressure").
 
+**Shipped 16 Aug 2026** (registry-verified 18 Aug: `spools@0.1.0` · `spools-relay@0.2.0` · `spools-keeper@0.1.0`, tags at f4db17e). The record lagged the keyboard by two days — the publish was owner-at-keyboard and no session ran after it; T-130's Notes hold the correction and the lesson (for "did it ship," the registry outranks this table). **M12 closed; the ECOSYSTEM vessel/fork gate is open.**
+
 | Ticket | Title | Depends | Status |
 |---|---|---|---|
-| [T-130](T-130-npm-release.md) | npm release: real SDK 0.1.0, relay 0.2.0 (T-124 knobs), keeper first publish | — | doing |
+| [T-130](T-130-npm-release.md) | npm release: real SDK 0.1.0, relay 0.2.0 (T-124 knobs), keeper first publish | — | done |
 
 ## M13 — the telling (white paper + ecosystem plan)
 
@@ -138,6 +140,14 @@ Drafted at a brainstorm session, Aug 2026: the shipped system's public story boi
 | [T-143](T-143-homepage.md) | Publish the white paper to a homepage — **owner at keyboard** | T-140, T-130 | todo |
 | [T-144](T-144-lore-vessel.md) | lore leads the constellation — riff → brief, build order redirected | T-141 | done |
 | [T-145](T-145-forks-of-purpose.md) | Forks of purpose — the agent-workspace track, chartered beside the lane | T-141 | done |
+
+## M14 — familiar (the fork is born)
+
+Kicked off Aug 2026 from the two research riffs ([docs/spools-of-spools.md](../docs/spools-of-spools.md) and [docs/forks/familiar-riff.md](../docs/forks/familiar-riff.md) — collections, splice physics, machine seats; both measured, `scratch/riff-spools-of-spools/`). The agent-workspace fork chartered at T-145 gets its body: repo `osfasofa/familiar` (the owner corrected the name from `pfam` — supersession recorded in ECOSYSTEM.md and T-145's notes), consuming the T-130 packages like a stranger. One kickoff ticket lives here; per the fork rules, everything after it lives in the fork's own repo and feeds back only as evidence at the gate.
+
+| Ticket | Title | Depends | Status |
+|---|---|---|---|
+| [T-150](T-150-familiar-kickoff.md) | familiar is born — repo, charter, the desk walking skeleton | T-130 | todo |
 
 ## Parked (no ticket until evidence demands one)
 

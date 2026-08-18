@@ -54,6 +54,14 @@ word changing.
   free (404, probably never needed — it's an app, not a package); faint
   Pfam protein-database collision noted and dismissed. Repo
   `osfasofa/pfam` is born after T-130; only the name is claimed here.
+- **Correction (owner, Aug 2026 — recorded 18 Aug at the agents-riff
+  merge): the name is `familiar`.** The pfam call above was reversed in
+  favor of the original first candidate; the reversal happened off-repo
+  (in conversation) and is recorded retroactively here and in
+  ECOSYSTEM.md so future sessions inherit the right name. Repo:
+  `osfasofa/familiar`. npm `familiar` is a squatted 2022 package —
+  irrelevant per this ticket's own note (the fork is an app, not a
+  package). Kickoff: T-150.
 - First spike sketch, recorded so the fork repo starts warm: an agent
   holds a spool link for one task; winds `finding`/`question`/`decision`
   entries as it works; the human opens the link on a phone, steers by

@@ -1,7 +1,7 @@
 ---
 id: T-130
 title: "npm release: the real SDK + current relay + first keeper"
-status: doing
+status: done
 milestone: M12
 depends: []
 ---
@@ -60,14 +60,14 @@ Version proposal — sign-off at publish time, not protocol-shaping:
       `index.ts`'s wider one). Cheapest before any external vessel repo
       exists. Keeper `engines >=22` vs relay `>=18` confirmed intended or
       harmonized in the same pass.
-- [ ] Publish, owner at keyboard: `npm publish` ×3 in dependency-safe order
+- [x] Publish, owner at keyboard: `npm publish` ×3 in dependency-safe order
       (**relay, SDK, keeper** — the keeper's `"spools": "workspace:^"` is
       rewritten to `^0.1.0` at pack time, so `spools@0.1.0` must exist on
       the registry before the keeper lands or `npm i spools-keeper` breaks
       in the gap; relay first still keeps the SDK README's default-relay
       story honest — the original "none actually depend on each other" was
       wrong for the keeper, see docs/RELEASING.md).
-- [ ] Post-publish: `npm view` sanity ×3; a git tag per package
+- [x] Post-publish: `npm view` sanity ×3; a git tag per package
       (`spools@0.1.0` etc.); INDEX + this ticket's Notes record the shipped
       versions.
 
@@ -103,6 +103,21 @@ Version proposal — sign-off at publish time, not protocol-shaping:
   - Relay README knob table verified against `server.js` (K=8, 24 PUTs/min,
     60 d, 8 MiB, 1 GiB) — already true, no edit needed. CHANGELOG.md ×3
     written (repo-side; not added to `files`).
+- **2026-08-18, record correction (headless): SHIPPED 2026-08-16, ~07:38–07:40 UTC.**
+  Registry-verified this session: `npm view` → `spools@0.1.0`
+  (time.modified 07:39:09Z), `spools-relay@0.2.0` (07:38:16Z — the
+  dependency-safe order was followed: relay first), `spools-keeper@0.1.0`
+  (07:39:56Z). Tags `spools@0.1.0` / `spools-relay@0.2.0` /
+  `spools-keeper@0.1.0` were already pushed, all at f4db17e (the prep-merge
+  tree the tarballs were packed from). Every AC is met; the only unticked
+  box was this one — "record the shipped versions" — because the publish
+  was owner-at-keyboard and no session ran afterward to flip the record.
+  Two days of drift cost one downstream doc a wrong gate claim (the agents
+  riff called the fork "gated on T-130"), caught at merge. Lesson for the
+  lab notebook: **for "did it ship," the registry outranks INDEX** — a
+  future session seeing an owner-at-keyboard ticket in `doing` should
+  `npm view` before repeating the claim. M12 closed; the ECOSYSTEM
+  vessel/fork gate is open (lore and familiar are unblocked).
 - T-002's deprioritization note stands in spirit: none of this is urgent —
   it's here so the release is a checklist, not a design session, whenever
   the mood strikes.

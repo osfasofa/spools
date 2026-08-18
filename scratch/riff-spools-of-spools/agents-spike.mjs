@@ -1,4 +1,4 @@
-// Agents riff (docs/forks/pfam-riff.md): three agent-shaped questions,
+// Agents riff (docs/forks/familiar-riff.md): three agent-shaped questions,
 // measured on the shipped SDK before the riff speculates past them.
 //
 //  1. THE CLAIM CONVENTION — two agents race to claim one task entry,
