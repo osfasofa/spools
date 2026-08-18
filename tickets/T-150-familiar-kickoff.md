@@ -89,3 +89,11 @@ Fork-side (`osfasofa/familiar` — its own culture from day one):
 - Deliberately not in this ticket: the gardener, the courier, swarms,
   memory constellations — the desk earns them one at a time, each through
   the fork's own notes.
+- **Mission two is named** (owner riff, 18 Aug 2026 — riff §6, "the
+  project familiar"): familiar manages the building of familiar. Tickets,
+  decisions, and the standing brief live in a spool outside the repo;
+  a session-start hook reads the brief + open tickets (context cost =
+  open work, not project history); status = append-only newest-wins
+  children carrying `data.commit`; milestone exports committed to the
+  repo as the fossil record. Dogfood on the fork first — the loom
+  migrates nothing.
