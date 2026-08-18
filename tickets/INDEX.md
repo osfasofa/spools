@@ -147,7 +147,9 @@ Kicked off Aug 2026 from the two research riffs ([docs/spools-of-spools.md](../d
 
 | Ticket | Title | Depends | Status |
 |---|---|---|---|
-| [T-150](T-150-familiar-kickoff.md) | familiar is born — repo, charter, the desk walking skeleton | T-130 | todo |
+| [T-150](T-150-familiar-kickoff.md) | familiar is born — repo, charter, the desk walking skeleton | T-130 | doing |
+
+**Where it stands, 18 Aug 2026.** Built and run: the riff migrated, its §8 folded into ECOSYSTEM.md as the standing evidence-expected note, and `familiar` is a working repo — charter, desk skeleton, static surface, offline tests, torture round 1 against the canonical relay (two agents racing one task, wake-from-pocket, `kill -9`, the human renaming the agent). Three evidence items filed at stranger's rank in the ticket's notes; **zero SDK asks — the published packages sufficed.** Still `doing` for one reason: `osfasofa/familiar` isn't created and pushed yet, which is an owner-at-keyboard moment.
 
 ## Parked (no ticket until evidence demands one)
 
