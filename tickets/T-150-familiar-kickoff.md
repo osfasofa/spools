@@ -1,7 +1,7 @@
 ---
 id: T-150
 title: "familiar is born — repo, charter, the desk walking skeleton"
-status: doing
+status: done
 milestone: M14
 depends: [T-130]
 ---
@@ -41,7 +41,7 @@ Loom-side (this repo):
       read-only keys' first structural demand) into ECOSYSTEM.md's fork
       paragraph as the standing evidence-expected note; leave a one-line
       pointer where the riff lived.
-- [ ] INDEX: this ticket `done` when the skeleton run is recorded in the
+- [x] INDEX: this ticket `done` when the skeleton run is recorded in the
       fork's own notes — after this, familiar's work stops being loom
       tickets entirely.
 
@@ -133,11 +133,16 @@ and kept working). Unrun rows are marked ⬜ in the fork's TESTING.md — real
 second devices, midnight from another machine, offline/reunion, wrong key,
 back-pressure, a poisoned worker.
 
-**Owner-at-keyboard remainder (why this ticket is still `doing`).**
-`osfasofa/familiar` does not exist on GitHub yet — repo creation and the push
-are T-002-style owner moments. Everything else is done; the local repo is
-committed and ready to push. This ticket goes `done` the moment the repo is
-created and pushed.
+**Owner-at-keyboard moment, closed.** The owner created
+`osfasofa/familiar` (private) at the end of this session and the three
+commits are pushed — `main` is the default branch. One wrinkle recorded for
+next time: this machine's SSH key authenticates as `jdomonell`, not
+`osfasofa`, so the SSH remote couldn't see a private repo owned by the other
+account; the push went over HTTPS with `gh`'s credential helper
+(`git -c credential.helper='!gh auth git-credential' push https://github.com/osfasofa/familiar.git main`).
+The fork's `origin` is still the SSH URL, which will fail the same way until
+the key is added to `osfasofa` or the remote is switched to HTTPS. Not the
+loom's problem — noted here because the next session will hit it.
 
 ## Evidence filed (stranger's rank, no asks)
 
