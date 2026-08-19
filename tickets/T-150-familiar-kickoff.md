@@ -175,3 +175,11 @@ sufficed.**
 - Whether familiar deploys a human surface anywhere (a subdomain is a vessel
   pattern; the fork may simply stay local — it has no lane obligation to be
   reachable). Left to the fork.
+- **Mission two is named** (owner riff, 18 Aug 2026 — riff §6, "the
+  project familiar"): familiar manages the building of familiar. Tickets,
+  decisions, and the standing brief live in a spool outside the repo;
+  a session-start hook reads the brief + open tickets (context cost =
+  open work, not project history); status = append-only newest-wins
+  children carrying `data.commit`; milestone exports committed to the
+  repo as the fossil record. Dogfood on the fork first — the loom
+  migrates nothing.
