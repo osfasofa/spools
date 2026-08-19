@@ -75,7 +75,7 @@ Session-sized chunks of the build order (DESIGN_DOC §4). Each ticket is one fil
 
 ## M10 — Async sync (the pocket)
 
-Signed off Aug 2026 (all four decisions + two review-round hardenings); design record: [docs/M10-async-brief.md](../docs/M10-async-brief.md). The relay gains an optional capability: it holds the last few sealed full-state deposits per key-derived namespace — ciphertext or nothing — so the spool is there when a friend opens the link while the writer sleeps. T-100 gates everything; T-106 (SPEC) goes last, per the constitution.
+Signed off Aug 2026 (all four decisions + two review-round hardenings); design record: [docs/M10-async-brief.md](../docs/M10-async-brief.md). The relay gains an optional capability: it holds the last few sealed full-state deposits per key-derived namespace — ciphertext or nothing — so the spool is there when a friend opens the link while the writer sleeps. T-100 gates everything; T-106 (SPEC) goes last, per the constitution. **M10 complete (Aug 2026)** — the pocket is live on the canonical relay, volume-backed, 60-day courtesy TTL.
 
 **Complete, 15 Aug 2026.** The canonical relay runs the pocket volume-backed (60-day TTL, stock knobs); deposits survive restarts, and a cold reader collects them with nobody online. A test client is deployed at <https://osfasofa.github.io/spools/> (mixtape `dist/` on the `gh-pages` branch). **M10 closed — and with it the v1 roadmap: every ticket T-001…T-107 is done.**
 
