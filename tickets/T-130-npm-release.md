@@ -103,6 +103,22 @@ Version proposal — sign-off at publish time, not protocol-shaping:
   - Relay README knob table verified against `server.js` (K=8, 24 PUTs/min,
     60 d, 8 MiB, 1 GiB) — already true, no edit needed. CHANGELOG.md ×3
     written (repo-side; not added to `files`).
+  - **Publish-hour follow-up (same day):** the guards as first written
+    (`pnpm test`) failed on the publish machine — `sh: pnpm: command not
+    found`. Lesson: when corepack launches pnpm without `corepack enable`'s
+    global shims (this repo's documented setup), pnpm does **not** put
+    itself on the lifecycle scripts' PATH. Guards now call `npm run build` /
+    `npm test` — npm ships beside node and always resolves. Verified by
+    reproducing the failure under a pnpm-less PATH, then dry-run publishing
+    all three packages green under that same PATH. (The owner unblocked
+    live with a one-time `corepack enable`; the guard fix stays for
+    machines without it.)
+- **Shipped, 2026-08-16:** `spools@0.1.0`, `spools-relay@0.2.0`,
+  `spools-keeper@0.1.0` — all three verified live via `npm view`. Second
+  wall at the keyboard, recorded for next time: `404 Not Found - PUT` from
+  the registry is npm's way of saying *not logged in* (writes hide auth
+  failures as 404 to avoid leaking package existence); `npm login` with the
+  security key resolved it. Publish order relay → SDK → keeper held.
 - **2026-08-18, record correction (headless): SHIPPED 2026-08-16, ~07:38–07:40 UTC.**
   Registry-verified this session: `npm view` → `spools@0.1.0`
   (time.modified 07:39:09Z), `spools-relay@0.2.0` (07:38:16Z — the

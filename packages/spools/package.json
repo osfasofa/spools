@@ -23,7 +23,7 @@
   "scripts": {
     "build": "tsup && tsc -p tsconfig.build.json",
     "test": "vitest run",
-    "prepublishOnly": "pnpm build && pnpm test"
+    "prepublishOnly": "npm run build && npm test"
   },
   "dependencies": {
     "tweetnacl": "^1.0.3",
