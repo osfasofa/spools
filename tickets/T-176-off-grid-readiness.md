@@ -72,3 +72,7 @@ http, as the brief already plans. Review finding F18.
 - Also true, for the brief: `crypto.getRandomValues` (the seat, T-164's key)
   works on http; only `randomUUID` (the SDK half) and the clipboard were the
   landmines in these clients.
+- Clipboard half landed in commit `fa7a02d` (room + mixtape). Open: the SDK
+  UUID fallback (SDK lane), the `apps/client` LAN row + off-grid brief
+  asterisk, and the two-device Wi-Fi acceptance (owner) — the ticket stays
+  `doing` for those.
