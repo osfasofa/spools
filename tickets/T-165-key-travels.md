@@ -71,3 +71,6 @@ already stores the full link in localStorage, deliberately. Review finding F6.
   key") can be read straight off `stash.list()` after `whenReady` — no new
   storage needed. The mixtape has the same `replaceState` shape and would
   need the same decision applied.
+- App half landed in commit `42d0b57` (room only). Open: the whitepaper /
+  SDK README sentence (other lane) and the address-bar decision (owner
+  sign-off) — the ticket stays `doing` for those.
