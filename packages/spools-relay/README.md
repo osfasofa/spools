@@ -34,6 +34,11 @@ That's the whole setup. No config file, no database, no state.
   simply degrades to sync-when-together until deposits accrue again. Honest,
   but it defeats the pocket's purpose during exactly the gaps it exists to
   bridge — give the canonical relay a disk.
+- **Behind either proxy, set `TRUST_PROXY=1`** (`fly.toml` already does;
+  on Railway it's a service variable). Without it the socket address every
+  per-IP limit keys on is the proxy's own, so the whole relay shares one
+  bucket. With it, the client is the rightmost `X-Forwarded-For` hop — the
+  one the proxy appended.
 
 Resource expectations: tiny. The relay does no computation on frames — it's
 a fan-out loop. A hobby-tier instance carries intimate-scale traffic easily.
@@ -53,6 +58,10 @@ signaling endpoint from it (same host, root path). One URL, both jobs.
 Rooms are created on first join and vanish when the last member leaves.
 Crude guards, documented in the source: 8 MiB max frame, 64 connections per
 room.
+
+| knob | default | |
+|---|---|---|
+| `TRUST_PROXY` | *(unset — off)* | behind an edge proxy (Railway, Fly): every per-IP limit keys on the rightmost `X-Forwarded-For` hop, the one the proxy appended, instead of the proxy's own address. Leave it off on a relay exposed directly — there the header is whatever the client wrote |
 
 ## The pocket
 
@@ -139,10 +148,13 @@ but **nine or more people writing in isolation** (offline, partitioned) can
 silently outrun the ring: the oldest unmerged worldview is evicted, a cold
 joiner won't see it, and only that writer's own return heals it. The per-IP
 deposit budget (**24/min**) covers a couple of dozen same-NAT devices at the
-clients' own 1/min pacing. And the **64 connections per room** guard counts
+clients' own 1/min pacing — per *client* address only where `TRUST_PROXY`
+is set; a relay behind a proxy without it sees one address, and the budget
+becomes one bucket for everyone on it. And the **64 connections per room** guard counts
 tabs, not people; a 65th connection is closed with code 1013 ("room full"),
 which today's SDK experiences as an endless connect/drop cycle — a full room
 looks like a bad connection.
 
-Env: `PORT` (default 4444), `HOST` (default 0.0.0.0), pocket knobs above.
-Node ≥ 18. Tests: `pnpm test` (node:test, spawns real instances).
+Env: `PORT` (default 4444), `HOST` (default 0.0.0.0), `TRUST_PROXY` (default
+off), pocket knobs above. Node ≥ 18. Tests: `pnpm test` (node:test, spawns
+real instances).

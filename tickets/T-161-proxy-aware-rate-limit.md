@@ -1,7 +1,7 @@
 ---
 id: T-161
 title: "Proxy-aware rate limit: the per-IP bucket is global behind Railway"
-status: todo
+status: doing
 milestone: M15
 depends: []
 ---
@@ -28,21 +28,61 @@ finding F2.
 - [ ] Verify first: one temporary log line on PUT printing `remoteAddress` and
       `x-forwarded-for` (never the room or token — the relay doesn't chat about
       rendezvous names). Deploy, deposit once from a browser, read the log,
-      remove the line.
-- [ ] Add `TRUST_PROXY` (env, default off). When set, client IP = the
+      remove the line. **Owner at keyboard** — see Notes for the exact line.
+- [x] Add `TRUST_PROXY` (env, default off). When set, client IP = the
       **rightmost** `X-Forwarded-For` hop, falling back to `remoteAddress`.
       Never the leftmost value (client-supplied). Use it for the pocket bucket
       and for whatever T-169/T-170 add.
-- [ ] While here: bound `putLog` on insert (drop entries older than a minute)
+- [x] While here: bound `putLog` on insert (drop entries older than a minute)
       instead of only in the hourly sweep.
 - [ ] Set `TRUST_PROXY=1` on the canonical relay (owner at keyboard, Railway
-      variables); add the knob to the README table and `fly.toml`.
-- [ ] Test (node:test, real instance): with `TRUST_PROXY`, two `X-Forwarded-For`
+      variables) — **owner at keyboard, still unset**; the knob is in the
+      README table and `fly.toml`.
+- [x] Test (node:test, real instance): with `TRUST_PROXY`, two `X-Forwarded-For`
       values get independent 24/min budgets; without it, the header is ignored.
 
 ## Acceptance criteria
 
 - The production log line (before removal) shows the real client address
-  being keyed.
-- The two-address test passes; the ignore-header test passes.
-- README knob table matches the code.
+  being keyed. *(Owner-owed; not yet done.)*
+- The two-address test passes; the ignore-header test passes. *(Done.)*
+- README knob table matches the code. *(Done.)*
+
+## Notes / open questions
+
+- **Shipped (relay lane, 3 Sep 2026): `TRUST_PROXY` off by default; one
+  `clientIp(request)` helper** in `server.js` that T-169/T-170/T-168 key
+  on too. Truthy = any value but `0/false/no/off` (case-insensitive).
+  Rightmost hop: `x-forwarded-for` split on commas, trimmed, empties
+  dropped, last one wins; no header → `remoteAddress` → `'unknown'`.
+  Nothing is normalized (`::ffff:` prefixes stay) — the key is opaque.
+- `putLog` became a small sliding-window hit log (`makeHitLog` /
+  `recentHits` / `recordHit` / `pruneHitLog`): the touched key is pruned on
+  every use and the whole map once per window, so it is bounded by live
+  traffic. The old code already pruned the *touched* entry on insert; what
+  waited for the hourly sweep was every *other* key — with `TRUST_PROXY`
+  on a mis-deployed direct relay, a stranger spraying header values could
+  have grown the map for an hour. Now it can't. The same helper carries
+  T-168's per-hour namespace-creation log.
+- Tests (`test/hardening.test.js`, real spawned instances): with
+  `TRUST_PROXY=1` and a 2/min budget, `203.0.113.1` ×3 → 200, 200, 429;
+  `203.0.113.2` → 200; a spoofed **leftmost** hop
+  (`198.51.100.9, 203.0.113.1`) → 429 (same bucket); a chain whose
+  rightmost hop is fresh → 200. Without the flag, three different header
+  values share one 2/min bucket (third → 429). The pocket helpers moved to
+  `test/helpers.js` so both files share them; each file owns a port range
+  because `node --test` runs files in parallel processes.
+- `fly.toml` sets `TRUST_PROXY=1` (Fly's proxy fronts everything and
+  appends the client last, same rule). **`railway.json` carries no env** —
+  Railway's config-as-code schema has no variables block; they live in the
+  dashboard, so the canonical flip is the owner's, at the keyboard.
+- **For the owner — the verify-first line.** In `handlePocketPut`, right
+  after `const ip = clientIp(request)`, add
+  `console.log('pocket put from', request.socket.remoteAddress, 'xff', request.headers['x-forwarded-for'] ?? '-', 'keyed', ip)`
+  — no room, no token. Deploy, deposit once from a browser, read the
+  Railway log: expect `remoteAddress` to be a private/proxy address and the
+  rightmost `xff` value to be your real address. Then remove the line
+  (the relay never chats about clients either) and set `TRUST_PROXY=1` in
+  the service variables. Until that flip, the canonical relay still runs
+  one shared 24/min bucket — this ticket stays `doing` until the log line
+  has been seen and the variable is set.

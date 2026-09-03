@@ -62,6 +62,55 @@ const POCKET_PUTS_PER_MIN = Number(process.env.POCKET_PUTS_PER_MIN ?? 24) // per
 const POCKET_SWEEP_MS = Number(process.env.POCKET_SWEEP_MS ?? 3_600_000)
 const POCKET_DIR = process.env.POCKET_DIR || null
 
+// Who is the client? (T-161) Behind an edge proxy (Railway, Fly) the socket's
+// remoteAddress is the proxy, so every per-IP limit collapses into one bucket
+// shared by everyone. With TRUST_PROXY set, the client is the RIGHTMOST
+// X-Forwarded-For hop — the one the proxy itself appended; anything left of
+// it is client-supplied and may lie. Off by default: a relay exposed directly
+// must never believe a header the client wrote.
+const envFlag = (name) => {
+  const v = (process.env[name] ?? '').trim().toLowerCase()
+  return v !== '' && !['0', 'false', 'no', 'off'].includes(v)
+}
+const TRUST_PROXY = envFlag('TRUST_PROXY')
+
+/** the address every per-IP limit keys on — one rule, shared by the pocket and the broadcast half */
+const clientIp = (request) => {
+  if (TRUST_PROXY) {
+    const hops = String(request.headers['x-forwarded-for'] ?? '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0)
+    if (hops.length > 0) return hops[hops.length - 1]
+  }
+  return request.socket.remoteAddress ?? 'unknown'
+}
+
+// Sliding-window hit logs keyed by client address (key → [timestamps]). The
+// touched key is pruned on every use and the whole map once per window, so
+// the log stays bounded by live traffic instead of waiting for the hourly
+// sweep (a stranger spraying addresses would otherwise pile up until then).
+const makeHitLog = (windowMs) => ({ windowMs, hits: new Map(), prunedAt: 0 })
+const pruneHitLog = (log, now = Date.now()) => {
+  log.prunedAt = now
+  for (const [key, times] of log.hits) {
+    const recent = times.filter((t) => now - t < log.windowMs)
+    if (recent.length === 0) log.hits.delete(key)
+    else log.hits.set(key, recent)
+  }
+}
+/** hits for `key` inside the window (pruning as it goes) */
+const recentHits = (log, key, now = Date.now()) => {
+  if (now - log.prunedAt >= log.windowMs) pruneHitLog(log, now)
+  const recent = (log.hits.get(key) ?? []).filter((t) => now - t < log.windowMs)
+  if (recent.length === 0) log.hits.delete(key)
+  else log.hits.set(key, recent)
+  return recent.length
+}
+const recordHit = (log, key, now = Date.now()) => {
+  map.setIfUndefined(log.hits, key, () => []).push(now)
+}
+
 const wsReadyStateConnecting = 0
 const wsReadyStateOpen = 1
 
@@ -212,8 +261,8 @@ const SEGMENT_RE = /^[A-Za-z0-9_-]{1,64}$/
 /** `${room}/${token}` → { room, token, touchedAt, tags: Map(tagHex → {at, bytes, blob|null}) } */
 const namespaces = new Map()
 let pocketTotalBytes = 0
-/** ip → [put timestamps] within the last minute */
-const putLog = new Map()
+/** client address → put timestamps within the last minute (T-161: keyed via clientIp) */
+const putLog = makeHitLog(60_000)
 
 const nsDir = (ns) => path.join(POCKET_DIR, ns.room, ns.token)
 
@@ -278,12 +327,10 @@ const parsePocketPath = (pathname) => {
 }
 
 const handlePocketPut = (request, response, { room, token }) => {
-  const ip = request.socket.remoteAddress ?? 'unknown'
+  const ip = clientIp(request)
   const now = Date.now()
-  const recent = (putLog.get(ip) ?? []).filter((t) => now - t < 60_000)
-  if (recent.length >= POCKET_PUTS_PER_MIN) return pocketJson(response, 429, { error: 'rate limited' })
-  recent.push(now)
-  putLog.set(ip, recent)
+  if (recentHits(putLog, ip, now) >= POCKET_PUTS_PER_MIN) return pocketJson(response, 429, { error: 'rate limited' })
+  recordHit(putLog, ip, now)
 
   const chunks = []
   let size = 0
@@ -353,12 +400,7 @@ setInterval(() => {
   for (const [key, ns] of namespaces) {
     if (ns.touchedAt < expiry) evictNamespace(key)
   }
-  const cutoff = Date.now() - 60_000
-  for (const [ip, times] of putLog) {
-    const recent = times.filter((t) => t > cutoff)
-    if (recent.length === 0) putLog.delete(ip)
-    else putLog.set(ip, recent)
-  }
+  pruneHitLog(putLog)
 }, POCKET_SWEEP_MS).unref()
 
 // ========== HTTP + UPGRADE ROUTING ==========
