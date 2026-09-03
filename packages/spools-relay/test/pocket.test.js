@@ -3,46 +3,15 @@
 // just node:test. Each test spawns its own instance with the knobs it needs.
 import { test, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { spawn } from 'node:child_process'
 import { mkdtemp, readdir } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join, dirname } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { join } from 'node:path'
 import { WebSocket } from 'ws'
+import { SERVER, relayPool, sleep, deposit, put, get } from './helpers.js'
 
-const SERVER = join(dirname(fileURLToPath(import.meta.url)), '..', 'server.js')
-let nextPort = 15100
-const children = []
-after(() => children.forEach((c) => c.kill()))
-
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
-
-const startRelay = async (env = {}) => {
-  const port = nextPort++
-  const child = spawn(process.execPath, [SERVER], {
-    env: { ...process.env, PORT: String(port), HOST: '127.0.0.1', ...env },
-    stdio: 'ignore',
-  })
-  children.push(child)
-  const base = `http://127.0.0.1:${port}`
-  for (let i = 0; i < 100; i++) {
-    try {
-      if ((await fetch(base)).ok) return { base, port, child }
-    } catch {
-      await sleep(50)
-    }
-  }
-  throw new Error('relay did not come up')
-}
-
-/** a minimal valid deposit: magic ‖ version ‖ tag(4) ‖ opaque payload */
-const deposit = (tag = [1, 2, 3, 4], payloadBytes = 40) =>
-  Buffer.concat([Buffer.from([0xe2, 0xe3, 1, ...tag]), Buffer.alloc(payloadBytes, 7)])
-
-const put = async (base, ns, blob) =>
-  fetch(`${base}/pocket/${ns}`, { method: 'PUT', body: blob }).then(async (r) => ({ status: r.status, json: await r.json() }))
-const get = async (base, ns) =>
-  fetch(`${base}/pocket/${ns}`).then(async (r) => ({ status: r.status, json: await r.json() }))
+const pool = relayPool(15100)
+const startRelay = pool.start
+after(pool.stop)
 
 test('health JSON keeps its old shape and gains the pocket block (counts only)', async () => {
   const { base } = await startRelay()
