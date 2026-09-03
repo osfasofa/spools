@@ -167,7 +167,12 @@ one friend's evening and another's midnight, and the thing that actually keeps
 a spool is a copy on somebody's disk (`export()`). Under the 1 GiB budget,
 namespaces nobody ever collected are evicted before ones somebody did; the
 creation and first-deposit knobs are at their inert defaults. **A determined
-stranger can still fill the pocket; devices remain the spool's home.**
+stranger can still fill the pocket; devices remain the spool's home.** The
+canonical relay answers at `wss://relay.spools.lol/yjs` — a name we own —
+since 3 Sep 2026 (T-160). Links minted before then carry
+`spools-relay-production.up.railway.app`; that hostname stays enabled on the
+same service indefinitely: same process, same rooms, same pocket, so old
+links and new links meet.
 
 **Group-scale honesty (T-110/T-111, measured).** The tag ring holds the
 newest deposit from each of the last **8** writer sessions. People writing
