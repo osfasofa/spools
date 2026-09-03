@@ -182,6 +182,7 @@ Drafted 3 Sep 2026 from the ship review — design record: [docs/M15-ship-review
 | [T-175](T-175-stun-honesty.md) | STUN honesty: the WebRTC path asks Google and Twilio — **sign-off** | — | todo |
 | [T-176](T-176-off-grid-readiness.md) | Off-grid readiness: the secure-context landmines | — | doing |
 | [T-177](T-177-link-shape.md) | Link shape: shorter and prettier without lying — **sign-off** | T-160 | todo |
+| [T-181](T-181-npm-release-2.md) | npm release: SDK 0.2.0, relay 0.3.0, keeper 0.1.1 — **owner at keyboard** | T-160 | todo |
 
 ## M16 — the gate (evidence from the vessels)
 

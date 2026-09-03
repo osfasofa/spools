@@ -1,6 +1,6 @@
 # spools-relay changelog
 
-## Unreleased
+## 0.3.0 — 2026-09-03
 
 - `TRUST_PROXY` (default off): behind an edge proxy, per-IP limits key on the rightmost `X-Forwarded-For` hop instead of the proxy's own address (T-161). Migration: set `TRUST_PROXY=1` on Railway/Fly deployments, or the pocket's per-IP budget stays one bucket for everyone.
 - The pocket's rate log is pruned on every use, not just at the hourly sweep (T-161).

@@ -1,6 +1,6 @@
 # spools changelog
 
-## Unreleased
+## 0.2.0 — 2026-09-03
 
 - `DEFAULT_RELAY` is now `wss://relay.spools.lol/yjs` — a hostname the project owns (T-160). Links minted against the old default (`spools-relay-production.up.railway.app`) keep working: that hostname stays enabled on the same service indefinitely. Migration: none; links carry their own `relay=`.
 

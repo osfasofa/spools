@@ -1,6 +1,6 @@
 {
   "name": "spools-relay",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Dumb byte relay + WebRTC signaling for spools. Never sees your content.",
   "license": "MIT",
   "repository": {
