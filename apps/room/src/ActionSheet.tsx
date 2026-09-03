@@ -5,9 +5,10 @@ import { recentEmoji } from './emoji'
  * The message action sheet (design README §4): bottom sheet over a dimmed
  * backdrop — preview line, quick-react tiles, an input that accepts the OS
  * emoji keyboard ("any emoji" without shipping a picker dataset), then
- * action rows. The action list is the caller's: Reply (T-118), Edit/Remove
- * on your own messages and Restore on tombstones (T-120) — the affordance is
- * own-only; the protocol's honest contract lives in settings, not here.
+ * action rows. The action list is the caller's: Reply (T-118), Edit/Hide
+ * on your own messages and Restore on tombstones (T-120; "hide for everyone"
+ * since T-162 — the label says what the soft delete does) — the affordance
+ * is own-only; the protocol's honest contract lives in settings, not here.
  */
 export const ActionSheet = ({
   preview,

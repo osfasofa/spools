@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { Spool } from 'spools'
+import { DEFAULT_RELAY, buildSpoolLink, generateCode, parseSpoolLink, stash, type Spool } from 'spools'
 import { ActionSheet } from './ActionSheet'
 import { Arrival } from './Arrival'
 import { drawFavicon, pageTitle } from './badge'
+import { copyText } from './clipboard'
 import { Composer } from './Composer'
 import { MessageList, seatOf, type ParentRef, type Rec } from './MessageList'
 import { normalizeEmoji, rememberEmoji } from './emoji'
 import { mySeat, seatColor, seatSuffix, initialOf } from './seat'
-import { nameFor, participants, profileTable, type Profile } from './profiles'
+import { nameFor, participants, profileTable, renamedByFor, type Profile } from './profiles'
 import { THEMES, applyTheme, currentTheme } from './theme'
 import { usePresence } from './usePresence'
 import { useRoom } from './useRoom'
@@ -22,6 +23,15 @@ import { useRoom } from './useRoom'
 const SEAT = typeof localStorage !== 'undefined' ? mySeat() : ''
 
 /**
+ * Where the key actually goes (T-165, review finding F6): "never sent to any
+ * server" is true of spools' servers only. The address bar carries the key,
+ * browsers sync their address bars, and a link travels through whatever
+ * messenger carries it. Said wherever a link is copied, and in the fine print.
+ */
+const KEY_TRAVELS =
+  'your browser may sync this address to its maker; send the link over something end-to-end encrypted, or in person.'
+
+/**
  * One person row: live-looking input, but the profile entry winds on COMMIT
  * (blur/Enter), not per keystroke — every rename is permanent under gc:false,
  * and a keystroke-per-entry rename would spend dozens of them (D2's accepted
@@ -30,11 +40,14 @@ const SEAT = typeof localStorage !== 'undefined' ? mySeat() : ''
 const PersonRow = ({
   seat,
   profile,
+  renamedBy,
   isMe,
   onRename,
 }: {
   seat: string
   profile: Profile | undefined
+  /** the renamer's current display name (T-172), resolved by the caller from the same table */
+  renamedBy: string | null
   isMe: boolean
   onRename: (name: string) => void
 }) => {
@@ -71,7 +84,7 @@ const PersonRow = ({
           }}
           aria-label={`name for ${seatSuffix(seat)}`}
         />
-        {profile ? <span className="personAudit">renamed by {profile.renamedBy}</span> : null}
+        {renamedBy ? <span className="personAudit">renamed by {renamedBy}</span> : null}
       </div>
       <span className="personSeatId">
         {seatSuffix(seat)}
@@ -92,6 +105,10 @@ const Settings = ({
   onToggleMute,
   notifState,
   onEnableNotifications,
+  notifText,
+  onToggleNotifText,
+  onForget,
+  onNewRoom,
   onBack,
 }: {
   spool: Spool
@@ -104,9 +121,39 @@ const Settings = ({
   onToggleMute: () => void
   notifState: string
   onEnableNotifications: () => void
+  /** per-device: put the message text in the OS notification (T-173); default off */
+  notifText: boolean
+  onToggleNotifText: () => void
+  /** the one hard delete, after the ceremony below has been completed (T-163) */
+  onForget: () => void
+  /** a fresh keyed room on the same relay, its link copied — the only remedy against a bad actor (T-164) */
+  onNewRoom: () => void
   onBack: () => void
 }) => {
   const [copied, setCopied] = useState(false)
+  // T-163 keepsake: export is a plain file download; forget is the one hard
+  // delete in the system and owes confirm-twice ceremony (stash docstring) —
+  // step 1 says what it does, step 2 has you type the room code
+  const [exported, setExported] = useState(false)
+  const [forgetStep, setForgetStep] = useState<0 | 1 | 2>(0)
+  const [forgetTyped, setForgetTyped] = useState('')
+  const exportRoom = () => {
+    const blob = new Blob([spool.export()], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${spool.code}.spool.json`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 10_000)
+    setExported(true)
+    setTimeout(() => setExported(false), 1600)
+  }
+  const keepIt = () => {
+    setForgetStep(0)
+    setForgetTyped('')
+  }
   const [nameDraft, setNameDraft] = useState(roomName)
   const [nameEditing, setNameEditing] = useState(false)
   useEffect(() => {
@@ -116,12 +163,28 @@ const Settings = ({
   // handwriting; it syncs nothing (owner-approved cut)
   const [theme, setTheme] = useState(currentTheme)
   const link = spool.share()
+  // T-176: no Clipboard API (plain http on a LAN) → execCommand; no copy at
+  // all → show the whole link, pre-selected, with a long-press hint
+  const [copyHint, setCopyHint] = useState(false)
+  const fullLinkRef = useRef<HTMLSpanElement>(null)
   const copy = () => {
-    void navigator.clipboard.writeText(link).then(() => {
-      setCopied(true)
-      setTimeout(() => setCopied(false), 1600)
+    void copyText(link).then((ok) => {
+      if (ok) {
+        setCopied(true)
+        setTimeout(() => setCopied(false), 1600)
+      } else {
+        setCopyHint(true)
+      }
     })
   }
+  useEffect(() => {
+    if (!copyHint || !fullLinkRef.current) return
+    const range = document.createRange()
+    range.selectNodeContents(fullLinkRef.current)
+    const selection = getSelection()
+    selection?.removeAllRanges()
+    selection?.addRange(range)
+  }, [copyHint])
   return (
     <div className="screen">
       <header className="header">
@@ -182,17 +245,23 @@ const Settings = ({
         </section>
         <section className="settingsSection">
           <div className="sectionLabel">people</div>
-          {seats.map((seat) => (
-            <PersonRow
-              key={seat}
-              seat={seat}
-              profile={profiles.get(seat)}
-              isMe={seat === SEAT}
-              onRename={(name) =>
-                void spool.wind({ kind: 'room:profile', body: name, data: { seat } })
-              }
-            />
-          ))}
+          {seats.map((seat) => {
+            const profile = profiles.get(seat)
+            return (
+              <PersonRow
+                key={seat}
+                seat={seat}
+                profile={profile}
+                renamedBy={profile ? renamedByFor(profiles, profile) : null}
+                isMe={seat === SEAT}
+                onRename={(name) =>
+                  // target seat + the renamer's seat (T-172): the audit trail
+                  // resolves to a person, and follows that person's renames
+                  void spool.wind({ kind: 'room:profile', body: name, data: { seat, by: SEAT } })
+                }
+              />
+            )
+          })}
           <div className="caption">anyone can rename anyone — it applies everywhere</div>
         </section>
         <section className="settingsSection">
@@ -211,6 +280,10 @@ const Settings = ({
           <button className="copyBtn" onClick={onToggleMute}>
             {muted ? 'unmute this device' : 'mute this device'}
           </button>
+          <button className="copyBtn notifTextToggle" onClick={onToggleNotifText} aria-pressed={notifText}>
+            {notifText ? '✓ ' : ''}show message text in notifications
+          </button>
+          <div className="caption">notifications go through your OS and may be kept in its history.</div>
           <div className="caption">
             this room can only reach you while it's open somewhere — there is no server to call you
             back.
@@ -224,13 +297,96 @@ const Settings = ({
               {copied ? 'copied ✓' : 'copy'}
             </button>
           </div>
+          {copyHint ? (
+            <div className="caption">
+              copy didn't work here — long-press or select the link to copy it.
+              <span className="linkFull" ref={fullLinkRef}>
+                {link}
+              </span>
+            </div>
+          ) : null}
           <div className="caption">the link is the key — share it with people you trust</div>
+          <div className="caption keyTravels">{KEY_TRAVELS}</div>
+        </section>
+        <section className="settingsSection">
+          <div className="sectionLabel">new room</div>
+          <button className="copyBtn" onClick={onNewRoom}>
+            start a new room
+          </button>
+          <div className="caption">
+            a fresh room with a fresh key, its link copied. this room stays on this device — export or
+            forget it below.
+          </div>
+        </section>
+        <section className="settingsSection">
+          <div className="sectionLabel">keepsake</div>
+          <button className="copyBtn" onClick={exportRoom}>
+            {exported ? 'exported ✓' : 'export this room'}
+          </button>
+          <div className="caption">
+            everything here, as a file you can read without any software. the key is never in the file.
+          </div>
+          {forgetStep === 0 ? (
+            <button className="copyBtn" onClick={() => setForgetStep(1)}>
+              forget this room on this device
+            </button>
+          ) : (
+            <div className="confirmCard">
+              <div>
+                gone from this device only — everyone else keeps their copy, and the relay's pocket keeps
+                sealed copies for up to 60 days.
+              </div>
+              {forgetStep === 1 ? (
+                <div className="keepsakeRow">
+                  <button className="copyBtn" onClick={() => setForgetStep(2)}>
+                    yes, forget it
+                  </button>
+                  <button className="copyBtn" onClick={keepIt}>
+                    keep it
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <label className="caption" htmlFor="forgetCode">
+                    type the room code to confirm: <span className="mono">{spool.code}</span>
+                  </label>
+                  <input
+                    id="forgetCode"
+                    className="codeInput"
+                    value={forgetTyped}
+                    placeholder={spool.code}
+                    autoCapitalize="off"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    onInput={(ev) => {
+                      const value = ev.currentTarget.value
+                      setForgetTyped(value)
+                    }}
+                  />
+                  <div className="keepsakeRow">
+                    <button
+                      className="copyBtn forgetBtn"
+                      disabled={forgetTyped.trim() !== spool.code}
+                      onClick={onForget}
+                    >
+                      forget
+                    </button>
+                    <button className="copyBtn" onClick={keepIt}>
+                      keep it
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
         </section>
         <section className="settingsSection">
           <div className="sectionLabel">fine print</div>
           <div className="finePrint">
             anyone with the link can edit or delete anything. no push, no server that knows you. rewind
-            never forgets. "seen" is live-only — nobody learns what you read while they were away.
+            never forgets. "seen" is live-only — nobody learns what you read while they were away. what
+            you put here is kept by everyone in the room, for as long as they keep it. there is no way to
+            remove someone. make a new room and hand the new link only to the people you want. {KEY_TRAVELS}
           </div>
         </section>
       </div>
@@ -262,12 +418,63 @@ export const App = () => {
   }
 
   const [inviteCopied, setInviteCopied] = useState(false)
+  /** the link shown in the feed when no copy path worked (T-176) */
+  const [copyFallback, setCopyFallback] = useState<string | null>(null)
   const invite = () => {
     if (!spool) return
-    void navigator.clipboard.writeText(spool.share()).then(() => {
-      setInviteCopied(true)
-      setTimeout(() => setInviteCopied(false), 1600)
+    const link = spool.share()
+    void copyText(link).then((ok) => {
+      if (ok) {
+        setInviteCopied(true)
+        setTimeout(() => setInviteCopied(false), 4000) // long enough to read where the key goes (T-165)
+      } else {
+        setCopyFallback(link)
+      }
     })
+  }
+
+  // T-164: the way out when someone turns bad — a new spool, handed only to
+  // the people you want. The link is minted here (code + 32 random bytes,
+  // same relay as this room) so the clipboard write happens synchronously
+  // inside the tap — Safari refuses one after an await — and the new page's
+  // ordinary openSpool(link) is what creates the room; no second Spool ever
+  // lives in this page. History does not come along: that's `splice`, parked.
+  const startNewRoom = () => {
+    if (!spool) return
+    const relay = parseSpoolLink(spool.share()).relay ?? DEFAULT_RELAY
+    const link = buildSpoolLink({ code: generateCode(), relay, key: crypto.getRandomValues(new Uint8Array(32)) })
+    const go = (copied: boolean) => {
+      try {
+        sessionStorage.setItem('room-came-from', JSON.stringify({ code: spool.code, copied }))
+      } catch {
+        // no sessionStorage: the arrival notice is a courtesy, not a gate
+      }
+      location.href = link // a fragment change — main.tsx's hashchange reload opens it
+    }
+    void copyText(link).then(go) // synchronous first step, inside the tap (T-176)
+  }
+  // …and the arrival on the other side: one notice, consumed on read so a
+  // reload never repeats it
+  const [cameFrom, setCameFrom] = useState<{ code: string; copied: boolean } | null>(() => {
+    try {
+      const raw = sessionStorage.getItem('room-came-from')
+      if (!raw) return null
+      sessionStorage.removeItem('room-came-from')
+      const parsed = JSON.parse(raw) as { code?: unknown; copied?: unknown }
+      return typeof parsed.code === 'string' ? { code: parsed.code, copied: parsed.copied === true } : null
+    } catch {
+      return null
+    }
+  })
+
+  // T-162: the first hide on this device gets one honest line — a hide is a
+  // soft delete that lands everywhere, but every copy keeps the message and
+  // rewind still shows it (MANIFESTO §2: no delete that doesn't delete)
+  const [hideExplained, setHideExplained] = useState(false)
+  const explainHideOnce = () => {
+    if (localStorage.getItem('room-hide-explained') === '1') return
+    localStorage.setItem('room-hide-explained', '1')
+    setHideExplained(true)
   }
 
   // T-118: the two social gestures — both pure parent mechanics
@@ -325,7 +532,7 @@ export const App = () => {
   const resolveParent = (id: string): ParentRef => {
     const rec = parentIndex.live.get(id)
     if (rec) return { kind: 'ok', seat: seatOf(rec), body: rec.body }
-    return parentIndex.deleted.has(id) ? { kind: 'removed' } : { kind: 'missing' }
+    return parentIndex.deleted.has(id) ? { kind: 'hidden' } : { kind: 'missing' }
   }
 
   const myReactionsOn = (rec: Rec): Set<string> => {
@@ -367,6 +574,10 @@ export const App = () => {
   const [notifState, setNotifState] = useState(() =>
     typeof Notification !== 'undefined' ? Notification.permission : 'unsupported'
   )
+  // T-173: a notification carries the sender's name, not the message —
+  // macOS and Android keep notification history and some of it syncs — unless
+  // this device opted in. Per-device, like mute.
+  const [notifText, setNotifText] = useState(() => localStorage.getItem('room-notif-text') === '1')
   const seenMsgCount = useRef<number | null>(null)
   useEffect(() => {
     const others = entries.filter((e) => e.kind === 'message' && seatOf(e) !== SEAT)
@@ -380,13 +591,15 @@ export const App = () => {
     setUnread((n) => n + fresh)
     const latest = others[others.length - 1]
     if (!muted && notifState === 'granted' && latest) {
-      // tag collapses the pile into one — this is a nudge, not a feed
+      // tag collapses the pile into one — this is a nudge, not a feed. The
+      // body is the name alone unless this device opted into the text (T-173)
+      const name = nameFor(profileTable(entries), seatOf(latest))
       new Notification(roomName || 'a room', {
-        body: `${nameFor(profileTable(entries), seatOf(latest))}: ${latest.body.slice(0, 80)}`,
+        body: notifText ? `${name}: ${latest.body.slice(0, 80)}` : `${name} said something`,
         tag: `room-${spool?.code ?? ''}`,
       })
     }
-  }, [entries, muted, notifState, roomName, spool])
+  }, [entries, muted, notifState, notifText, roomName, spool])
   useEffect(() => {
     const onVisible = () => {
       if (document.visibilityState === 'visible') setUnread(0)
@@ -465,6 +678,51 @@ export const App = () => {
     return () => clearTimeout(t)
   }, [pocket?.phase])
 
+  // T-163: forget. useRoom owns the spool's lifetime and leave() is
+  // idempotent end to end (engine #left guard; history/pocket/store destroys
+  // are re-entrant), so leaving here and letting the page go is safe: a
+  // navigation never unmounts React, and a second leave() would be a no-op
+  // anyway. Order: leave() closes the database (forget rejects while it's
+  // open) → the one hard delete → the room-local key → the bare URL, on the
+  // same relay when it isn't the default. `spool-seat` is never touched.
+  const [forgetState, setForgetState] = useState<
+    { phase: 'idle' } | { phase: 'working' } | { phase: 'failed'; message: string }
+  >({ phase: 'idle' })
+  const forgetRoom = async () => {
+    if (!spool) return
+    const code = spool.code
+    const relay = parseSpoolLink(spool.share()).relay
+    setForgetState({ phase: 'working' })
+    try {
+      await spool.leave()
+      // the closing connection can still trip deleteDatabase's `blocked` for a
+      // beat after close() — retry briefly before calling it another tab's
+      let lastErr: unknown = null
+      for (let attempt = 0; attempt < 6; attempt++) {
+        try {
+          await stash.forget(code)
+          lastErr = null
+          break
+        } catch (err) {
+          lastErr = err
+          await new Promise((r) => setTimeout(r, 250))
+        }
+      }
+      if (lastErr !== null) throw lastErr
+      localStorage.removeItem(`room-seen:${code}`)
+      const bare = location.origin + location.pathname
+      location.replace(relay && relay !== DEFAULT_RELAY ? `${bare}#relay=${encodeURIComponent(relay)}` : bare)
+    } catch (err) {
+      const raw = err instanceof Error ? err.message : String(err)
+      setForgetState({
+        phase: 'failed',
+        message: /still open/.test(raw)
+          ? 'this room is still open in another tab on this device — close it and try again.'
+          : raw,
+      })
+    }
+  }
+
   if (error) {
     return (
       <div className="screen">
@@ -477,6 +735,21 @@ export const App = () => {
     )
   }
   if (!spool) return <div className="screen loading">opening the room…</div>
+  if (forgetState.phase === 'working')
+    return <div className="screen loading">forgetting this room on this device…</div>
+  if (forgetState.phase === 'failed')
+    return (
+      <div className="screen">
+        <div className="errorCard">
+          <h2>couldn't forget this room</h2>
+          <p>{forgetState.message}</p>
+          <p className="caption">nothing was deleted. reopen the room and try again.</p>
+          <button className="copyBtn" onClick={() => location.reload()}>
+            reopen the room
+          </button>
+        </div>
+      </div>
+    )
 
   if (view === 'settings')
     return (
@@ -498,6 +771,14 @@ export const App = () => {
           // a button, never an ambush — permission is asked only here
           void Notification.requestPermission().then(setNotifState)
         }}
+        notifText={notifText}
+        onToggleNotifText={() => {
+          const next = !notifText
+          localStorage.setItem('room-notif-text', next ? '1' : '0')
+          setNotifText(next)
+        }}
+        onForget={() => void forgetRoom()}
+        onNewRoom={startNewRoom}
         onBack={() => setView('room')}
       />
     )
@@ -589,7 +870,44 @@ export const App = () => {
         readMarkers={readMarkers}
         unreadAfter={unreadAfter}
       />
-      {inviteCopied ? <div className="notice">link copied — hand it to someone you trust</div> : null}
+      {inviteCopied ? (
+        <div className="notice linkCopied">link copied — hand it to someone you trust. {KEY_TRAVELS}</div>
+      ) : null}
+      {copyFallback ? (
+        <div className="noticeRow copyFallback">
+          <div className="notice">
+            copy didn't work here — long-press or select the link to copy it.
+            <span className="linkFull">{copyFallback}</span>
+            {KEY_TRAVELS}
+          </div>
+          <button className="noticeClose" onClick={() => setCopyFallback(null)} aria-label="Dismiss">
+            ✕
+          </button>
+        </div>
+      ) : null}
+      {cameFrom ? (
+        <div className="noticeRow cameFrom">
+          <div className="notice">
+            your old room is still on this device.{' '}
+            {cameFrom.copied
+              ? `the new link is copied — hand it only to the people you want. ${KEY_TRAVELS}`
+              : 'copy the new link from settings → link and hand it only to the people you want.'}
+          </div>
+          <button className="noticeClose" onClick={() => setCameFrom(null)} aria-label="Dismiss">
+            ✕
+          </button>
+        </div>
+      ) : null}
+      {hideExplained ? (
+        <div className="noticeRow hideExplained">
+          <div className="notice">
+            this hides it everywhere, but every copy keeps it and rewind still shows it.
+          </div>
+          <button className="noticeClose" onClick={() => setHideExplained(false)} aria-label="Dismiss">
+            ✕
+          </button>
+        </div>
+      ) : null}
       {!profiles.get(SEAT) && !namePromptDismissed ? (
         <div className="namePrompt">
           <button className="namePromptText" onClick={() => setView('settings')}>
@@ -636,7 +954,7 @@ export const App = () => {
           const isMine = seatOf(sheetFor) === SEAT
           return (
             <ActionSheet
-              preview={`${resolveName(seatOf(sheetFor))} — ${isTombstone ? 'removed' : `${sheetFor.body.slice(0, 48)}${sheetFor.body.length > 48 ? '…' : ''}`}`}
+              preview={`${resolveName(seatOf(sheetFor))} — ${isTombstone ? 'hidden' : `${sheetFor.body.slice(0, 48)}${sheetFor.body.length > 48 ? '…' : ''}`}`}
               myReactions={isTombstone ? undefined : myReactionsOn(sheetFor)}
               onReact={isTombstone ? undefined : (emoji) => toggleReaction(sheetFor.id, emoji)}
               actions={
@@ -667,8 +985,13 @@ export const App = () => {
                               },
                             },
                             {
-                              label: '✕ remove',
-                              run: () => entries.find((e) => e.id === sheetFor.id)?.delete(),
+                              // the label says what the mechanism does: a
+                              // soft hide anyone can restore (T-162)
+                              label: '✕ hide for everyone',
+                              run: () => {
+                                entries.find((e) => e.id === sheetFor.id)?.delete()
+                                explainHideOnce()
+                              },
                             },
                           ]
                         : []),

@@ -115,6 +115,23 @@ body {
 .deckBtn:active:not(:disabled) { transform: translateY(1px); box-shadow: none; }
 .deckBtn:disabled { opacity: 0.45; cursor: default; }
 
+/* the whole link, in place, when no copy path worked (T-176) */
+.copyFallback {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  color: var(--ink-soft);
+  text-align: center;
+  margin: -0.5rem 0 1rem;
+}
+.copyFallback .linkFull {
+  display: block;
+  margin-top: 0.3rem;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+  -webkit-user-select: all;
+  user-select: all;
+}
+
 .warn {
   font-family: var(--mono);
   font-size: 0.75rem;

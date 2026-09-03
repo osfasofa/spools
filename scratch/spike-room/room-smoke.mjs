@@ -18,6 +18,9 @@ import { readFile } from 'node:fs/promises'
 import { randomBytes } from 'node:crypto'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+// the built SDK, for the export round-trip (T-163): importSpool runs in plain
+// Node with persist:false and no relay — the file must open where no browser is
+import { importSpool } from '../../packages/spools/dist/index.js'
 
 const CHROME = process.env.CHROME_BIN ?? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
 const CDP_PORT = 9347
@@ -49,11 +52,14 @@ const serveDist = (port) =>
 // ---------- minimal CDP Tab (verbatim idiom from torture-t021/t104) ----------
 
 class Tab {
-  static async open(url, { width = 375, height = 667, patch } = {}) {
+  static async open(url, { width = 375, height = 667, patch, network = false } = {}) {
     const info = await (await fetch(`http://127.0.0.1:${CDP_PORT}/json/new`, { method: 'PUT' })).json()
     const tab = new Tab()
     tab.id = info.id
     tab.errors = []
+    /** every http(s) request url + every websocket url, when opened with { network: true } (T-166) */
+    tab.requests = []
+    tab.sockets = []
     tab.ws = new WebSocket(info.webSocketDebuggerUrl)
     await new Promise((r) => tab.ws.addEventListener('open', r))
     tab.msgId = 0
@@ -67,10 +73,15 @@ class Tab {
         tab.errors.push(msg.params.exceptionDetails?.exception?.description ?? 'exception')
       } else if (msg.method === 'Runtime.consoleAPICalled' && msg.params.type === 'error') {
         tab.errors.push(msg.params.args.map((a) => a.value ?? a.description ?? '?').join(' '))
+      } else if (msg.method === 'Network.requestWillBeSent') {
+        tab.requests.push(msg.params.request.url)
+      } else if (msg.method === 'Network.webSocketCreated') {
+        tab.sockets.push(msg.params.url)
       }
     })
     await tab.call('Runtime.enable')
     await tab.call('Page.enable')
+    if (network) await tab.call('Network.enable')
     await tab.call('Emulation.setDeviceMetricsOverride', {
       width,
       height,
@@ -319,6 +330,20 @@ await scenario('5. rename on B applies retroactively on cold-opened C, survives 
   )
   if (stale) throw new Error('C still renders bare seat ids for named seats')
 
+  // "renamed by" resolves to a person (T-172): B is unnamed, so C's people
+  // list credits the rename to B's seat suffix — never "anonymous"
+  const bSuffix = `#${(await b.eval(`localStorage.getItem('spool-seat')`)).slice(-4).toLowerCase()}`
+  await c.eval(`document.querySelector('.headerTitle').click()`)
+  await c.until(
+    `(() => {
+      const row = [...document.querySelectorAll('.personRow')].find(r => r.querySelector('.personSeatId').textContent.startsWith('${suffix}'))
+      return row?.querySelector('.personAudit')?.textContent === 'renamed by ${bSuffix}'
+    })()`,
+    10_000,
+    `C's people list says A was renamed by ${bSuffix}`
+  )
+  await c.eval(`document.querySelector('.headerBtn').click()`)
+
   // no name string ever lands inside a message entry (the fosho anti-pattern)
   const clean = await c.eval(`window.spool.entries
     .filter(e => e.kind === 'message')
@@ -335,7 +360,7 @@ await scenario('5. rename on B applies retroactively on cold-opened C, survives 
     10_000,
     'rename survives B reload'
   )
-  return 'renamed via UI on B; retroactive on cold C; message entries clean; survived reload'
+  return `renamed via UI on B; retroactive on cold C; message entries clean; survived reload; audit says "renamed by ${bSuffix}"`
 })
 
 await scenario('6. concurrent renames of the same seat converge newest-wins everywhere', async () => {
@@ -365,10 +390,34 @@ await scenario('6. concurrent renames of the same seat converge newest-wins ever
     10_000,
     'A renders the winning name'
   )
+
+  // T-172, both halves. Those raw winds carried no data.by (the pre-T-172
+  // shape), so the audit falls back to the entry's author — "anonymous"…
+  const bRow = `[...document.querySelectorAll('.personRow')].find(r => r.querySelector('.personSeatId').textContent.startsWith('#${bSeat.slice(-4).toLowerCase()}'))`
+  await a.eval(`document.querySelector('.headerTitle').click()`)
+  await a.until(`${bRow}?.querySelector('.personAudit')?.textContent === 'renamed by anonymous'`, 10_000, 'old-shape entries fall back to the author')
+  // …and a rename through the UI stamps the renamer's seat: A (named "zora"
+  // by B in scenario 5) renames B, and C's people list credits zora
+  await a.eval(`(() => {
+    const input = ${bRow}.querySelector('.personName')
+    input.focus()
+    ;(${SET_INPUT})(input, 'zed')
+    input.blur()
+  })()`)
+  await a.eval(`document.querySelector('.headerBtn').click()`)
+  await c.eval(`document.querySelector('.headerTitle').click()`)
+  await c.until(`${bRow}?.querySelector('.personAudit')?.textContent === 'renamed by zora'`, 10_000, 'C sees "renamed by zora"')
+  const stampedBy = await c.eval(`(() => {
+    const profs = window.spool.entries.filter(e => e.kind === 'room:profile' && e.data?.seat === '${bSeat}')
+    return profs[profs.length - 1].data.by
+  })()`)
+  const aSeatNow = await a.eval(`localStorage.getItem('spool-seat')`)
+  if (stampedBy !== aSeatNow) throw new Error(`data.by is ${stampedBy}, expected A's seat`)
+  await c.eval(`document.querySelector('.headerBtn').click()`)
   if (a.errors.length || b.errors.length || c.errors.length) {
     throw new Error(`page errors: ${[...a.errors, ...b.errors, ...c.errors].join(' | ')}`)
   }
-  return `all three devices agree on "${names[0]}" (newest-wins), DOM matches, 0 page errors`
+  return `all three devices agree on "${names[0]}" (newest-wins), DOM matches; old-shape audit → "anonymous", UI rename → "renamed by zora" on C; 0 page errors`
 })
 
 // ---------- T-118: reactions + replies ----------
@@ -454,12 +503,12 @@ await scenario('10. replies: quote, jump, and orphan stubs', async () => {
   // tap-to-jump exists and doesn't throw (structural lookup, small feed)
   await a.eval(`${bubbleSel('replying to the first thing')}.querySelector('.replyQuote').click()`)
 
-  // orphan 1: parent soft-deleted → quote degrades to "removed"
+  // orphan 1: parent hidden (soft-deleted) → quote degrades to "hidden"
   await a.eval(`window.spool.entries.find((e) => e.kind === 'message' && e.body === 'hello from A').delete()`)
   await b.until(
-    `(() => { const bub = ${bubbleSel('replying to the first thing')}; return bub?.querySelector('.replyQuote')?.textContent === 'removed' })()`,
+    `(() => { const bub = ${bubbleSel('replying to the first thing')}; return bub?.querySelector('.replyQuote')?.textContent === 'hidden' })()`,
     10_000,
-    'deleted parent renders the removed stub'
+    'hidden parent renders the hidden stub'
   )
   // orphan 2: parent that never synced → "not synced yet"
   await b.eval(`window.spool.wind({ kind: 'message', body: 'reply into the void', data: { seat: localStorage.getItem('spool-seat') }, parent: 'never-going-to-exist' })`)
@@ -471,7 +520,7 @@ await scenario('10. replies: quote, jump, and orphan stubs', async () => {
   // restore the deleted message so later scenarios see a stable world
   await a.eval(`window.spool.deleted.find((e) => e.body === 'hello from A')?.restore()`)
   if (a.errors.length || b.errors.length) throw new Error(`page errors: ${[...a.errors, ...b.errors].join(' | ')}`)
-  return 'quote resolves via profiles; jump works; removed + not-synced stubs render; 0 page errors'
+  return 'quote resolves via profiles; jump works; hidden + not-synced stubs render; 0 page errors'
 })
 
 // ---------- T-119: presence ----------
@@ -523,9 +572,9 @@ await scenario('11. presence: dots for everyone, typing transitions, zero doc by
   return `3 dots → typing bubble → idle clear (0 doc bytes moved) → send clears → close dropped in ~${((Date.now() - t0) / 1000).toFixed(1)} s`
 })
 
-// ---------- T-120: edit, delete, the honest contract ----------
+// ---------- T-120: edit, hide (soft delete), the honest contract ----------
 
-await scenario('12. edit-own, tombstones, restore, cross-writer honesty', async () => {
+await scenario('12. edit-own, hide for everyone, restore, cross-writer honesty', async () => {
   // B edits its own message through the sheet: prefilled draft → rewrite
   await b.eval(`${bubbleSel('done thinking')}.click()`)
   await b.until(`[...document.querySelectorAll('.sheetAction')].some(el => el.textContent.includes('edit'))`, 5_000, 'own message offers edit')
@@ -548,11 +597,27 @@ await scenario('12. edit-own, tombstones, restore, cross-writer honesty', async 
     'A sees the edit + marker'
   )
 
-  // B removes a message → tombstone on A, never a silent vanish
+  // B hides a message → tombstone on A, never a silent vanish. The label
+  // says what the mechanism does (T-162): no user-facing string says remove
   await b.eval(`${bubbleSel('reply into the void')}.click()`)
-  await b.until(`[...document.querySelectorAll('.sheetAction')].some(el => el.textContent.includes('remove'))`, 5_000, 'own message offers remove')
-  await b.eval(`[...document.querySelectorAll('.sheetAction')].find(el => el.textContent.includes('remove')).click()`)
+  await b.until(`[...document.querySelectorAll('.sheetAction')].some(el => el.textContent.includes('hide for everyone'))`, 5_000, 'own message offers "hide for everyone"')
+  const removeWord = await b.eval(`[...document.querySelectorAll('.sheetAction')].some(el => /remove/i.test(el.textContent))`)
+  if (removeWord) throw new Error('the action sheet still says "remove" — T-162 says hide')
+  await b.eval(`[...document.querySelectorAll('.sheetAction')].find(el => el.textContent.includes('hide for everyone')).click()`)
   await a.until(`!!document.querySelector('.tombstone')`, 10_000, 'tombstone renders on A')
+  const tombstoneText = await a.eval(`document.querySelector('.tombstone').textContent`)
+  if (tombstoneText !== 'hidden · anyone can restore') throw new Error(`tombstone reads "${tombstoneText}"`)
+  // the first hide on a device explains itself, once (localStorage-gated)
+  await b.until(
+    `document.querySelector('.hideExplained')?.textContent.includes('every copy keeps it and rewind still shows it')`,
+    5_000,
+    'the one-time hide explainer shows on the hiding device'
+  )
+  const explained = await b.eval(`localStorage.getItem('room-hide-explained')`)
+  if (explained !== '1') throw new Error(`room-hide-explained is ${explained}, expected "1"`)
+  await b.eval(`document.querySelector('.noticeClose').click()`)
+  const explainerGone = await b.eval(`!document.querySelector('.hideExplained')`)
+  if (!explainerGone) throw new Error('the hide explainer did not dismiss')
 
   // anyone can restore from the tombstone's sheet (the honest contract cuts both ways)
   await a.eval(`document.querySelector('.tombstone').click()`)
@@ -584,7 +649,7 @@ await scenario('12. edit-own, tombstones, restore, cross-writer honesty', async 
   )
   await a.eval(`document.querySelector('.headerBtn').click()`)
   if (a.errors.length || b.errors.length) throw new Error(`page errors: ${[...a.errors, ...b.errors].join(' | ')}`)
-  return `edit prefilled+marked; tombstone → restore round-trip; cross-writer edit attributed ("${attributed}"); honest sentence present`
+  return `edit prefilled+marked; hide → "hidden · anyone can restore" → restore round-trip; explainer shown once; cross-writer edit attributed ("${attributed}"); honest sentence present`
 })
 
 // ---------- T-121: ephemeral read receipts (the D4 decision) ----------
@@ -806,6 +871,16 @@ await scenario('8. truly empty room: calm verdict, invite affordance, non-blocki
     `!!document.querySelector('.inviteBtn') && document.querySelector('.honestLine').textContent.includes('reads everything')`
   )
   if (!inviteThere) throw new Error('empty room lacks the invite affordance + honest sentence')
+  // the "link copied" toast says where the key goes (T-165) — read it while
+  // the feed is still empty; a hidden message keeps its slot, so the invite
+  // affordance never comes back once something has been said
+  await e.eval(`navigator.clipboard.writeText = () => Promise.resolve()`)
+  await e.eval(`document.querySelector('.inviteBtn').click()`)
+  await e.until(
+    `document.querySelector('.linkCopied')?.textContent.includes('your browser may sync this address to its maker; send the link over something end-to-end encrypted, or in person.')`,
+    5_000,
+    'the link-copied toast carries the key-travels sentence'
+  )
   // the naming prompt is present but never a gate: the composer works right now
   const promptThere = await e.eval(`!!document.querySelector('.namePrompt')`)
   await e.typeAndSend('unnamed and talking anyway')
@@ -819,7 +894,235 @@ await scenario('8. truly empty room: calm verdict, invite affordance, non-blocki
   if (!promptThere || !promptGone) throw new Error(`name prompt present=${promptThere}, dismissed=${promptGone}`)
   if (e.errors.length) throw new Error(`page errors: ${e.errors.join(' | ')}`)
   await e.close()
-  return 'nobody-here → really-empty → invite + honest sentence; naming prompt ignorable and dismissible'
+  return 'nobody-here → really-empty → invite + honest sentence; naming prompt ignorable and dismissible; link-copied toast says where the key goes'
+})
+
+// ---------- T-163: keepsake — export, and the one hard delete ----------
+
+await scenario('16. keepsake: export round-trips through importSpool; forget removes the database and the stash row', async () => {
+  await a.eval(`document.querySelector('.headerTitle').click()`)
+  await a.until(`!!document.querySelector('.settingsBody')`, 5_000, 'settings open')
+  const permanence = await a.eval(
+    `document.querySelector('.finePrint').textContent.includes('kept by everyone in the room, for as long as they keep it')`
+  )
+  if (!permanence) throw new Error('the permanence sentence is missing from the fine print')
+  const keyTravels = await a.eval(`(() => {
+    const s = 'your browser may sync this address to its maker; send the link over something end-to-end encrypted, or in person.'
+    return document.querySelector('.finePrint').textContent.includes(s) && document.querySelector('.keyTravels')?.textContent === s
+  })()`)
+  if (!keyTravels) throw new Error('the key-travels sentence is missing from the fine print or the link caption (T-165)')
+
+  // export: capture the anchor download instead of letting headless Chrome
+  // write a file, then read the blob back inside the page
+  await a.eval(`(() => {
+    window.__download = null
+    HTMLAnchorElement.prototype.click = function () { window.__download = { href: this.href, name: this.download } }
+  })()`)
+  await a.eval(`[...document.querySelectorAll('button')].find(el => el.textContent === 'export this room').click()`)
+  await a.until(`!!window.__download`, 5_000, 'export produced a download')
+  const fileName = await a.eval(`window.__download.name`)
+  if (fileName !== `${code}.spool.json`) throw new Error(`download named "${fileName}"`)
+  const text = await a.eval(`fetch(window.__download.href).then(r => r.text())`)
+  const file = JSON.parse(text)
+  if (file.format !== 'spool-export' || file.code !== code) throw new Error(`bad export header: ${file.format} / ${file.code}`)
+  if (text.includes(keyB64)) throw new Error('the key is in the export file')
+  const live = await a.eval(`({ n: window.spool.entries.length, d: window.spool.deleted.length, msgs: window.spool.entries.filter(e => e.kind === 'message').map(e => e.body).sort() })`)
+  const back = await importSpool(text, { persist: false })
+  const backMsgs = back.entries.filter((e) => e.kind === 'message').map((e) => e.body).sort()
+  const same = back.entries.length === live.n && back.deleted.length === live.d && JSON.stringify(backMsgs) === JSON.stringify(live.msgs)
+  await back.leave()
+  if (!same) throw new Error(`import differs: ${back.entries.length}/${back.deleted.length} vs live ${live.n}/${live.d}`)
+
+  // forget: confirm twice, the second step typed. Nothing happens until the
+  // code matches; the seat survives; the room-local last-seen goes
+  const seatBefore = await a.eval(`localStorage.getItem('spool-seat')`)
+  const seenBefore = await a.eval(`localStorage.getItem('room-seen:${code}')`)
+  if (!seenBefore) throw new Error('precondition: A has no room-seen key to clear')
+  const dbsBefore = await a.eval(`indexedDB.databases().then(l => l.map(d => d.name))`)
+  if (!dbsBefore.includes(code)) throw new Error('precondition: the room database is not there to forget')
+  await a.eval(`[...document.querySelectorAll('button')].find(el => el.textContent === 'forget this room on this device').click()`)
+  await a.until(`document.querySelector('.confirmCard')?.textContent.includes('gone from this device only')`, 5_000, 'first confirmation carries the honest copy')
+  await a.eval(`[...document.querySelectorAll('button')].find(el => el.textContent === 'yes, forget it').click()`)
+  await a.until(`!!document.querySelector('.codeInput')`, 5_000, 'second confirmation asks for the room code')
+  const setCode = (value) => a.eval(`(() => { const input = document.querySelector('.codeInput'); (${SET_INPUT})(input, ${JSON.stringify(value)}) })()`)
+  if (!(await a.eval(`document.querySelector('.forgetBtn').disabled`))) throw new Error('forget enabled before any code was typed')
+  await setCode('wrong-code-000')
+  if (!(await a.eval(`document.querySelector('.forgetBtn').disabled`))) throw new Error('forget enabled on a wrong code')
+  await setCode(code)
+  await a.until(`!document.querySelector('.forgetBtn').disabled`, 2_000, 'the typed code arms the button')
+  await a.eval(`document.querySelector('.forgetBtn').click()`)
+  // the bare URL opens a fresh room on the SAME (local) relay — never the default
+  await a.until(`!!window.spool && window.spool.code !== '${code}' && location.hash.includes('spool=')`, 20_000, 'a fresh room opened on the bare url')
+  const newLink = decodeURIComponent(await a.eval(`window.spool.share()`))
+  if (!newLink.includes(`relay=ws://localhost:${RELAY_PORT}/yjs`)) throw new Error(`the fresh room left the local relay: ${newLink}`)
+  const after = await a.eval(`({
+    seat: localStorage.getItem('spool-seat'),
+    seen: localStorage.getItem('room-seen:${code}'),
+    stash: Object.keys(JSON.parse(localStorage.getItem('spools:stash') ?? '{}')),
+  })`)
+  if (after.seat !== seatBefore) throw new Error('spool-seat changed across forget')
+  if (after.seen !== null) throw new Error('room-seen key survived forget')
+  if (after.stash.includes(code)) throw new Error('stash registry row survived forget')
+  const dbsAfter = await a.eval(`indexedDB.databases().then(l => l.map(d => d.name))`)
+  if (dbsAfter.includes(code)) throw new Error('the room database survived forget')
+  // everyone else keeps their copy: B is untouched, and the old link still
+  // opens on this device — the room comes back from B / the pocket
+  const bCount = await b.eval(`window.spool.entries.filter(e => e.kind === 'message').length`)
+  if (bCount === 0) throw new Error("B's copy vanished")
+  const again = await Tab.open(linkFor(ORIGINS[0]))
+  await again.until(`document.querySelectorAll('.bubble').length > 0`, 20_000, 'the old link reopens from the others')
+  if (again.errors.length || a.errors.length) throw new Error(`page errors: ${[...again.errors, ...a.errors].join(' | ')}`)
+  await again.close()
+  return `export ${fileName} (${text.length} B, key absent) reopened in Node with ${back.entries.length}+${back.deleted.length} entries; forget: db + stash row + room-seen gone, seat kept, fresh room on the local relay, old link reopens`
+})
+
+// ---------- T-164: start a new room ----------
+
+await scenario('17. start a new room: one tap lands in a fresh keyed room with its link copied; the old room still opens', async () => {
+  // B is still in the original room. Headless Chrome has no clipboard to
+  // speak of — record what the app hands it, where the next document can read it
+  await b.eval(`navigator.clipboard.writeText = (t) => { localStorage.setItem('__copied', t); return Promise.resolve() }`)
+  await b.eval(`document.querySelector('.headerTitle').click()`)
+  await b.until(`!!document.querySelector('.settingsBody')`, 5_000, 'settings open')
+  const sentence = await b.eval(
+    `document.querySelector('.finePrint').textContent.includes('there is no way to remove someone. make a new room and hand the new link only to the people you want.')`
+  )
+  if (!sentence) throw new Error('the no-removal sentence is missing from the fine print')
+  await b.eval(`[...document.querySelectorAll('button')].find(el => el.textContent === 'start a new room').click()`)
+  await b.until(`!!window.spool && window.spool.code !== '${code}' && location.hash.includes('spool=')`, 20_000, 'a fresh room opened')
+  const fresh = await b.eval(`({ link: window.spool.share(), copied: localStorage.getItem('__copied'), came: sessionStorage.getItem('room-came-from') })`)
+  await b.eval(`localStorage.removeItem('__copied')`)
+  if (fresh.copied !== fresh.link) throw new Error(`copied "${fresh.copied}" is not the new room's link "${fresh.link}"`)
+  const decoded = decodeURIComponent(fresh.link)
+  if (!decoded.includes(`relay=ws://localhost:${RELAY_PORT}/yjs`)) throw new Error(`the new room left the local relay: ${decoded}`)
+  if (!/[&#]k=[A-Za-z0-9_-]{43}$/.test(fresh.link)) throw new Error(`the new room is not keyed: ${fresh.link}`)
+  if (fresh.came !== null) throw new Error('the arrival flag was not consumed on read')
+  await b.until(`document.querySelector('.cameFrom')?.textContent.includes('your old room is still on this device.')`, 10_000, 'arrival notice shows')
+  const copiedLine = await b.eval(`document.querySelector('.cameFrom').textContent.includes('the new link is copied')`)
+  if (!copiedLine) throw new Error('arrival notice does not say the link was copied')
+  await b.eval(`document.querySelector('.cameFrom .noticeClose').click()`)
+  if (await b.eval(`!!document.querySelector('.cameFrom')`)) throw new Error('arrival notice did not dismiss')
+  // the old room still opens from its old link, on the same device, from its own database
+  const old = await Tab.open(linkFor(ORIGINS[1]))
+  await old.until(`document.querySelectorAll('.bubble').length > 0`, 15_000, 'the old room reopens from its link')
+  if (old.errors.length || b.errors.length) throw new Error(`page errors: ${[...old.errors, ...b.errors].join(' | ')}`)
+  await old.close()
+  return `fresh keyed room ${(await b.eval('window.spool.code'))} on the local relay, link copied verbatim, arrival notice shown + dismissed, old room reopens`
+})
+
+// ---------- T-166: zero third-party requests ----------
+
+await scenario('18. a fresh room load contacts only its own origin and the relay (self-hosted font)', async () => {
+  // a cold open on the third origin with the network panel on: every request
+  // must be the page origin (html, js, css, woff2) or the relay (pocket
+  // http + websocket). STUN is UDP and not a request — T-175's question.
+  const n = await Tab.open(linkFor(ORIGINS[2]), { network: true })
+  await n.ready()
+  await n.until(`document.querySelectorAll('.bubble').length > 0`, 20_000, 'content lands')
+  await sleep(3_000) // let late loads (font faces, pocket, reconnects) show up
+  const pageOrigin = `http://localhost:${ORIGINS[2]}/`
+  const relayHttp = `http://localhost:${RELAY_PORT}/`
+  const relayWs = `ws://localhost:${RELAY_PORT}/`
+  const foreign = [
+    ...n.requests.filter((u) => !u.startsWith(pageOrigin) && !u.startsWith(relayHttp) && !u.startsWith('data:') && !u.startsWith('blob:')),
+    ...n.sockets.filter((u) => !u.startsWith(relayWs)),
+  ]
+  const fonts = n.requests.filter((u) => u.endsWith('.woff2'))
+  const fontOk = fonts.length > 0 && fonts.every((u) => u.startsWith(`${pageOrigin}fonts/JetBrainsMono-`))
+  const google = [...n.requests, ...n.sockets].filter((u) => /googleapis|gstatic/.test(u))
+  await n.close()
+  if (google.length) throw new Error(`google fonts still requested: ${google.join(', ')}`)
+  if (foreign.length) throw new Error(`requests beyond the page origin + relay: ${foreign.join(', ')}`)
+  if (!fontOk) throw new Error(`font faces not loaded from the page origin: ${fonts.join(', ') || '(none requested)'}`)
+  return `${n.requests.length} requests + ${n.sockets.length} sockets, all on the page origin or the relay; ${fonts.length} woff2 from ./fonts`
+})
+
+// ---------- T-173: notification text stays out of the OS ----------
+
+await scenario('19. notifications carry the name, not the text, unless this device opts in', async () => {
+  // a stand-in Notification that records what the app hands the OS, installed
+  // before the app reads Notification.permission; the reader tab opens on
+  // C's origin, the sender on B's, both back in the original room
+  const NOTIF_STUB = `
+    window.__notifs = []
+    window.Notification = class {
+      constructor(title, opts) { window.__notifs.push({ title, body: opts?.body ?? '' }) }
+      static get permission() { return 'granted' }
+      static requestPermission() { return Promise.resolve('granted') }
+    }
+  `
+  const reader = await Tab.open(linkFor(ORIGINS[2]), { patch: NOTIF_STUB })
+  await reader.ready()
+  await reader.until(`document.querySelectorAll('.bubble').length > 0`, 20_000, 'reader has the room')
+  const sender = await Tab.open(linkFor(ORIGINS[1]))
+  await sender.ready()
+  await sender.until(`document.querySelectorAll('.bubble').length > 0`, 20_000, 'sender has the room')
+  await sender.call('Page.bringToFront')
+  await sleep(500)
+  await reader.eval(`window.__notifs = []`)
+  await sender.typeAndSend('the secret ingredient is love')
+  await reader.until(`window.__notifs.length > 0`, 10_000, 'a notification fires for the hidden reader')
+  const first = await reader.eval(`window.__notifs[window.__notifs.length - 1]`)
+  if (!/ said something$/.test(first.body)) throw new Error(`default body is "${first.body}", expected "<name> said something"`)
+  if (/secret|love/.test(first.body) || /secret|love/.test(first.title)) throw new Error(`message text leaked into the notification: ${JSON.stringify(first)}`)
+
+  // opt in, per device: the toggle in settings, then the same message shape carries the text
+  await reader.call('Page.bringToFront')
+  await sleep(300)
+  await reader.eval(`document.querySelector('.headerTitle').click()`)
+  await reader.until(`!!document.querySelector('.notifTextToggle')`, 5_000, 'toggle in settings')
+  const caption = await reader.eval(`document.querySelector('.settingsBody').textContent.includes('notifications go through your OS and may be kept in its history.')`)
+  if (!caption) throw new Error('the OS-history caption is missing')
+  await reader.eval(`document.querySelector('.notifTextToggle').click()`)
+  const stored = await reader.eval(`localStorage.getItem('room-notif-text')`)
+  if (stored !== '1') throw new Error(`room-notif-text is ${stored}`)
+  await reader.eval(`document.querySelector('.headerBtn').click()`)
+  await sender.call('Page.bringToFront')
+  await sleep(500)
+  await reader.eval(`window.__notifs = []`)
+  await sender.typeAndSend('the second secret is butter')
+  await reader.until(`window.__notifs.length > 0`, 10_000, 'a notification fires after opting in')
+  const second = await reader.eval(`window.__notifs[window.__notifs.length - 1]`)
+  if (!second.body.includes('the second secret is butter')) throw new Error(`opted-in body is "${second.body}"`)
+  if (reader.errors.length || sender.errors.length) throw new Error(`page errors: ${[...reader.errors, ...sender.errors].join(' | ')}`)
+  await sender.close()
+  await reader.close()
+  return `default body "${first.body}" (no text); after opting in: "${second.body}"`
+})
+
+// ---------- T-176: copy without the Clipboard API ----------
+
+await scenario('20. copy without the Clipboard API: execCommand fallback, then the long-press hint', async () => {
+  // plain http on a LAN is not a secure context: navigator.clipboard is
+  // simply absent. Stand in for that, and for execCommand's verdict
+  const NO_CLIPBOARD = `
+    Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true })
+    window.__exec = []
+    document.execCommand = (cmd) => { window.__exec.push(cmd); return window.__execOk !== false }
+  `
+  const t = await Tab.open(linkFor(ORIGINS[2]), { patch: NO_CLIPBOARD })
+  await t.ready()
+  await t.eval(`document.querySelector('.headerTitle').click()`)
+  await t.until(`!!document.querySelector('.settingsBody')`, 5_000, 'settings open')
+  const copyBtn = `[...document.querySelectorAll('.copyBtn')].find(el => el.textContent === 'copy')`
+  await t.eval(`${copyBtn}.click()`)
+  await t.until(`[...document.querySelectorAll('.copyBtn')].some(el => el.textContent === 'copied ✓')`, 5_000, 'the execCommand path reports copied')
+  const execs = await t.eval(`window.__exec`)
+  if (!execs.includes('copy')) throw new Error(`execCommand('copy') was not used: ${JSON.stringify(execs)}`)
+  const focusBack = await t.eval(`document.activeElement === ${copyBtn} || document.activeElement === document.body`)
+  if (!focusBack) throw new Error('the off-screen textarea kept focus')
+  // nothing works at all: the whole link is shown, pre-selected, with the hint
+  await t.eval(`window.__execOk = false`)
+  await sleep(1_700) // "copied ✓" reverts to "copy"
+  await t.eval(`${copyBtn}.click()`)
+  await t.until(`document.querySelector('.settingsBody').textContent.includes('long-press or select the link to copy it')`, 5_000, 'the hint shows')
+  const shown = await t.eval(`document.querySelector('.linkFull')?.textContent === window.spool.share()`)
+  if (!shown) throw new Error('the full link is not shown for a manual copy')
+  const selected = await t.eval(`getSelection().toString() === window.spool.share()`)
+  if (!selected) throw new Error('the shown link is not pre-selected')
+  if (t.errors.length) throw new Error(`page errors: ${t.errors.join(' | ')}`)
+  await t.close()
+  return 'no navigator.clipboard → execCommand("copy") → "copied ✓"; execCommand false → full link shown + selected + hint; 0 page errors'
 })
 
 await a?.close()

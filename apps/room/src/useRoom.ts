@@ -41,9 +41,14 @@ export const useRoom = (author: string): RoomState => {
     const open = async () => {
       try {
         const handed = location.hash.includes('spool=')
+        // a bare URL may still name a relay (`#relay=…`, no `spool=`): forget
+        // (T-163) and start-a-new-room (T-164) land here from a room on a
+        // self-hosted relay, and staying on it is what its people expect —
+        // the canonical relay is only ever the default, never a redirect
+        const relay = new URLSearchParams(location.hash.slice(1)).get('relay')
         const spool = handed
           ? await openSpool(location.href, { author })
-          : await newSpool({ author })
+          : await newSpool({ author, ...(relay && /^wss?:\/\//.test(relay) ? { relay } : {}) })
         if (!alive) {
           void spool.leave() // strict-mode double-mount or fast unmount
           return

@@ -166,18 +166,18 @@ Drafted 3 Sep 2026 from the ship review — design record: [docs/M15-ship-review
 |---|---|---|---|
 | [T-160](T-160-relay-hostname.md) | Own the relay hostname (`relay.spools.lol`) — **owner at keyboard** | — | todo |
 | [T-161](T-161-proxy-aware-rate-limit.md) | Proxy-aware rate limit: the per-IP bucket is global behind Railway | — | doing |
-| [T-162](T-162-hide-not-remove.md) | Hide, not remove — the delete affordance says what it does | — | todo |
-| [T-163](T-163-room-export-forget.md) | Export and forget in the room | — | todo |
-| [T-164](T-164-start-a-new-room.md) | Start a new room — the way out when someone turns bad | — | todo |
-| [T-165](T-165-key-travels.md) | Where the key actually goes: the sentence + the address-bar decision — **sign-off** | — | todo |
-| [T-166](T-166-self-host-font.md) | Self-host the font — zero third-party requests | — | todo |
+| [T-162](T-162-hide-not-remove.md) | Hide, not remove — the delete affordance says what it does | — | done |
+| [T-163](T-163-room-export-forget.md) | Export and forget in the room | — | done |
+| [T-164](T-164-start-a-new-room.md) | Start a new room — the way out when someone turns bad | — | done |
+| [T-165](T-165-key-travels.md) | Where the key actually goes: the sentence + the address-bar decision — **sign-off** | — | doing |
+| [T-166](T-166-self-host-font.md) | Self-host the font — zero third-party requests | — | done |
 | [T-167](T-167-static-hosting.md) | Static hosting: leave Vercel, fix the gh-pages 404 — **sign-off, owner at keyboard** | T-160 | todo |
 | [T-168](T-168-pocket-eviction.md) | Pocket eviction order + namespace creation cap — **sign-off** | T-161 | doing |
 | [T-169](T-169-room-full.md) | Room-full lockout: per-IP room cap; the SDK says "full" | T-161 | doing |
 | [T-170](T-170-relay-backpressure.md) | Backpressure and frame budget on the broadcast path | — | done |
 | [T-171](T-171-security-headers.md) | Security headers on the room | T-166, T-167 | todo |
-| [T-172](T-172-renamed-by.md) | "renamed by" resolves to a person | — | todo |
-| [T-173](T-173-notification-text.md) | Notification text stays out of the OS | — | todo |
+| [T-172](T-172-renamed-by.md) | "renamed by" resolves to a person | — | done |
+| [T-173](T-173-notification-text.md) | Notification text stays out of the OS | — | done |
 | [T-174](T-174-honesty-page.md) | The honesty page + abuse contact | T-143 | todo |
 | [T-175](T-175-stun-honesty.md) | STUN honesty: the WebRTC path asks Google and Twilio — **sign-off** | — | todo |
 | [T-176](T-176-off-grid-readiness.md) | Off-grid readiness: the secure-context landmines | — | doing |

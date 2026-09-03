@@ -36,7 +36,7 @@ export const seatOf = (rec: Rec): string =>
 /** what a reply quote resolves to — structurally by id, never by position (T-116) */
 export type ParentRef =
   | { kind: 'ok'; seat: string; body: string }
-  | { kind: 'removed' }
+  | { kind: 'hidden' }
   | { kind: 'missing' }
 
 /** entries come from peers; a url is untrusted input — http(s) only (T-030) */
@@ -103,7 +103,7 @@ interface Item {
   dayBreak: string | null
   fallback: boolean
   clockAhead: boolean
-  removed: boolean
+  hidden: boolean
 }
 
 export const MessageList = ({
@@ -154,7 +154,7 @@ export const MessageList = ({
   // The window is anchored by START index, not by tail: while the reader is
   // at the bottom it trims to the newest WINDOW_INITIAL; while they're
   // scrolled up it FREEZES, so arrivals only append below and nothing above
-  // the viewport is ever removed (a sliding window shifts the page one row
+  // the viewport is ever taken out (a sliding window shifts the page one row
   // per message — a slow yank).
   const [start, setStart] = useState(0)
   const [pill, setPill] = useState(false)
@@ -243,13 +243,13 @@ export const MessageList = ({
       const next = windowed[i + 1]
       const seat = seatOf(rec)
       const fallback = rec.kind !== 'message'
-      const removed = deletedIds.has(rec.id)
+      const hidden = deletedIds.has(rec.id)
       const sameDay = (x: Rec, y: Rec) => new Date(x.createdAt).toDateString() === new Date(y.createdAt).toDateString()
       const dayBreak = !prev || !sameDay(prev, rec) ? dayLabel(rec.createdAt) : null
       const joins = (other: Rec | undefined) =>
         !!other && other.kind === 'message' && !deletedIds.has(other.id) && seatOf(other) === seat
-      const joinsPrev = i > 0 && !dayBreak && !fallback && !removed && joins(prev)
-      const joinsNext = !fallback && !removed && joins(next) && !!next && sameDay(rec, next)
+      const joinsPrev = i > 0 && !dayBreak && !fallback && !hidden && joins(prev)
+      const joinsNext = !fallback && !hidden && joins(next) && !!next && sameDay(rec, next)
       out.push({
         rec,
         mine: seat === mySeat,
@@ -259,7 +259,7 @@ export const MessageList = ({
         dayBreak,
         fallback,
         clockAhead: rec.createdAt - now > CLOCK_AHEAD_MS,
-        removed,
+        hidden,
       })
     }
     return out
@@ -349,7 +349,7 @@ export const MessageList = ({
   }, [items, typingSeats?.length])
 
   // the newest real message currently rendered — what "seen" can honestly claim
-  const lastMsg = [...items].reverse().find((it) => !it.fallback && !it.removed)
+  const lastMsg = [...items].reverse().find((it) => !it.fallback && !it.hidden)
   const lastMsgId = useRef<string | null>(null)
   lastMsgId.current = lastMsg?.rec.id ?? null
   const onSeenRef = useRef(onSeen)
@@ -415,7 +415,7 @@ export const MessageList = ({
                 <div className="systemLine">
                   <span className="kindLabel">{it.rec.kind}</span> {it.rec.body || '(no text)'}
                 </div>
-              ) : it.removed ? (
+              ) : it.hidden ? (
                 <div className={`msgRow ${it.mine ? 'mine' : 'them'} ${it.groupStart ? 'groupStart' : ''}`}>
                   {!it.mine ? <div className="tileCol" /> : null}
                   <div className="msgCol">
@@ -423,7 +423,7 @@ export const MessageList = ({
                       className="tombstone"
                       onClick={onBubbleTap ? () => onBubbleTap(it.rec) : undefined}
                     >
-                      removed
+                      hidden · anyone can restore
                     </button>
                   </div>
                 </div>
@@ -456,8 +456,8 @@ export const MessageList = ({
                         >
                           {parentRef.kind === 'ok'
                             ? `${resolveName(parentRef.seat)}: ${parentRef.body.slice(0, 34)}${parentRef.body.length > 34 ? '…' : ''}`
-                            : parentRef.kind === 'removed'
-                              ? 'removed'
+                            : parentRef.kind === 'hidden'
+                              ? 'hidden'
                               : 'not synced yet'}
                         </button>
                       ) : null}
@@ -476,7 +476,7 @@ export const MessageList = ({
                             key={emoji}
                             className={`reactionChip ${seats.has(mySeat) ? 'active' : ''}`}
                             title={[...seats].map(resolveName).join(', ')}
-                            aria-label={`${emoji} — ${[...seats].map(resolveName).join(', ')}${seats.has(mySeat) ? ' (tap to remove yours)' : ' (tap to react too)'}`}
+                            aria-label={`${emoji} — ${[...seats].map(resolveName).join(', ')}${seats.has(mySeat) ? ' (tap to take yours back)' : ' (tap to react too)'}`}
                             onClick={() => onToggleReaction?.(it.rec.id, emoji)}
                           >
                             {emoji}

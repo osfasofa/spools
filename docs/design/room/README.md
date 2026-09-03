@@ -50,7 +50,7 @@ Layout: full-height column — header (hairline bottom) → optional people draw
 - **Reactions**: chips under the bubble, aligned to its side. Chip: emoji + count (10px), padding 2px 8px, radius 4px, bg `--sf`, border 1px `--ln` — accent border when I reacted. Tap toggles mine.
 - **Read receipts**: row of 9px solid seat-color squares (radius 2px), right-aligned under the last message each participant has seen. One marker per participant, never per message.
 - **Edited marker**: " · edited" 9px, 55% opacity, inline after body.
-- **Removed**: bubble keeps its slot; italic 12px 60% opacity "removed".
+- **Hidden** *(T-162 wording note — was "Removed"/"removed")*: bubble keeps its slot; italic 12px 60% opacity "hidden · anyone can restore".
 - **System line**: centered 10.5px `--dim`, e.g. `nadia renamed z44d to "the intern"`.
 - **Day divider**: centered mono 10px `--dim`, letter-spacing .08em, "today".
 - **Typing indicator**: left-side bubble (`--sf`, radius 6/6/6/1) with three 6px bouncing dots (1.1s loop, 0.15s stagger) + 20px seat tile.
@@ -68,7 +68,7 @@ Back header. Sections spaced 24px, each with a mono uppercase label:
 - **fine print** — surface card, 12px/1.6: "anyone with the link can edit or delete anything. no push, no server that knows you. rewind never forgets."
 
 ### 4. Message action sheet
-Bottom sheet over rgba(0,0,0,.55) backdrop (fade 150ms, sheet slides up 180ms). Radius 18px top. Content: dim preview line ("name — snippet"), quick-react row (👍 😆 💀 🔥 ❤️ as 46px tiles, radius 12px, accent border on hover), then Reply / Edit / Remove rows (44px, hairline-separated). No emoji picker — the OS keyboard is the picker; the quick row is just recents.
+Bottom sheet over rgba(0,0,0,.55) backdrop (fade 150ms, sheet slides up 180ms). Radius 18px top. Content: dim preview line ("name — snippet"), quick-react row (👍 😆 💀 🔥 ❤️ as 46px tiles, radius 12px, accent border on hover), then Reply / Edit / Hide rows (44px, hairline-separated; T-162: the hide row reads "✕ hide for everyone", tombstones offer "↺ restore"). No emoji picker — the OS keyboard is the picker; the quick row is just recents.
 
 ### 5. Arrival states
 Full-screen overlay in `--bg`, mono 12.5px lines appearing sequentially (~550ms apart) with a blinking accent block cursor; tap to skip: `checking the pocket…` → `catching up…` → `connected — 2 others here`. Never show a bare empty state that looks like data loss.
@@ -80,7 +80,8 @@ Full-screen overlay in `--bg`, mono 12.5px lines appearing sequentially (~550ms 
 
 ## Interactions & Behavior
 - Tap bubble → action sheet. Reply/Edit prefill the composer banner; Enter or ↑ sends.
-- Edit rewrites the entry **body** (bodies are mutable, metadata write-once) and shows "· edited". Remove = soft delete (`deletedAt`), leaves the "removed" tombstone. Anyone can edit/remove anything — that's the honest contract, stated once in settings, never a surprise dialog.
+- Edit rewrites the entry **body** (bodies are mutable, metadata write-once) and shows "· edited". Hide (T-162; was "Remove") = soft delete (`deletedAt`), leaves the "hidden · anyone can restore" tombstone. Anyone can edit/hide anything — that's the honest contract, stated once in settings, never a surprise dialog.
+- *Wording note (T-162, from the M15 ship review):* no user-facing string says remove/removed. The mechanism is a soft hide anyone can restore from the same sheet, present in every peer's copy and in `rewind()` forever — MANIFESTO §2 forbids a delete that doesn't delete, so the label says what the button does. The first hide on a device adds one line under the feed, once (localStorage `room-hide-explained`): "this hides it everywhere, but every copy keeps it and rewind still shows it."
 - Renames (room or person) are live inputs, no save button; newest-wins at render.
 - Theme pick applies instantly, persists to localStorage.
 - Feed: pin to bottom on open and on new messages. Use a mount/update split so rerenders never eat composer focus (T-030 trap).
@@ -103,4 +104,4 @@ None. No icon font, no images — glyphs are text characters (‹ ⋯ ↑ ✕ �
 - `Spools Room.dc.html` — earlier flush-row/IRC direction, kept for reference only.
 - `ios-frame.jsx`, `support.js` — prototype scaffolding (device frame + runtime), not part of the design.
 
-Prototype demo copy (names, "midnight picnic", message content) is placeholder. UI copy that IS the design: "Message", "removed", "· edited", the arrival lines, the fine-print sentence, the settings captions.
+Prototype demo copy (names, "midnight picnic", message content) is placeholder. UI copy that IS the design: "Message", "hidden · anyone can restore" (T-162; was "removed"), "· edited", the arrival lines, the fine-print sentence, the settings captions.
