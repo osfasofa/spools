@@ -34,3 +34,4 @@ Spool is a protocol + SDK (`spools`) + relay (`spools-relay`) + static reference
 - `packages/spools-relay` — plain ESM JS, no build step, aggressively boring.
 - `apps/client` — pure static files, **no build step** (must work from a USB stick).
 - `docs/` — design notes. `tickets/` — the roadmap. `DESIGN_DOC.md` — source of truth until code earns revisions.
+- `.claude/skills/` — what a session *outside* this repo needs: `spool-vessel` (an app in the lane), `spool-fork` (a fork of purpose beside it). Prose to copy, never code to import.

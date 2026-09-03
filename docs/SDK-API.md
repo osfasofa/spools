@@ -263,3 +263,14 @@ Per-spool instance bundles: `Y.Doc` + `IndexeddbPersistence` (db name = spool co
 - **Pocket ring tag persistence** — pocket.ts's 4-byte tag is per-instance,
   so every reload takes a fresh ring slot (T-124 evidence). A localStorage
   tag beside `spool-author` would pin one slot per device.
+- **`stash.remember(code, link)`** — syrup mirrors `touch()`'s localStorage
+  write by hand (same key, same row shape) because its satchel opens with
+  `persist: false`. A vessel coupled to a private format is the evidence;
+  T-179 is the review.
+- **The `splice` family — fork / retelling / rejoin** — evidence from four
+  sources: the spools-of-spools spike (fork keeps lineage; reunion by a
+  dual-key human), syrup's shipped `/branch` convention and its `/splice`
+  + `/rejoin` ask, lore's brief, and the owner's reel riff (forgetting as
+  cutting a new reel). T-180 is the review; it waits on the riff.
+- *(Not parked, a bug: pocket deposits lost at `leave()` under 429 or
+  unload — T-178.)*
