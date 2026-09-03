@@ -6,3 +6,6 @@ dist/
 
 # per-machine session settings; the skills in .claude/skills are tracked
 .claude/settings.local.json
+
+# session worktrees made by the Claude Code Agent tool
+.claude/worktrees/
