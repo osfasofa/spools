@@ -156,6 +156,43 @@ Kicked off Aug 2026 from the two research riffs ([docs/spools-of-spools.md](../d
 
 **Where it stands, 18 Aug 2026.** Built and run: the riff migrated, its §8 folded into ECOSYSTEM.md as the standing evidence-expected note, and `familiar` is a working repo — charter, desk skeleton, static surface, offline tests, torture round 1 against the canonical relay (two agents racing one task, wake-from-pocket, `kill -9`, the human renaming the agent). Three evidence items filed at stranger's rank in the ticket's notes; **zero SDK asks — the published packages sufficed.** The repo was created by the owner and pushed the same session (`osfasofa/familiar`, private, `main`), which closes the ticket — **and closes the loom's involvement: familiar's work is its own from here, and reaches this repo only as evidence at the gate.**
 
+## M15 — the hardening (ship review)
+
+Drafted 3 Sep 2026 from the ship review — design record: [docs/M15-ship-review.md](../docs/M15-ship-review.md). The review answered "how do we hand this to more people without lying to any of them": keep it public, don't promote it, one room at a time, and close a short list first. Nothing here is protocol-shaping; the **sign-off** items are conventions and canonical-relay defaults, each with trade-offs in its ticket. Two rails: *before the next handful* (T-160…T-166, the 404s in T-167, the UUID fallback in T-176) and *before it goes wider* (the rest, plus T-143 and T-125's hardware pass). **T-160 goes first** — until the relay has a hostname we own, every link handed out pins Railway's.
+
+**Pick up here (any session, no owner needed):** the code-only tickets run in three lanes that don't share files — *SDK* (T-176's UUID fallback, T-178, T-169's SDK half), *relay* (T-161, T-170, T-169's relay half, T-168 without changing canonical defaults), *room* (T-162, T-163, T-164, T-166, T-172, T-173, T-176's clipboard fallback, T-165's sentence). Take the top unblocked `todo` in a lane, set it `doing` here and in the ticket, meet its acceptance criteria, set it `done`. Leave every **sign-off** and **owner at keyboard** row alone; the owner works those from the handoff room.
+
+| Ticket | Title | Depends | Status |
+|---|---|---|---|
+| [T-160](T-160-relay-hostname.md) | Own the relay hostname (`relay.spools.lol`) — **owner at keyboard** | — | todo |
+| [T-161](T-161-proxy-aware-rate-limit.md) | Proxy-aware rate limit: the per-IP bucket is global behind Railway | — | todo |
+| [T-162](T-162-hide-not-remove.md) | Hide, not remove — the delete affordance says what it does | — | todo |
+| [T-163](T-163-room-export-forget.md) | Export and forget in the room | — | todo |
+| [T-164](T-164-start-a-new-room.md) | Start a new room — the way out when someone turns bad | — | todo |
+| [T-165](T-165-key-travels.md) | Where the key actually goes: the sentence + the address-bar decision — **sign-off** | — | todo |
+| [T-166](T-166-self-host-font.md) | Self-host the font — zero third-party requests | — | todo |
+| [T-167](T-167-static-hosting.md) | Static hosting: leave Vercel, fix the gh-pages 404 — **sign-off, owner at keyboard** | T-160 | todo |
+| [T-168](T-168-pocket-eviction.md) | Pocket eviction order + namespace creation cap — **sign-off** | T-161 | todo |
+| [T-169](T-169-room-full.md) | Room-full lockout: per-IP room cap; the SDK says "full" | T-161 | todo |
+| [T-170](T-170-relay-backpressure.md) | Backpressure and frame budget on the broadcast path | — | todo |
+| [T-171](T-171-security-headers.md) | Security headers on the room | T-166, T-167 | todo |
+| [T-172](T-172-renamed-by.md) | "renamed by" resolves to a person | — | todo |
+| [T-173](T-173-notification-text.md) | Notification text stays out of the OS | — | todo |
+| [T-174](T-174-honesty-page.md) | The honesty page + abuse contact | T-143 | todo |
+| [T-175](T-175-stun-honesty.md) | STUN honesty: the WebRTC path asks Google and Twilio — **sign-off** | — | todo |
+| [T-176](T-176-off-grid-readiness.md) | Off-grid readiness: the secure-context landmines | — | todo |
+| [T-177](T-177-link-shape.md) | Link shape: shorter and prettier without lying — **sign-off** | T-160 | todo |
+
+## M16 — the gate (evidence from the vessels)
+
+Opened 3 Sep 2026. Seven repos now consume `spools` from the registry, and two of them had filed SDK evidence in their own notes instead of here — syrup's HANDOFF and familiar/manyhands' evidence #8. ECOSYSTEM's rule 7 says friction flows back as evidence; this rail is that filing. One bug, two gate reviews; the reviews are **sign-off** and the splice one waits on the owner's forgetting riff.
+
+| Ticket | Title | Depends | Status |
+|---|---|---|---|
+| [T-178](T-178-pocket-deposit-loss.md) | Pocket deposits can be lost at leave — syrup + manyhands evidence | T-161 | todo |
+| [T-179](T-179-stash-remember.md) | `stash.remember` — a vessel mirrors the stash's private format — **sign-off** | — | todo |
+| [T-180](T-180-splice-gate.md) | `splice()` — the gate review — **sign-off** | — | todo |
+
 ## Parked (no ticket until evidence demands one)
 
 - Structured `data` field for immutable kinds — T-030 records the verdict.
