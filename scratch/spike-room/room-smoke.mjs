@@ -330,6 +330,20 @@ await scenario('5. rename on B applies retroactively on cold-opened C, survives 
   )
   if (stale) throw new Error('C still renders bare seat ids for named seats')
 
+  // "renamed by" resolves to a person (T-172): B is unnamed, so C's people
+  // list credits the rename to B's seat suffix — never "anonymous"
+  const bSuffix = `#${(await b.eval(`localStorage.getItem('spool-seat')`)).slice(-4).toLowerCase()}`
+  await c.eval(`document.querySelector('.headerTitle').click()`)
+  await c.until(
+    `(() => {
+      const row = [...document.querySelectorAll('.personRow')].find(r => r.querySelector('.personSeatId').textContent.startsWith('${suffix}'))
+      return row?.querySelector('.personAudit')?.textContent === 'renamed by ${bSuffix}'
+    })()`,
+    10_000,
+    `C's people list says A was renamed by ${bSuffix}`
+  )
+  await c.eval(`document.querySelector('.headerBtn').click()`)
+
   // no name string ever lands inside a message entry (the fosho anti-pattern)
   const clean = await c.eval(`window.spool.entries
     .filter(e => e.kind === 'message')
@@ -346,7 +360,7 @@ await scenario('5. rename on B applies retroactively on cold-opened C, survives 
     10_000,
     'rename survives B reload'
   )
-  return 'renamed via UI on B; retroactive on cold C; message entries clean; survived reload'
+  return `renamed via UI on B; retroactive on cold C; message entries clean; survived reload; audit says "renamed by ${bSuffix}"`
 })
 
 await scenario('6. concurrent renames of the same seat converge newest-wins everywhere', async () => {
@@ -376,10 +390,34 @@ await scenario('6. concurrent renames of the same seat converge newest-wins ever
     10_000,
     'A renders the winning name'
   )
+
+  // T-172, both halves. Those raw winds carried no data.by (the pre-T-172
+  // shape), so the audit falls back to the entry's author — "anonymous"…
+  const bRow = `[...document.querySelectorAll('.personRow')].find(r => r.querySelector('.personSeatId').textContent.startsWith('#${bSeat.slice(-4).toLowerCase()}'))`
+  await a.eval(`document.querySelector('.headerTitle').click()`)
+  await a.until(`${bRow}?.querySelector('.personAudit')?.textContent === 'renamed by anonymous'`, 10_000, 'old-shape entries fall back to the author')
+  // …and a rename through the UI stamps the renamer's seat: A (named "zora"
+  // by B in scenario 5) renames B, and C's people list credits zora
+  await a.eval(`(() => {
+    const input = ${bRow}.querySelector('.personName')
+    input.focus()
+    ;(${SET_INPUT})(input, 'zed')
+    input.blur()
+  })()`)
+  await a.eval(`document.querySelector('.headerBtn').click()`)
+  await c.eval(`document.querySelector('.headerTitle').click()`)
+  await c.until(`${bRow}?.querySelector('.personAudit')?.textContent === 'renamed by zora'`, 10_000, 'C sees "renamed by zora"')
+  const stampedBy = await c.eval(`(() => {
+    const profs = window.spool.entries.filter(e => e.kind === 'room:profile' && e.data?.seat === '${bSeat}')
+    return profs[profs.length - 1].data.by
+  })()`)
+  const aSeatNow = await a.eval(`localStorage.getItem('spool-seat')`)
+  if (stampedBy !== aSeatNow) throw new Error(`data.by is ${stampedBy}, expected A's seat`)
+  await c.eval(`document.querySelector('.headerBtn').click()`)
   if (a.errors.length || b.errors.length || c.errors.length) {
     throw new Error(`page errors: ${[...a.errors, ...b.errors, ...c.errors].join(' | ')}`)
   }
-  return `all three devices agree on "${names[0]}" (newest-wins), DOM matches, 0 page errors`
+  return `all three devices agree on "${names[0]}" (newest-wins), DOM matches; old-shape audit → "anonymous", UI rename → "renamed by zora" on C; 0 page errors`
 })
 
 // ---------- T-118: reactions + replies ----------

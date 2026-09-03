@@ -176,7 +176,7 @@ Drafted 3 Sep 2026 from the ship review — design record: [docs/M15-ship-review
 | [T-169](T-169-room-full.md) | Room-full lockout: per-IP room cap; the SDK says "full" | T-161 | todo |
 | [T-170](T-170-relay-backpressure.md) | Backpressure and frame budget on the broadcast path | — | todo |
 | [T-171](T-171-security-headers.md) | Security headers on the room | T-166, T-167 | todo |
-| [T-172](T-172-renamed-by.md) | "renamed by" resolves to a person | — | todo |
+| [T-172](T-172-renamed-by.md) | "renamed by" resolves to a person | — | done |
 | [T-173](T-173-notification-text.md) | Notification text stays out of the OS | — | todo |
 | [T-174](T-174-honesty-page.md) | The honesty page + abuse contact | T-143 | todo |
 | [T-175](T-175-stun-honesty.md) | STUN honesty: the WebRTC path asks Google and Twilio — **sign-off** | — | todo |

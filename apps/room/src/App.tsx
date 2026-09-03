@@ -7,7 +7,7 @@ import { Composer } from './Composer'
 import { MessageList, seatOf, type ParentRef, type Rec } from './MessageList'
 import { normalizeEmoji, rememberEmoji } from './emoji'
 import { mySeat, seatColor, seatSuffix, initialOf } from './seat'
-import { nameFor, participants, profileTable, type Profile } from './profiles'
+import { nameFor, participants, profileTable, renamedByFor, type Profile } from './profiles'
 import { THEMES, applyTheme, currentTheme } from './theme'
 import { usePresence } from './usePresence'
 import { useRoom } from './useRoom'
@@ -39,11 +39,14 @@ const KEY_TRAVELS =
 const PersonRow = ({
   seat,
   profile,
+  renamedBy,
   isMe,
   onRename,
 }: {
   seat: string
   profile: Profile | undefined
+  /** the renamer's current display name (T-172), resolved by the caller from the same table */
+  renamedBy: string | null
   isMe: boolean
   onRename: (name: string) => void
 }) => {
@@ -80,7 +83,7 @@ const PersonRow = ({
           }}
           aria-label={`name for ${seatSuffix(seat)}`}
         />
-        {profile ? <span className="personAudit">renamed by {profile.renamedBy}</span> : null}
+        {renamedBy ? <span className="personAudit">renamed by {renamedBy}</span> : null}
       </div>
       <span className="personSeatId">
         {seatSuffix(seat)}
@@ -220,17 +223,23 @@ const Settings = ({
         </section>
         <section className="settingsSection">
           <div className="sectionLabel">people</div>
-          {seats.map((seat) => (
-            <PersonRow
-              key={seat}
-              seat={seat}
-              profile={profiles.get(seat)}
-              isMe={seat === SEAT}
-              onRename={(name) =>
-                void spool.wind({ kind: 'room:profile', body: name, data: { seat } })
-              }
-            />
-          ))}
+          {seats.map((seat) => {
+            const profile = profiles.get(seat)
+            return (
+              <PersonRow
+                key={seat}
+                seat={seat}
+                profile={profile}
+                renamedBy={profile ? renamedByFor(profiles, profile) : null}
+                isMe={seat === SEAT}
+                onRename={(name) =>
+                  // target seat + the renamer's seat (T-172): the audit trail
+                  // resolves to a person, and follows that person's renames
+                  void spool.wind({ kind: 'room:profile', body: name, data: { seat, by: SEAT } })
+                }
+              />
+            )
+          })}
           <div className="caption">anyone can rename anyone — it applies everywhere</div>
         </section>
         <section className="settingsSection">

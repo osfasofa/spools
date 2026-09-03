@@ -2,10 +2,13 @@ import { seatSuffix } from './seat'
 
 /**
  * The shared profile table (D1/D2): nicknames are `room:profile` entries —
- * body = display name, data.seat = the TARGET seat — resolved newest-wins per
- * seat at render time. Anyone can rename anyone, retroactively, because
- * nothing is ever denormalized into a message (fosho's chat.ts mistake).
- * The entry's own `author` is the free audit trail ("renamed by —").
+ * body = display name, data.seat = the TARGET seat, data.by = the RENAMER's
+ * seat (T-172) — resolved newest-wins per seat at render time. Anyone can
+ * rename anyone, retroactively, because nothing is ever denormalized into a
+ * message (fosho's chat.ts mistake). The audit trail ("renamed by —") is
+ * `by`, resolved through this same table so it follows renames too; the
+ * entry's `author` is the fallback for entries wound before `by` existed
+ * (the room never writes `spool-author`, so that reads "anonymous").
  */
 
 /** what both live Entries and frozen EntrySnapshots look like */
@@ -20,8 +23,10 @@ export interface ProfileRec {
 
 export interface Profile {
   name: string
-  /** the renamer's self-declared author string, straight off the entry */
+  /** the renamer's self-declared author string, straight off the entry — the fallback when `by` is absent */
   renamedBy: string
+  /** the renamer's seat (data.by), when the entry carries one (T-172) */
+  by?: string
   at: number
 }
 
@@ -38,10 +43,20 @@ export const profileTable = (records: readonly ProfileRec[]): Map<string, Profil
     if (typeof target !== 'string' || target === '') continue
     const name = rec.body.trim()
     if (!name) continue
-    table.set(target, { name, renamedBy: rec.author, at: rec.createdAt })
+    const by = rec.data?.by
+    table.set(target, {
+      name,
+      renamedBy: rec.author,
+      ...(typeof by === 'string' && by !== '' ? { by } : {}),
+      at: rec.createdAt,
+    })
   }
   return table
 }
+
+/** who renamed this seat, as a display name: the renamer's seat resolved through the table, else the entry's author */
+export const renamedByFor = (table: Map<string, Profile>, profile: Profile): string =>
+  profile.by ? nameFor(table, profile.by) : profile.renamedBy
 
 /** every seat that has ever written or been named, mine first, then by first appearance */
 export const participants = (records: readonly ProfileRec[], mine: string): string[] => {
