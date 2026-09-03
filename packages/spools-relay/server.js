@@ -42,6 +42,18 @@ const PING_TIMEOUT_MS = 30_000
 // is single-digit MB at most; a room is an intimate-scale rendezvous.
 const MAX_FRAME_BYTES = 8 * 1024 * 1024
 const MAX_CONNS_PER_ROOM = 64
+// Backpressure and a frame budget on the broadcast path (T-170). A peer that
+// stops reading would otherwise buffer in this process without bound, and a
+// code-holder without the key could push 8 MiB junk frames and have each one
+// fanned out ×63. Both are "the relay's own business" (SPEC §3): over either
+// line the connection is closed with 1008 (policy) and a reason — never 1013,
+// which the SDK reads as "room full". 0 disables a guard. The defaults sit
+// well above intimate-scale traffic (one frame per Yjs transaction plus
+// awareness; a full state frame is single-digit MB) — see the README for the
+// one boundary they do touch, a 64-seat room reconnecting in the same second.
+const RELAY_MAX_BUFFERED_BYTES = Number(process.env.RELAY_MAX_BUFFERED_BYTES ?? 16 * 1024 * 1024)
+const RELAY_MAX_FRAMES_PER_SEC = Number(process.env.RELAY_MAX_FRAMES_PER_SEC ?? 60)
+const RELAY_MAX_BYTES_PER_MIN = Number(process.env.RELAY_MAX_BYTES_PER_MIN ?? 32 * 1024 * 1024)
 
 // Pocket knobs (T-101). Memory by default — npx-and-done stays npx-and-done,
 // and a restart degrades to exactly v1 semantics. POCKET_DIR makes deposits
@@ -149,13 +161,42 @@ const onBroadcastConnection = (conn, roomName) => {
   }
   members.add(conn)
   const pingInterval = keepAlive(conn)
+  // per-connection frame budget (T-170): fixed one-second / one-minute windows
+  let frameWindowAt = 0
+  let framesInWindow = 0
+  let byteWindowAt = 0
+  let bytesInWindow = 0
 
   conn.on('message', (data, isBinary) => {
+    if (conn.readyState !== wsReadyStateOpen) return // closed by us — nothing more gets forwarded
+    const now = Date.now()
+    if (now - frameWindowAt >= 1_000) {
+      frameWindowAt = now
+      framesInWindow = 0
+    }
+    if (now - byteWindowAt >= 60_000) {
+      byteWindowAt = now
+      bytesInWindow = 0
+    }
+    framesInWindow += 1
+    bytesInWindow += data.length
+    if (
+      (RELAY_MAX_FRAMES_PER_SEC > 0 && framesInWindow > RELAY_MAX_FRAMES_PER_SEC) ||
+      (RELAY_MAX_BYTES_PER_MIN > 0 && bytesInWindow > RELAY_MAX_BYTES_PER_MIN)
+    ) {
+      conn.close(1008, 'frame budget exceeded')
+      return
+    }
     // the whole job: hand the bytes to everyone else in the room, unread
     for (const peer of members) {
-      if (peer !== conn && peer.readyState === wsReadyStateOpen) {
-        peer.send(data, { binary: isBinary })
+      if (peer === conn || peer.readyState !== wsReadyStateOpen) continue
+      if (RELAY_MAX_BUFFERED_BYTES > 0 && peer.bufferedAmount > RELAY_MAX_BUFFERED_BYTES) {
+        // it stopped reading: stop feeding it. close() leaves OPEN at once,
+        // so from here on the loop skips it and what's queued is the bound.
+        peer.close(1008, 'slow consumer')
+        continue
       }
+      peer.send(data, { binary: isBinary })
     }
   })
 

@@ -5,6 +5,8 @@
 - `TRUST_PROXY` (default off): behind an edge proxy, per-IP limits key on the rightmost `X-Forwarded-For` hop instead of the proxy's own address (T-161). Migration: set `TRUST_PROXY=1` on Railway/Fly deployments, or the pocket's per-IP budget stays one bucket for everyone.
 - The pocket's rate log is pruned on every use, not just at the hourly sweep (T-161).
 - `fly.toml` now sets `TRUST_PROXY=1`.
+- Backpressure on the broadcast path (T-170): a member with more than `RELAY_MAX_BUFFERED_BYTES` (16 MiB) queued for it is skipped and closed with 1008 "slow consumer" instead of buffering without bound.
+- Per-connection frame budget (T-170): over `RELAY_MAX_FRAMES_PER_SEC` (60) or `RELAY_MAX_BYTES_PER_MIN` (32 MiB) → closed with 1008 "frame budget exceeded"; the room keeps going for everyone else. 0 disables any of the three.
 
 ## 0.2.0 — 2026-08-16
 
