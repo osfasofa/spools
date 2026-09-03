@@ -86,7 +86,7 @@ F4.
   like a bad connection" are now half-true: the SDK no longer spins, but
   the room does not yet show the line — those sentences retire with the
   room half, per the ticket's last task.
-- Landed in commit `TBD-T169` (filled in by the wrap-up commit).
+- Landed in commit `b2b751b` (filled in by the wrap-up commit).
 
 ### Remaining — relay lane, room lane, owner
 

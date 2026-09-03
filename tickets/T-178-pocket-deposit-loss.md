@@ -172,7 +172,13 @@ Mechanism verdicts:
 - The ticket depends on T-161 (relay lane); nothing here needed it — the
   SDK's behavior is the same whether the bucket is per-IP or global, only
   how often it trips changes.
-- Landed in commit `TBD-T178` (filled in by the wrap-up commit).
+- One thing to watch: of eleven root-level `pnpm -r test` runs this session
+  (the three packages test concurrently), exactly one showed a single SDK
+  test failing, and the name was not captured; the same tree then passed
+  ten root runs and three package-level runs in a row. Treated as a load
+  flake in one of the real-relay tests (the relay-restart one is the usual
+  suspect), not a regression — but if it recurs, capture the name.
+- Landed in commit `824431d` (filled in by the wrap-up commit).
 
 ### Remaining
 

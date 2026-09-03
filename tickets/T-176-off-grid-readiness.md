@@ -64,7 +64,7 @@ http, as the brief already plans. Review finding F18.
   `apps/client/vendor/spools.js` is a vendored SDK build and still carries
   the bare `crypto.randomUUID()` — run `pnpm client:vendor` (root script) so
   the static client picks the fallback up before it is served over http.
-- Landed in commit `TBD-T176` (hash filled in by the session's wrap-up
+- Landed in commit `03bf0ec` (hash filled in by the session's wrap-up
   commit; it cannot be known from inside the commit itself).
 
 ### Remaining — room lane and owner
