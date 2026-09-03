@@ -2,6 +2,34 @@
    below — everything reads the 8 custom properties + radius scalar that
    theme.ts writes (design README: skins change tokens, never layout). */
 
+/* JetBrains Mono, self-hosted (T-166): the 400/500/700 woff2 faces live in
+   public/fonts beside their OFL licence, so a room page load contacts
+   nothing but its own origin and the link's relay — no fonts.googleapis.com,
+   no fonts.gstatic.com (ECOSYSTEM constitution #6; review finding F9). */
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/JetBrainsMono-Regular.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/JetBrainsMono-Medium.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/JetBrainsMono-Bold.woff2') format('woff2');
+}
+
 :root {
   --sans: -apple-system, system-ui, 'Helvetica Neue', sans-serif;
   --mono: 'JetBrains Mono', ui-monospace, monospace;

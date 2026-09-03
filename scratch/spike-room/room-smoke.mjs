@@ -52,11 +52,14 @@ const serveDist = (port) =>
 // ---------- minimal CDP Tab (verbatim idiom from torture-t021/t104) ----------
 
 class Tab {
-  static async open(url, { width = 375, height = 667, patch } = {}) {
+  static async open(url, { width = 375, height = 667, patch, network = false } = {}) {
     const info = await (await fetch(`http://127.0.0.1:${CDP_PORT}/json/new`, { method: 'PUT' })).json()
     const tab = new Tab()
     tab.id = info.id
     tab.errors = []
+    /** every http(s) request url + every websocket url, when opened with { network: true } (T-166) */
+    tab.requests = []
+    tab.sockets = []
     tab.ws = new WebSocket(info.webSocketDebuggerUrl)
     await new Promise((r) => tab.ws.addEventListener('open', r))
     tab.msgId = 0
@@ -70,10 +73,15 @@ class Tab {
         tab.errors.push(msg.params.exceptionDetails?.exception?.description ?? 'exception')
       } else if (msg.method === 'Runtime.consoleAPICalled' && msg.params.type === 'error') {
         tab.errors.push(msg.params.args.map((a) => a.value ?? a.description ?? '?').join(' '))
+      } else if (msg.method === 'Network.requestWillBeSent') {
+        tab.requests.push(msg.params.request.url)
+      } else if (msg.method === 'Network.webSocketCreated') {
+        tab.sockets.push(msg.params.url)
       }
     })
     await tab.call('Runtime.enable')
     await tab.call('Page.enable')
+    if (network) await tab.call('Network.enable')
     await tab.call('Emulation.setDeviceMetricsOverride', {
       width,
       height,
@@ -962,6 +970,33 @@ await scenario('17. start a new room: one tap lands in a fresh keyed room with i
   if (old.errors.length || b.errors.length) throw new Error(`page errors: ${[...old.errors, ...b.errors].join(' | ')}`)
   await old.close()
   return `fresh keyed room ${(await b.eval('window.spool.code'))} on the local relay, link copied verbatim, arrival notice shown + dismissed, old room reopens`
+})
+
+// ---------- T-166: zero third-party requests ----------
+
+await scenario('18. a fresh room load contacts only its own origin and the relay (self-hosted font)', async () => {
+  // a cold open on the third origin with the network panel on: every request
+  // must be the page origin (html, js, css, woff2) or the relay (pocket
+  // http + websocket). STUN is UDP and not a request — T-175's question.
+  const n = await Tab.open(linkFor(ORIGINS[2]), { network: true })
+  await n.ready()
+  await n.until(`document.querySelectorAll('.bubble').length > 0`, 20_000, 'content lands')
+  await sleep(3_000) // let late loads (font faces, pocket, reconnects) show up
+  const pageOrigin = `http://localhost:${ORIGINS[2]}/`
+  const relayHttp = `http://localhost:${RELAY_PORT}/`
+  const relayWs = `ws://localhost:${RELAY_PORT}/`
+  const foreign = [
+    ...n.requests.filter((u) => !u.startsWith(pageOrigin) && !u.startsWith(relayHttp) && !u.startsWith('data:') && !u.startsWith('blob:')),
+    ...n.sockets.filter((u) => !u.startsWith(relayWs)),
+  ]
+  const fonts = n.requests.filter((u) => u.endsWith('.woff2'))
+  const fontOk = fonts.length > 0 && fonts.every((u) => u.startsWith(`${pageOrigin}fonts/JetBrainsMono-`))
+  const google = [...n.requests, ...n.sockets].filter((u) => /googleapis|gstatic/.test(u))
+  await n.close()
+  if (google.length) throw new Error(`google fonts still requested: ${google.join(', ')}`)
+  if (foreign.length) throw new Error(`requests beyond the page origin + relay: ${foreign.join(', ')}`)
+  if (!fontOk) throw new Error(`font faces not loaded from the page origin: ${fonts.join(', ') || '(none requested)'}`)
+  return `${n.requests.length} requests + ${n.sockets.length} sockets, all on the page origin or the relay; ${fonts.length} woff2 from ./fonts`
 })
 
 await a?.close()

@@ -170,7 +170,7 @@ Drafted 3 Sep 2026 from the ship review — design record: [docs/M15-ship-review
 | [T-163](T-163-room-export-forget.md) | Export and forget in the room | — | done |
 | [T-164](T-164-start-a-new-room.md) | Start a new room — the way out when someone turns bad | — | done |
 | [T-165](T-165-key-travels.md) | Where the key actually goes: the sentence + the address-bar decision — **sign-off** | — | doing |
-| [T-166](T-166-self-host-font.md) | Self-host the font — zero third-party requests | — | todo |
+| [T-166](T-166-self-host-font.md) | Self-host the font — zero third-party requests | — | done |
 | [T-167](T-167-static-hosting.md) | Static hosting: leave Vercel, fix the gh-pages 404 — **sign-off, owner at keyboard** | T-160 | todo |
 | [T-168](T-168-pocket-eviction.md) | Pocket eviction order + namespace creation cap — **sign-off** | T-161 | todo |
 | [T-169](T-169-room-full.md) | Room-full lockout: per-IP room cap; the SDK says "full" | T-161 | todo |
