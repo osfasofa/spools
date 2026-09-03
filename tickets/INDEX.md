@@ -180,7 +180,7 @@ Drafted 3 Sep 2026 from the ship review — design record: [docs/M15-ship-review
 | [T-173](T-173-notification-text.md) | Notification text stays out of the OS | — | todo |
 | [T-174](T-174-honesty-page.md) | The honesty page + abuse contact | T-143 | todo |
 | [T-175](T-175-stun-honesty.md) | STUN honesty: the WebRTC path asks Google and Twilio — **sign-off** | — | todo |
-| [T-176](T-176-off-grid-readiness.md) | Off-grid readiness: the secure-context landmines | — | todo |
+| [T-176](T-176-off-grid-readiness.md) | Off-grid readiness: the secure-context landmines | — | doing |
 | [T-177](T-177-link-shape.md) | Link shape: shorter and prettier without lying — **sign-off** | T-160 | todo |
 
 ## M16 — the gate (evidence from the vessels)
@@ -189,7 +189,7 @@ Opened 3 Sep 2026. Seven repos now consume `spools` from the registry, and two o
 
 | Ticket | Title | Depends | Status |
 |---|---|---|---|
-| [T-178](T-178-pocket-deposit-loss.md) | Pocket deposits can be lost at leave — syrup + manyhands evidence | T-161 | todo |
+| [T-178](T-178-pocket-deposit-loss.md) | Pocket deposits can be lost at leave — syrup + manyhands evidence | T-161 | doing |
 | [T-179](T-179-stash-remember.md) | `stash.remember` — a vessel mirrors the stash's private format — **sign-off** | — | todo |
 | [T-180](T-180-splice-gate.md) | `splice()` — the gate review — **sign-off** | — | todo |
 

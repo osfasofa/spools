@@ -4,13 +4,13 @@
  * pattern history tests use; the relay is the real workspace spools-relay.
  */
 import 'fake-indexeddb/auto'
-import { afterEach, expect, it } from 'vitest'
+import { afterEach, expect, it, vi } from 'vitest'
 import { spawn, type ChildProcess } from 'node:child_process'
 import http from 'node:http'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { newSpool, openSpool, Spool, SpoolEngine, generateCode, buildSpoolLink, parseSpoolLink } from './index'
-import { deriveToken, sealDeposit, _resetPocketCache, type PocketState } from './pocket'
+import { deriveToken, sealDeposit, _resetPocketCache, KEEPALIVE_MAX_BYTES, type PocketState } from './pocket'
 import { generateKey } from './link'
 
 const RELAY_SERVER = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'spools-relay', 'server.js')
@@ -53,6 +53,29 @@ const startRealRelay = async (env: Record<string, string> = {}, port = nextPort+
 const depositCount = async (relayHttp: string, code: string, token: string) => {
   const json = await (await fetch(`${relayHttp}/pocket/${code}/${token}`)).json()
   return (json.deposits ?? []).length as number
+}
+
+/** a stub relay with an empty pocket whose PUTs answer `statuses` in order, the last one repeating (T-178) */
+const startStubRelay = async (statuses: number[]) => {
+  const port = nextPort++
+  const puts: number[] = []
+  const server = http.createServer((req, res) => {
+    if (req.method === 'PUT') {
+      const status = statuses[Math.min(puts.length, statuses.length - 1)]
+      puts.push(status)
+      req.resume()
+      req.on('end', () => {
+        res.writeHead(status, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ format: 'spool-pocket', version: 1, ...(status === 200 ? { stored: true } : { error: 'rate limited' }) }))
+      })
+      return
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json' })
+    res.end(JSON.stringify({ format: 'spool-pocket', version: 1, ttlDays: 60, deposits: [] }))
+  })
+  await new Promise<void>((r) => server.listen(port, '127.0.0.1', r))
+  cleanups.push(() => new Promise<void>((r) => server.close(() => r())))
+  return { ws: `ws://127.0.0.1:${port}/yjs`, puts }
 }
 
 /** a spool with test-speed pocket timing, constructed the way history tests do it */
@@ -221,4 +244,106 @@ it('a deposit the relay refuses as too big degrades loudly to live-only', async 
   expect(state.depositError).toBe('too-big')
   expect(a.entries).toHaveLength(1) // the spool itself is fine — live-only, stated loudly
   expect(await depositCount(relay.http, code, deriveToken(key))).toBe(0)
+})
+
+// ---- T-178: a deposit never fails silently at leave ----
+
+/** deposits debounce beyond the test's life; the flush's retries are fast (tries at +0, +20 ms, +60 ms) */
+const rateLimitedSpool = (relayWs: string, key: Uint8Array, flushRetries = 2) =>
+  new Spool(
+    new SpoolEngine({ code: generateCode(), relay: relayWs, key, persist: false }),
+    relayWs,
+    key,
+    'a',
+    { debounceMs: 10, minGapMs: 10 },
+    { debounceMs: 60_000, minGapMs: 0, flushRetries, flushBackoffMs: 20 }
+  )
+
+it('a 429 on the way out is retried with backoff and lands (T-178)', async () => {
+  const stub = await startStubRelay([429, 429, 200])
+  const a = rateLimitedSpool(stub.ws, generateKey())
+  await settled(a)
+  a.wind({ kind: 'note', body: 'going out under a rate limit' })
+  const t0 = Date.now()
+  await a.leave()
+  expect(stub.puts).toEqual([429, 429, 200]) // three tries, the third admitted
+  expect(Date.now() - t0).toBeGreaterThanOrEqual(60) // 20 ms then 40 ms: backoff, not a hot loop
+  expect(a.pocket?.depositError).toBeUndefined()
+})
+
+it('a 429 that outlasts the bounded retry is named, never swallowed (T-178)', async () => {
+  const stub = await startStubRelay([429])
+  const a = rateLimitedSpool(stub.ws, generateKey())
+  await settled(a)
+  const seen: PocketState[] = []
+  a.on('pocket', (s) => seen.push(s))
+  a.wind({ kind: 'note', body: 'refused three times' })
+  await a.leave() // resolves: a refused deposit is no reason to block leaving
+  expect(stub.puts).toEqual([429, 429, 429])
+  expect(a.pocket?.depositError).toBe('rate-limited') // readable after leave(), the moment an app would ask
+  expect(seen[seen.length - 1]?.depositError).toBe('rate-limited') // and the event carried it before teardown
+})
+
+it("a hidden tab's flush that gives up says 'rate-limited'; the next accepted deposit clears it (T-178)", async () => {
+  const stub = await startStubRelay([429, 200])
+  const listeners: (() => void)[] = []
+  const fakeDocument = {
+    visibilityState: 'visible',
+    addEventListener: (_type: string, cb: () => void) => listeners.push(cb),
+    removeEventListener: () => {},
+  }
+  vi.stubGlobal('document', fakeDocument) // the pocket client wires visibilitychange only when a document exists
+  try {
+    const key = generateKey()
+    const relayWs = stub.ws
+    // no flush retries: the hidden tab's one try meets the 429 and names it;
+    // the scheduler's own re-arm after a 429 then lands the deposit and heals
+    const a = new Spool(
+      new SpoolEngine({ code: generateCode(), relay: relayWs, key, persist: false }),
+      relayWs,
+      key,
+      'a',
+      { debounceMs: 10, minGapMs: 10 },
+      { debounceMs: 100, minGapMs: 0, flushRetries: 0 }
+    )
+    await settled(a)
+    const seen: (string | undefined)[] = []
+    a.on('pocket', (s) => seen.push(s.depositError))
+    a.wind({ kind: 'note', body: 'tab going dark' })
+    fakeDocument.visibilityState = 'hidden'
+    for (const cb of listeners) cb() // visibilitychange → the best-effort flush
+    expect(await until(() => stub.puts.length === 2 && a.pocket?.depositError === undefined)).toBe(true)
+    expect(stub.puts).toEqual([429, 200])
+    expect(seen).toEqual(['rate-limited', undefined]) // named, then healed — both said out loud
+    await a.leave()
+  } finally {
+    vi.unstubAllGlobals()
+  }
+})
+
+it('small deposits ride keepalive so a closing tab cannot cancel them; past 64 KiB sealed they cannot (T-178)', async () => {
+  const relay = await startRealRelay()
+  const code = generateCode()
+  const key = generateKey()
+  const seen: { bytes: number; keepalive: unknown }[] = []
+  const realFetch = globalThis.fetch
+  const spy = vi.spyOn(globalThis, 'fetch').mockImplementation((input, init) => {
+    if (init?.method === 'PUT') seen.push({ bytes: (init.body as Uint8Array).byteLength, keepalive: init.keepalive })
+    return realFetch(input, init)
+  })
+  try {
+    const a = track(tunedSpool(code, relay.ws, key))
+    await settled(a)
+    a.wind({ kind: 'note', body: 'small' })
+    expect(await until(() => seen.length === 1)).toBe(true)
+    a.wind({ kind: 'note', body: 'x'.repeat(70_000) }) // sealed, this no longer fits the keepalive budget
+    expect(await until(() => seen.length === 2)).toBe(true)
+    expect(seen[0].bytes).toBeLessThanOrEqual(KEEPALIVE_MAX_BYTES)
+    expect(seen[0].keepalive).toBe(true)
+    expect(seen[1].bytes).toBeGreaterThan(KEEPALIVE_MAX_BYTES)
+    expect(seen[1].keepalive).toBeUndefined()
+    expect(await depositCount(relay.http, code, deriveToken(key))).toBe(1) // one tag, newest wins: both were admitted
+  } finally {
+    spy.mockRestore()
+  }
 })

@@ -14851,6 +14851,7 @@ ${err.toString()}`);
     EncryptedIndexeddbPersistence: () => EncryptedIndexeddbPersistence,
     Entry: () => Entry,
     POCKET_VERSION: () => POCKET_VERSION,
+    ROOM_FULL_CLOSE_CODE: () => ROOM_FULL_CLOSE_CODE,
     Spool: () => Spool,
     SpoolEngine: () => SpoolEngine,
     SpoolExportError: () => SpoolExportError,
@@ -15888,9 +15889,10 @@ ${reason}`);
   };
 
   // src/engine.ts
+  var ROOM_FULL_CLOSE_CODE = 1013;
   var inBrowser = typeof indexedDB !== "undefined";
   var hasWebRTC = typeof RTCPeerConnection !== "undefined";
-  var _idb, _websocket, _webrtc, _webrtcPending, _wsStatus, _rtcConnected, _status, _statusListeners, _undecryptable, _undecryptableListeners, _left, _SpoolEngine_instances, countUndecryptable_fn, deriveStatus_fn;
+  var _idb, _websocket, _webrtc, _webrtcPending, _wsStatus, _rtcConnected, _status, _statusListeners, _undecryptable, _undecryptableListeners, _roomFull, _fullListeners, _fullTimer, _roomFullBackoffMs, _left, _SpoolEngine_instances, countUndecryptable_fn, deriveStatus_fn;
   var SpoolEngine = class {
     constructor(opts) {
       __privateAdd(this, _SpoolEngine_instances);
@@ -15907,8 +15909,13 @@ ${reason}`);
       __privateAdd(this, _statusListeners, /* @__PURE__ */ new Set());
       __privateAdd(this, _undecryptable, 0);
       __privateAdd(this, _undecryptableListeners, /* @__PURE__ */ new Set());
+      __privateAdd(this, _roomFull, false);
+      __privateAdd(this, _fullListeners, /* @__PURE__ */ new Set());
+      __privateAdd(this, _fullTimer, null);
+      __privateAdd(this, _roomFullBackoffMs);
       __privateAdd(this, _left, false);
       this.code = opts.code;
+      __privateSet(this, _roomFullBackoffMs, opts.roomFullBackoffMs ?? 3e4);
       this.doc = new Doc({ gc: false });
       const persist = opts.persist ?? inBrowser;
       if (persist) {
@@ -15924,11 +15931,26 @@ ${reason}`);
         __privateSet(this, _websocket, new WebsocketProvider(opts.relay, opts.code, this.doc, {
           resyncInterval: opts.resyncIntervalMs ?? 2e4,
           disableBc: opts.disableBc ?? false,
+          // 1013 is the relay saying "room full". y-websocket's default would
+          // reconnect at once and forever — the endless spinner of T-169 — so
+          // treat it as terminal for one backoff, then resume below. The
+          // 4400–4499 rule is the provider's own default, kept as is.
+          shouldReconnect: (event) => event.code !== ROOM_FULL_CLOSE_CODE && !(event.code >= 4400 && event.code < 4500),
           ...Transport ? { WebSocketPolyfill: Transport } : {}
         }));
         __privateGet(this, _websocket).on("status", ({ status }) => {
           __privateSet(this, _wsStatus, status === "connected" ? "connected" : status === "connecting" ? "connecting" : "disconnected");
+          if (status === "connected") __privateSet(this, _roomFull, false);
           __privateMethod(this, _SpoolEngine_instances, deriveStatus_fn).call(this);
+        });
+        __privateGet(this, _websocket).on("closed", ({ code, reason }) => {
+          if (code !== ROOM_FULL_CLOSE_CODE || __privateGet(this, _left)) return;
+          __privateSet(this, _roomFull, true);
+          for (const cb of __privateGet(this, _fullListeners)) cb(reason);
+          __privateSet(this, _fullTimer, setTimeout(() => {
+            __privateSet(this, _fullTimer, null);
+            if (!__privateGet(this, _left)) __privateGet(this, _websocket)?.connect();
+          }, __privateGet(this, _roomFullBackoffMs)));
         });
       }
       const webrtc = opts.webrtc ?? hasWebRTC;
@@ -15969,6 +15991,19 @@ ${reason}`);
       return () => __privateGet(this, _undecryptableListeners).delete(cb);
     }
     /**
+     * The relay refused the last connection with 1013 "room full" (T-169).
+     * The SDK stands back (~30 s) between attempts instead of spinning;
+     * status reads 'offline' meanwhile. Clears when a connection is accepted.
+     */
+    get roomFull() {
+      return __privateGet(this, _roomFull);
+    }
+    /** fires with the close reason on every refused attempt */
+    onFull(cb) {
+      __privateGet(this, _fullListeners).add(cb);
+      return () => __privateGet(this, _fullListeners).delete(cb);
+    }
+    /**
      * Disconnect and release resources. Local IndexedDB data is retained — a
      * spool is a keepsake. Teardown order per fosho disconnectFromNote:
      * webrtc → websocket → idb → doc.
@@ -15976,6 +16011,8 @@ ${reason}`);
     async leave() {
       if (__privateGet(this, _left)) return;
       __privateSet(this, _left, true);
+      if (__privateGet(this, _fullTimer)) clearTimeout(__privateGet(this, _fullTimer));
+      __privateSet(this, _fullTimer, null);
       await __privateGet(this, _webrtcPending);
       __privateGet(this, _webrtc)?.destroy();
       __privateGet(this, _websocket)?.destroy();
@@ -15983,6 +16020,7 @@ ${reason}`);
       this.doc.destroy();
       __privateGet(this, _statusListeners).clear();
       __privateGet(this, _undecryptableListeners).clear();
+      __privateGet(this, _fullListeners).clear();
       if (__privateGet(this, _status) !== "offline") {
         __privateSet(this, _status, "offline");
       }
@@ -15998,6 +16036,10 @@ ${reason}`);
   _statusListeners = new WeakMap();
   _undecryptable = new WeakMap();
   _undecryptableListeners = new WeakMap();
+  _roomFull = new WeakMap();
+  _fullListeners = new WeakMap();
+  _fullTimer = new WeakMap();
+  _roomFullBackoffMs = new WeakMap();
   _left = new WeakMap();
   _SpoolEngine_instances = new WeakSet();
   countUndecryptable_fn = function() {
@@ -16016,6 +16058,14 @@ ${reason}`);
   init_yjs();
   var ENTRIES = "entries";
   var bodyKey = (id2) => `entry:${id2}`;
+  var uuid = () => {
+    if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
+    const b = crypto.getRandomValues(new Uint8Array(16));
+    b[6] = b[6] & 15 | 64;
+    b[8] = b[8] & 63 | 128;
+    const hex = Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+  };
   var byCreation = (a, b) => a.createdAt - b.createdAt || (a.id < b.id ? -1 : 1);
   var _store, _Entry_instances, meta_fn;
   var Entry = class {
@@ -16154,7 +16204,7 @@ ${reason}`);
       if (typeof input.kind !== "string" || input.kind === "") {
         throw new Error("wind() needs a non-empty kind");
       }
-      const id2 = crypto.randomUUID();
+      const id2 = uuid();
       this.doc.transact(() => {
         const meta = new YMap();
         meta.set("id", id2);
@@ -16505,6 +16555,9 @@ ${reason}`);
   var HEADER_LEN = 7;
   var TOKEN_DOMAIN = "spool-pocket-v1";
   var POCKET_TX_ORIGIN = "spool-pocket";
+  var KEEPALIVE_MAX_BYTES = 64 * 1024;
+  var sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  var withoutError = ({ depositError: _cleared, ...rest }) => rest;
   var deriveToken = (key) => {
     const domain = new TextEncoder().encode(TOKEN_DOMAIN);
     const input = new Uint8Array(domain.length + key.length);
@@ -16539,7 +16592,7 @@ ${reason}`);
   };
   var isPocketEnvelope = (json) => typeof json === "object" && json !== null && json.format === "spool-pocket" && typeof json.version === "number";
   var unavailableOrigins = /* @__PURE__ */ new Set();
-  var _origin, _code, _key2, _doc2, _whenReady, _state, _listeners2, _abort, _destroyed3, _fetched, _tag, _debounceMs2, _minGapMs2, _armed3, _dirty, _timer2, _lastDepositAt, _inflight, _onVisibility, _PocketClient_instances, set_fn, isAheadOf_fn, docHasState_fn, _onTransaction3, schedule_fn2, deposit_fn;
+  var _origin, _code, _key2, _doc2, _whenReady, _state, _listeners2, _abort, _destroyed3, _fetched, _tag, _debounceMs2, _minGapMs2, _flushRetries, _flushBackoffMs, _armed3, _dirty, _rateLimited, _timer2, _lastDepositAt, _inflight, _flushing, _onVisibility, _PocketClient_instances, set_fn, isAheadOf_fn, docHasState_fn, _onTransaction3, schedule_fn2, stopped_fn, deposit_fn, put_fn, flushNow_fn;
   var PocketClient = class {
     constructor(opts) {
       __privateAdd(this, _PocketClient_instances);
@@ -16560,11 +16613,16 @@ ${reason}`);
       __privateAdd(this, _tag, crypto.getRandomValues(new Uint8Array(4)));
       __privateAdd(this, _debounceMs2);
       __privateAdd(this, _minGapMs2);
+      __privateAdd(this, _flushRetries);
+      __privateAdd(this, _flushBackoffMs);
       __privateAdd(this, _armed3, false);
       __privateAdd(this, _dirty, false);
+      /** the last PUT was answered 429 — what flush()'s bounded retry reads */
+      __privateAdd(this, _rateLimited, false);
       __privateAdd(this, _timer2, null);
       __privateAdd(this, _lastDepositAt, 0);
       __privateAdd(this, _inflight, null);
+      __privateAdd(this, _flushing, null);
       __privateAdd(this, _onVisibility, null);
       __privateAdd(this, _onTransaction3, (tr) => {
         if (!__privateGet(this, _armed3) || __privateGet(this, _destroyed3) || !tr.local) return;
@@ -16579,6 +16637,8 @@ ${reason}`);
       this.token = deriveToken(opts.key);
       __privateSet(this, _debounceMs2, opts.tuning?.debounceMs ?? 1e4);
       __privateSet(this, _minGapMs2, opts.tuning?.minGapMs ?? 6e4);
+      __privateSet(this, _flushRetries, opts.tuning?.flushRetries ?? 2);
+      __privateSet(this, _flushBackoffMs, opts.tuning?.flushBackoffMs ?? 1e3);
       __privateGet(this, _doc2).on("afterTransaction", __privateGet(this, _onTransaction3));
       if (typeof document !== "undefined") {
         __privateSet(this, _onVisibility, () => {
@@ -16666,15 +16726,17 @@ ${reason}`);
      * Capture pending changes right now instead of waiting out the debounce —
      * leave()'s last act before teardown, and the visibilitychange fallback.
      * Resolves once the PUT settles (or fails; failure is not a reason to
-     * block leaving — the doc stays safe locally either way).
+     * block leaving — the doc stays safe locally either way). A 429 on the
+     * way out is retried inside a bounded wait and then NAMED — never
+     * swallowed: that was the syrup/manyhands loss (T-178).
      */
-    async flush() {
-      if (__privateGet(this, _timer2)) {
-        clearTimeout(__privateGet(this, _timer2));
-        __privateSet(this, _timer2, null);
+    flush() {
+      if (!__privateGet(this, _flushing)) {
+        __privateSet(this, _flushing, __privateMethod(this, _PocketClient_instances, flushNow_fn).call(this).finally(() => {
+          __privateSet(this, _flushing, null);
+        }));
       }
-      if (__privateGet(this, _inflight)) await __privateGet(this, _inflight);
-      if (__privateGet(this, _dirty) && __privateGet(this, _armed3)) await __privateMethod(this, _PocketClient_instances, deposit_fn).call(this);
+      return __privateGet(this, _flushing);
     }
     destroy() {
       __privateSet(this, _destroyed3, true);
@@ -16699,11 +16761,15 @@ ${reason}`);
   _tag = new WeakMap();
   _debounceMs2 = new WeakMap();
   _minGapMs2 = new WeakMap();
+  _flushRetries = new WeakMap();
+  _flushBackoffMs = new WeakMap();
   _armed3 = new WeakMap();
   _dirty = new WeakMap();
+  _rateLimited = new WeakMap();
   _timer2 = new WeakMap();
   _lastDepositAt = new WeakMap();
   _inflight = new WeakMap();
+  _flushing = new WeakMap();
   _onVisibility = new WeakMap();
   _PocketClient_instances = new WeakSet();
   set_fn = function(state) {
@@ -16736,31 +16802,61 @@ ${reason}`);
       void __privateMethod(this, _PocketClient_instances, deposit_fn).call(this);
     }, wait));
   };
+  /** the hard limits stop depositing for good; 'rate-limited' is transient and does not */
+  stopped_fn = function() {
+    const e = __privateGet(this, _state).depositError;
+    return e === "too-big" || e === "budget";
+  };
   deposit_fn = async function() {
     if (__privateGet(this, _inflight)) return __privateGet(this, _inflight);
-    if (__privateGet(this, _destroyed3) || !__privateGet(this, _dirty) || !__privateGet(this, _origin) || __privateGet(this, _state).depositError) return;
-    __privateSet(this, _inflight, (async () => {
-      const blob = sealDeposit(encodeStateAsUpdate(__privateGet(this, _doc2)), __privateGet(this, _key2), __privateGet(this, _tag));
-      __privateSet(this, _dirty, false);
-      try {
-        const res = await fetch(`${__privateGet(this, _origin)}/pocket/${__privateGet(this, _code)}/${this.token}`, {
-          method: "PUT",
-          body: blob
-        });
-        __privateSet(this, _lastDepositAt, Date.now());
-        if (res.status === 413) __privateMethod(this, _PocketClient_instances, set_fn).call(this, { ...__privateGet(this, _state), depositError: "too-big" });
-        else if (res.status === 507) __privateMethod(this, _PocketClient_instances, set_fn).call(this, { ...__privateGet(this, _state), depositError: "budget" });
-        else if (!res.ok) __privateSet(this, _dirty, true);
-      } catch {
-        __privateSet(this, _dirty, true);
-        __privateSet(this, _lastDepositAt, Date.now());
-      }
-    })());
+    if (__privateGet(this, _destroyed3) || !__privateGet(this, _dirty) || !__privateGet(this, _origin) || __privateMethod(this, _PocketClient_instances, stopped_fn).call(this)) return;
+    __privateSet(this, _inflight, __privateMethod(this, _PocketClient_instances, put_fn).call(this));
     try {
       await __privateGet(this, _inflight);
     } finally {
       __privateSet(this, _inflight, null);
     }
+  };
+  put_fn = async function() {
+    const blob = sealDeposit(encodeStateAsUpdate(__privateGet(this, _doc2)), __privateGet(this, _key2), __privateGet(this, _tag));
+    __privateSet(this, _dirty, false);
+    __privateSet(this, _rateLimited, false);
+    try {
+      const res = await fetch(`${__privateGet(this, _origin)}/pocket/${__privateGet(this, _code)}/${this.token}`, {
+        method: "PUT",
+        body: blob,
+        // a small deposit outlives its tab — the visibilitychange flush's
+        // whole point; a big one can't carry the option at all (T-178)
+        ...blob.length <= KEEPALIVE_MAX_BYTES ? { keepalive: true } : {}
+      });
+      __privateSet(this, _lastDepositAt, Date.now());
+      if (res.status === 413) __privateMethod(this, _PocketClient_instances, set_fn).call(this, { ...__privateGet(this, _state), depositError: "too-big" });
+      else if (res.status === 507) __privateMethod(this, _PocketClient_instances, set_fn).call(this, { ...__privateGet(this, _state), depositError: "budget" });
+      else if (res.status === 429) {
+        __privateSet(this, _dirty, true);
+        __privateSet(this, _rateLimited, true);
+        if (!__privateGet(this, _destroyed3)) __privateMethod(this, _PocketClient_instances, schedule_fn2).call(this);
+      } else if (!res.ok) __privateSet(this, _dirty, true);
+      else if (__privateGet(this, _state).depositError === "rate-limited") __privateMethod(this, _PocketClient_instances, set_fn).call(this, withoutError(__privateGet(this, _state)));
+    } catch {
+      __privateSet(this, _dirty, true);
+      __privateSet(this, _lastDepositAt, Date.now());
+    }
+  };
+  flushNow_fn = async function() {
+    if (__privateGet(this, _timer2)) {
+      clearTimeout(__privateGet(this, _timer2));
+      __privateSet(this, _timer2, null);
+    }
+    if (__privateGet(this, _inflight)) await __privateGet(this, _inflight);
+    if (!__privateGet(this, _dirty) || !__privateGet(this, _armed3)) return;
+    await __privateMethod(this, _PocketClient_instances, deposit_fn).call(this);
+    for (let i = 0; i < __privateGet(this, _flushRetries) && __privateGet(this, _rateLimited) && !__privateGet(this, _destroyed3); i++) {
+      await sleep(__privateGet(this, _flushBackoffMs) * 2 ** i);
+      if (__privateGet(this, _destroyed3)) return;
+      await __privateMethod(this, _PocketClient_instances, deposit_fn).call(this);
+    }
+    if (__privateGet(this, _rateLimited) && !__privateGet(this, _destroyed3)) __privateMethod(this, _PocketClient_instances, set_fn).call(this, { ...__privateGet(this, _state), depositError: "rate-limited" });
   };
 
   // src/spool.ts
@@ -16814,6 +16910,17 @@ ${reason}`);
     get status() {
       return __privateGet(this, _engine).status;
     }
+    /**
+     * The engine's awareness instance, shared across both transports (M11,
+     * T-112) — the one SDK change of the milestone. App-defined payload,
+     * best-effort, ephemeral by design: state expires ~30 s after its writer
+     * goes quiet and must never be persisted (ghost presence is a named
+     * refusal). Sealed on keyed spools by construction — awareness frames ride
+     * the same encrypted transport as sync frames. null when relayless.
+     */
+    get awareness() {
+      return __privateGet(this, _engine).awareness;
+    }
     /** short key fingerprint for "are we on the same key?" UX; null for keyless spools */
     get keyFingerprint() {
       return __privateGet(this, _key3) ? keyFingerprint(__privateGet(this, _key3)) : null;
@@ -16825,6 +16932,16 @@ ${reason}`);
      */
     get undecryptableFrames() {
       return __privateGet(this, _engine).undecryptableFrames;
+    }
+    /**
+     * The relay refused the last connection with 1013 "room full" (T-169):
+     * the room is at the relay's per-room cap. The SDK stands back (~30 s)
+     * between attempts instead of spinning, and `status` reads 'offline'
+     * meanwhile; clears the moment a connection is accepted. Watch refusals
+     * via on('full'). The status union stays closed — this is beside it.
+     */
+    get roomFull() {
+      return __privateGet(this, _engine).roomFull;
     }
     /**
      * What the pocket did on open: `checking` → `applied` / `empty` /
@@ -16853,6 +16970,7 @@ ${reason}`);
       if (event === "undecryptable") return __privateGet(this, _engine).onUndecryptable(cb);
       if (event === "pocket") return __privateGet(this, _pocket)?.onState(cb) ?? (() => {
       });
+      if (event === "full") return __privateGet(this, _engine).onFull(cb);
       throw new Error(`unknown event: ${String(event)}`);
     }
     /**
@@ -16897,7 +17015,13 @@ ${reason}`);
     share(base) {
       return buildSpoolLink({ code: this.code, relay: __privateGet(this, _relay), key: __privateGet(this, _key3), base });
     }
-    /** disconnect and release resources; local data is retained (a spool is a keepsake) */
+    /**
+     * Disconnect and release resources; local data is retained (a spool is a
+     * keepsake). The final pocket deposit goes out first — a 429 is retried
+     * inside a few seconds and then named on `pocket` as
+     * `depositError: 'rate-limited'` (T-178) — so `leave()` may take ~3 s
+     * under a rate limit; it never blocks on a refused deposit for longer.
+     */
     async leave() {
       __privateGet(this, _history).flush();
       await __privateGet(this, _pocket)?.flush().catch(() => {
