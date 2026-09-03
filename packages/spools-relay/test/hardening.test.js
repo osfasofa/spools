@@ -11,7 +11,7 @@ import { join } from 'node:path'
 import { WebSocket } from 'ws'
 import { relayPool, sleep, deposit, put, get } from './helpers.js'
 
-const pool = relayPool(15300)
+const pool = relayPool(15700)
 const startRelay = pool.start
 after(pool.stop)
 

@@ -1,7 +1,10 @@
 // Shared test scaffolding: the relay has no build step and its tests have no
 // framework, just node:test spawning the real server as a child process with
-// per-test knobs. Test files run in parallel processes, so each one hands
-// `relayPool` its own port range.
+// per-test knobs. Test files run in parallel processes — and `pnpm -r test`
+// runs the SDK's suites (which spawn this same server.js) at the same time —
+// so each file hands `relayPool` its own port range. Taken: 15100
+// (pocket.test.js), 15300 and 15500 (packages/spools pocket-*.test.ts),
+// 15700 (hardening.test.js). Pick the next free 200-block.
 import { spawn } from 'node:child_process'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'

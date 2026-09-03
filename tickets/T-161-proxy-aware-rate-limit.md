@@ -71,7 +71,13 @@ finding F2.
   rightmost hop is fresh → 200. Without the flag, three different header
   values share one 2/min bucket (third → 429). The pocket helpers moved to
   `test/helpers.js` so both files share them; each file owns a port range
-  because `node --test` runs files in parallel processes.
+  because `node --test` runs files in parallel processes. **Lesson, the
+  hard way:** `pnpm -r test` also runs the SDK's suites *concurrently* with
+  the relay's, and `packages/spools/src/pocket-fetch.test.ts` starts its
+  stub relays at 15300 — the base I had first picked for
+  `hardening.test.js`. Its 200-trap test then tried to listen on a port one
+  of my spawned relays held and hung to vitest's 5 s timeout. Moved to
+  15700; the taken ranges are now listed in `helpers.js`.
 - `fly.toml` sets `TRUST_PROXY=1` (Fly's proxy fronts everything and
   appends the client last, same rule). **`railway.json` carries no env** —
   Railway's config-as-code schema has no variables block; they live in the
