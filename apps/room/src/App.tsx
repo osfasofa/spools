@@ -22,6 +22,15 @@ import { useRoom } from './useRoom'
 const SEAT = typeof localStorage !== 'undefined' ? mySeat() : ''
 
 /**
+ * Where the key actually goes (T-165, review finding F6): "never sent to any
+ * server" is true of spools' servers only. The address bar carries the key,
+ * browsers sync their address bars, and a link travels through whatever
+ * messenger carries it. Said wherever a link is copied, and in the fine print.
+ */
+const KEY_TRAVELS =
+  'your browser may sync this address to its maker; send the link over something end-to-end encrypted, or in person.'
+
+/**
  * One person row: live-looking input, but the profile entry winds on COMMIT
  * (blur/Enter), not per keystroke — every rename is permanent under gc:false,
  * and a keystroke-per-entry rename would spend dozens of them (D2's accepted
@@ -254,6 +263,7 @@ const Settings = ({
             </button>
           </div>
           <div className="caption">the link is the key — share it with people you trust</div>
+          <div className="caption keyTravels">{KEY_TRAVELS}</div>
         </section>
         <section className="settingsSection">
           <div className="sectionLabel">new room</div>
@@ -333,7 +343,7 @@ const Settings = ({
             anyone with the link can edit or delete anything. no push, no server that knows you. rewind
             never forgets. "seen" is live-only — nobody learns what you read while they were away. what
             you put here is kept by everyone in the room, for as long as they keep it. there is no way to
-            remove someone. make a new room and hand the new link only to the people you want.
+            remove someone. make a new room and hand the new link only to the people you want. {KEY_TRAVELS}
           </div>
         </section>
       </div>
@@ -369,7 +379,7 @@ export const App = () => {
     if (!spool) return
     void navigator.clipboard.writeText(spool.share()).then(() => {
       setInviteCopied(true)
-      setTimeout(() => setInviteCopied(false), 1600)
+      setTimeout(() => setInviteCopied(false), 4000) // long enough to read where the key goes (T-165)
     })
   }
 
@@ -807,13 +817,15 @@ export const App = () => {
         readMarkers={readMarkers}
         unreadAfter={unreadAfter}
       />
-      {inviteCopied ? <div className="notice">link copied — hand it to someone you trust</div> : null}
+      {inviteCopied ? (
+        <div className="notice linkCopied">link copied — hand it to someone you trust. {KEY_TRAVELS}</div>
+      ) : null}
       {cameFrom ? (
         <div className="noticeRow cameFrom">
           <div className="notice">
             your old room is still on this device.{' '}
             {cameFrom.copied
-              ? 'the new link is copied — hand it only to the people you want.'
+              ? `the new link is copied — hand it only to the people you want. ${KEY_TRAVELS}`
               : 'copy the new link from settings → link and hand it only to the people you want.'}
           </div>
           <button className="noticeClose" onClick={() => setCameFrom(null)} aria-label="Dismiss">

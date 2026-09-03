@@ -825,6 +825,16 @@ await scenario('8. truly empty room: calm verdict, invite affordance, non-blocki
     `!!document.querySelector('.inviteBtn') && document.querySelector('.honestLine').textContent.includes('reads everything')`
   )
   if (!inviteThere) throw new Error('empty room lacks the invite affordance + honest sentence')
+  // the "link copied" toast says where the key goes (T-165) — read it while
+  // the feed is still empty; a hidden message keeps its slot, so the invite
+  // affordance never comes back once something has been said
+  await e.eval(`navigator.clipboard.writeText = () => Promise.resolve()`)
+  await e.eval(`document.querySelector('.inviteBtn').click()`)
+  await e.until(
+    `document.querySelector('.linkCopied')?.textContent.includes('your browser may sync this address to its maker; send the link over something end-to-end encrypted, or in person.')`,
+    5_000,
+    'the link-copied toast carries the key-travels sentence'
+  )
   // the naming prompt is present but never a gate: the composer works right now
   const promptThere = await e.eval(`!!document.querySelector('.namePrompt')`)
   await e.typeAndSend('unnamed and talking anyway')
@@ -838,7 +848,7 @@ await scenario('8. truly empty room: calm verdict, invite affordance, non-blocki
   if (!promptThere || !promptGone) throw new Error(`name prompt present=${promptThere}, dismissed=${promptGone}`)
   if (e.errors.length) throw new Error(`page errors: ${e.errors.join(' | ')}`)
   await e.close()
-  return 'nobody-here → really-empty → invite + honest sentence; naming prompt ignorable and dismissible'
+  return 'nobody-here → really-empty → invite + honest sentence; naming prompt ignorable and dismissible; link-copied toast says where the key goes'
 })
 
 // ---------- T-163: keepsake — export, and the one hard delete ----------
@@ -850,6 +860,11 @@ await scenario('16. keepsake: export round-trips through importSpool; forget rem
     `document.querySelector('.finePrint').textContent.includes('kept by everyone in the room, for as long as they keep it')`
   )
   if (!permanence) throw new Error('the permanence sentence is missing from the fine print')
+  const keyTravels = await a.eval(`(() => {
+    const s = 'your browser may sync this address to its maker; send the link over something end-to-end encrypted, or in person.'
+    return document.querySelector('.finePrint').textContent.includes(s) && document.querySelector('.keyTravels')?.textContent === s
+  })()`)
+  if (!keyTravels) throw new Error('the key-travels sentence is missing from the fine print or the link caption (T-165)')
 
   // export: capture the anchor download instead of letting headless Chrome
   // write a file, then read the blob back inside the page
