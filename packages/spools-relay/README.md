@@ -62,19 +62,23 @@ room.
 | knob | default | |
 |---|---|---|
 | `TRUST_PROXY` | *(unset — off)* | behind an edge proxy (Railway, Fly): every per-IP limit keys on the rightmost `X-Forwarded-For` hop, the one the proxy appended, instead of the proxy's own address. Leave it off on a relay exposed directly — there the header is whatever the client wrote |
-| `RELAY_MAX_BUFFERED_BYTES` | `16777216` | a member with more than this queued for it (it stopped reading) is skipped and closed with 1008 "slow consumer"; 0 disables |
-| `RELAY_MAX_FRAMES_PER_SEC` | `60` | per-connection frame budget; over it → closed with 1008 "frame budget exceeded"; 0 disables |
-| `RELAY_MAX_BYTES_PER_MIN` | `33554432` | per-connection byte budget (32 MiB/min); same close; 0 disables |
+| `RELAY_MAX_BUFFERED_BYTES` | `67108864` | a member with more than this queued for it (it stopped reading) is skipped and closed with 1008 "slow consumer"; 0 disables. 64 MiB is eight peers at the 8 MiB frame cap — a cold joiner gets one state frame per peer at once |
+| `RELAY_MAX_FRAMES_PER_SEC` | `300` | per-connection frame budget; over it → closed with 1008 "frame budget exceeded"; 0 disables |
+| `RELAY_MAX_BYTES_PER_MIN` | `134217728` | per-connection byte budget (128 MiB/min — sixteen full-size state frames); same close; 0 disables |
 | `RELAY_CONNS_PER_IP_PER_ROOM` | `0` *(off)* | per-address cap inside one room; over it → closed with 1013 "too many connections from this address". **Enable together with `TRUST_PROXY`**: behind a proxy without it, everyone is one address and the cap would fall on all of them at once |
 
 The close code matters: **1013 means "room full"** to the SDK; **1008** is
 "you broke the relay's policy" (with the reason in the close frame), and a
-healthy connection never sees it. Ordinary traffic is nowhere near these
-lines — y-websocket sends one frame per Yjs transaction plus awareness, and a
-full state frame is single-digit MB. The one boundary they touch: a room at
-the 64-connection guard reconnecting *in the same second* has every member
-answering 63 SyncStep1s at once, which is 63 frames (and, for a big spool,
-63 state frames) in one window. A 5–8-seat room never gets near it.
+healthy connection never sees it. The defaults are sized to the relay's own
+ceilings rather than to typical traffic: a cold joiner has one state frame
+per peer queued for it at once (64 MiB is eight peers at the 8 MiB frame
+cap), a member at the 64-connection guard answers 63 SyncStep1s in one second
+after a relay restart (300/s clears it), and 128 MiB a minute is sixteen
+full-size state frames. Ordinary rooms send one frame per Yjs transaction
+plus awareness and never get near any of these lines. The one they can
+touch: a full-size spool in a room bigger than eight seats, cold-joined over
+a slow link, can trip the buffered cap on arrival — the joiner reconnects
+with backoff and gets the rest.
 
 ## The pocket
 
@@ -182,7 +186,7 @@ address could fill a room to that guard by itself; `RELAY_CONNS_PER_IP_PER_ROOM`
 (off by default — it needs `TRUST_PROXY` behind a proxy) caps that, and the
 extra sockets get 1013 with the reason "too many connections from this
 address". One connection that stops reading, or floods, is closed with
-**1008** and a reason (16 MiB queued, 60 frames/s, 32 MiB/min — the knobs
+**1008** and a reason (64 MiB queued, 300 frames/s, 128 MiB/min — the knobs
 above) and the room keeps going for everyone else; nothing is buffered
 without bound and nothing is fanned out past the budget.
 

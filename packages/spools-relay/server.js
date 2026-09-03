@@ -47,13 +47,18 @@ const MAX_CONNS_PER_ROOM = 64
 // code-holder without the key could push 8 MiB junk frames and have each one
 // fanned out ×63. Both are "the relay's own business" (SPEC §3): over either
 // line the connection is closed with 1008 (policy) and a reason — never 1013,
-// which the SDK reads as "room full". 0 disables a guard. The defaults sit
-// well above intimate-scale traffic (one frame per Yjs transaction plus
-// awareness; a full state frame is single-digit MB) — see the README for the
-// one boundary they do touch, a 64-seat room reconnecting in the same second.
-const RELAY_MAX_BUFFERED_BYTES = Number(process.env.RELAY_MAX_BUFFERED_BYTES ?? 16 * 1024 * 1024)
-const RELAY_MAX_FRAMES_PER_SEC = Number(process.env.RELAY_MAX_FRAMES_PER_SEC ?? 60)
-const RELAY_MAX_BYTES_PER_MIN = Number(process.env.RELAY_MAX_BYTES_PER_MIN ?? 32 * 1024 * 1024)
+// which the SDK reads as "room full". 0 disables a guard. The defaults are
+// sized to the relay's own ceilings, not to typical traffic: a cold joiner
+// has one state frame per peer queued for it at once (64 MiB = eight peers
+// at the 8 MiB frame cap), a member answers up to 63 SyncStep1s in one
+// second after a relay restart (300/s clears it), and 128 MiB/min is sixteen
+// full-size state frames. Floods are hundreds of frames a second and tens of
+// MiB a second; these lines only ever catch those. (Raised at review from
+// 16 MiB / 60 / 32 MiB — the first values could close a cold joiner in a
+// big room as a "slow consumer" on arrival.)
+const RELAY_MAX_BUFFERED_BYTES = Number(process.env.RELAY_MAX_BUFFERED_BYTES ?? 64 * 1024 * 1024)
+const RELAY_MAX_FRAMES_PER_SEC = Number(process.env.RELAY_MAX_FRAMES_PER_SEC ?? 300)
+const RELAY_MAX_BYTES_PER_MIN = Number(process.env.RELAY_MAX_BYTES_PER_MIN ?? 128 * 1024 * 1024)
 // Per-address cap per room (T-169). Codes are public by design (every URL,
 // every screenshot), so without this one address can fill a room up to the
 // 64 guard and lock everyone else out. Default 0 = off: behind a proxy

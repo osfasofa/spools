@@ -95,3 +95,11 @@ T-124's precedent: sign-off, README honesty section updated.
   `deposit()` is 47 B (7 + 40), not the 67 B the older budget test's
   60-byte variant uses — my first cut of the arithmetic assumed 67 and
   two assertions failed for it; the relay was right both times.
+- **Review at merge (3 Sep 2026), one limit said plainly:** a real deposit
+  nobody has collected yet — the mixtape wound last night, not yet opened by
+  the friend — ranks *with* junk in eviction order (never-read), and being
+  older than a junk flood that arrived after it, it goes before the junk
+  under budget pressure. Not worse than before (stalest-first did the same),
+  but "never-read first" must not be read as "junk first": the order protects
+  collected spools; the creation cap (off until `TRUST_PROXY`) is what
+  protects the uncollected one.

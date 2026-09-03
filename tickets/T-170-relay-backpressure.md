@@ -74,3 +74,13 @@ Review finding F5.
   three 300 B frames pass, the fourth closes); ordinary traffic on the
   stock knobs (three seats at 30 frames/s each, 60 frames heard by each,
   nobody closed).
+- **Review at merge (3 Sep 2026): defaults raised** 16 MiB → 64 MiB
+  buffered, 60 → 300 frames/s, 32 → 128 MiB/min. Reason: a cold joiner has
+  one state frame per peer queued for it at once — five peers on a 3 MiB
+  spool was already 15 MiB, and four peers at the 8 MiB cap would have
+  closed the joiner as a "slow consumer" on arrival, which is the pocket's
+  own headline case — and a member answers 63 SyncStep1s in one second
+  after a relay restart, so the boundary bullet above is superseded (300/s
+  clears it). The guards exist to catch floods, an order of magnitude past
+  these lines; the measured bound (cap + ~½ MiB slack) holds at any value.
+  The tests pin their own knobs, so nothing changed there.
