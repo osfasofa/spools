@@ -102,8 +102,14 @@ POCKET_DIR=/data/pocket npx spools-relay
 | `POCKET_TTL_DAYS` | `60` | namespaces untouched this long are swept; reads refresh the clock |
 | `POCKET_K` | `8` | distinct writer-session tags kept per spool (raised from 4 for group rooms — T-124) |
 | `POCKET_MAX_BYTES` | `8388608` | per-deposit cap (413 above it) |
-| `POCKET_MAX_TOTAL_BYTES` | `1073741824` | relay-wide budget; stalest spools evicted first, 507 when even that can't fit it |
+| `POCKET_MAX_TOTAL_BYTES` | `1073741824` | relay-wide budget. Eviction order: namespaces nobody has ever collected go first (oldest among them), then the stalest-touched; 507 when even that can't fit it |
 | `POCKET_PUTS_PER_MIN` | `24` | per-IP deposit admission (clients self-pace to ~1/min each, so this is ~24 sustained same-NAT devices) |
+| `POCKET_NEW_NAMESPACES_PER_HOUR` | `0` *(off)* | per-IP cap on *new* namespaces (429 "too many new namespaces" past it; deposits into an existing namespace don't count, nor do refused ones). **Enable together with `TRUST_PROXY`** behind a proxy |
+| `POCKET_FIRST_MAX_BYTES` | `= POCKET_MAX_BYTES` | per-deposit cap for a namespace nobody has collected yet (413 above it); after its first read, `POCKET_MAX_BYTES` applies. Equal to it by default — no change until a canonical value is signed off |
+
+In disk mode the read count is a `.reads` file beside a namespace's
+deposits — a plain number, never inside a deposit — restored at boot, so
+both the eviction rank and touch-on-read survive a restart.
 
 ## Point your links at it
 
@@ -125,8 +131,10 @@ Running a relay means you can observe: **room codes** (rendezvous names, not
 secrets), **connection counts**, **traffic volume and timing**, and IP
 addresses — the same metadata any websocket host sees. Running the pocket
 adds: **that a spool has deposits**, their **sizes and times**, an opaque
-per-spool **namespace id** (a one-way hash — it never yields the key), and
-how many distinct writer-session **tags** deposited recently. You still
+per-spool **namespace id** (a one-way hash — it never yields the key), how
+many distinct writer-session **tags** deposited recently, and how many
+times the namespace has been **collected** (a count, kept for eviction
+order). You still
 cannot see content: frames are opaque bytes forwarded unread, deposits are
 ciphertext held unopened, and the key rides in the URL fragment, which
 browsers never transmit to any server, this one included.
@@ -152,7 +160,10 @@ untouched namespaces are swept after **60 days**, **8** writer-session tags per
 spool, **8 MiB** per deposit, **1 GiB** relay-wide. Treat the 60 days as a
 courtesy window, not an archive — the pocket is there to bridge the gap between
 one friend's evening and another's midnight, and the thing that actually keeps
-a spool is a copy on somebody's disk (`export()`).
+a spool is a copy on somebody's disk (`export()`). Under the 1 GiB budget,
+namespaces nobody ever collected are evicted before ones somebody did; the
+creation and first-deposit knobs are at their inert defaults. **A determined
+stranger can still fill the pocket; devices remain the spool's home.**
 
 **Group-scale honesty (T-110/T-111, measured).** The tag ring holds the
 newest deposit from each of the last **8** writer sessions. People writing

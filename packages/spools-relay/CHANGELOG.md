@@ -8,6 +8,8 @@
 - Backpressure on the broadcast path (T-170): a member with more than `RELAY_MAX_BUFFERED_BYTES` (16 MiB) queued for it is skipped and closed with 1008 "slow consumer" instead of buffering without bound.
 - Per-connection frame budget (T-170): over `RELAY_MAX_FRAMES_PER_SEC` (60) or `RELAY_MAX_BYTES_PER_MIN` (32 MiB) → closed with 1008 "frame budget exceeded"; the room keeps going for everyone else. 0 disables any of the three.
 - `RELAY_CONNS_PER_IP_PER_ROOM` (default 0 = off; enable with `TRUST_PROXY`): per-address cap inside a room, over it → 1013 "too many connections from this address" (T-169, relay half).
+- Pocket eviction order (T-168): under `POCKET_MAX_TOTAL_BYTES`, namespaces nobody ever collected go first, then the stalest. Disk mode keeps the read count in a `.reads` sidecar beside the deposits, restored at boot — touch-on-read now survives a restart too.
+- `POCKET_NEW_NAMESPACES_PER_HOUR` (default 0 = off; per address, enable with `TRUST_PROXY`) and `POCKET_FIRST_MAX_BYTES` (default = `POCKET_MAX_BYTES`, i.e. no change; canonical value pending sign-off) (T-168).
 
 ## 0.2.0 — 2026-08-16
 

@@ -80,6 +80,17 @@ const POCKET_MAX_TOTAL_BYTES = Number(process.env.POCKET_MAX_TOTAL_BYTES ?? 1024
 const POCKET_PUTS_PER_MIN = Number(process.env.POCKET_PUTS_PER_MIN ?? 24) // per IP
 const POCKET_SWEEP_MS = Number(process.env.POCKET_SWEEP_MS ?? 3_600_000)
 const POCKET_DIR = process.env.POCKET_DIR || null
+// Admission levers for the pocket (T-168), both inert by default. Namespaces
+// are free to create — any room and any token that fit the charset — so at
+// the stock knobs one address could fill the relay-wide budget in minutes.
+// The first defense is eviction ORDER (never-read namespaces go first, see
+// ensureBudget); these two bound creation and the size of what nobody has
+// collected yet. NEW_NAMESPACES_PER_HOUR is per client address and needs
+// TRUST_PROXY behind a proxy (T-161). FIRST_MAX_BYTES caps deposits into a
+// namespace that has never been read; it defaults to POCKET_MAX_BYTES (no
+// change) until the owner signs off a canonical value.
+const POCKET_NEW_NAMESPACES_PER_HOUR = Number(process.env.POCKET_NEW_NAMESPACES_PER_HOUR ?? 0) // 0 = off
+const POCKET_FIRST_MAX_BYTES = Number(process.env.POCKET_FIRST_MAX_BYTES ?? POCKET_MAX_BYTES)
 
 // Who is the client? (T-161) Behind an edge proxy (Railway, Fly) the socket's
 // remoteAddress is the proxy, so every per-IP limit collapses into one bucket
@@ -318,25 +329,37 @@ const POCKET_HEADER_LEN = 7 // magic(2) + version(1) + tag(4)
 // traversal guard. Codes and base64url tokens both fit comfortably.
 const SEGMENT_RE = /^[A-Za-z0-9_-]{1,64}$/
 
-/** `${room}/${token}` → { room, token, touchedAt, tags: Map(tagHex → {at, bytes, blob|null}) } */
+/** `${room}/${token}` → { room, token, touchedAt, reads, tags: Map(tagHex → {at, bytes, blob|null}) } */
 const namespaces = new Map()
 let pocketTotalBytes = 0
 /** client address → put timestamps within the last minute (T-161: keyed via clientIp) */
 const putLog = makeHitLog(60_000)
+/** client address → namespace creations within the last hour (T-168) */
+const newNamespaceLog = makeHitLog(3_600_000)
+/** disk mode: a namespace's read count lives in this sidecar beside its deposits — never inside one */
+const READS_FILE = '.reads'
 
 const nsDir = (ns) => path.join(POCKET_DIR, ns.room, ns.token)
+const newNamespace = (room, token) => ({ room, token, touchedAt: 0, reads: 0, tags: new Map() })
 
-/** disk mode: rebuild the index from files at boot; touch times restart as deposit times */
+/** disk mode: rebuild the index from files at boot; touch times restart as deposit times, or the last read where the sidecar is newer */
 if (POCKET_DIR) {
   fs.mkdirSync(POCKET_DIR, { recursive: true })
   for (const room of fs.readdirSync(POCKET_DIR)) {
     const roomPath = path.join(POCKET_DIR, room)
     if (!fs.statSync(roomPath).isDirectory()) continue
     for (const token of fs.readdirSync(roomPath)) {
-      const ns = { room, token, touchedAt: 0, tags: new Map() }
-      for (const tag of fs.readdirSync(path.join(roomPath, token))) {
-        const st = fs.statSync(path.join(roomPath, token, tag))
-        ns.tags.set(tag, { at: st.mtimeMs, bytes: st.size, blob: null })
+      const ns = newNamespace(room, token)
+      for (const name of fs.readdirSync(path.join(roomPath, token))) {
+        const file = path.join(roomPath, token, name)
+        const st = fs.statSync(file)
+        if (name === READS_FILE) {
+          ns.reads = Number.parseInt(fs.readFileSync(file, 'utf8'), 10) || 0
+          ns.touchedAt = Math.max(ns.touchedAt, st.mtimeMs)
+          continue
+        }
+        if (name.startsWith('.')) continue // only tags are deposits
+        ns.tags.set(name, { at: st.mtimeMs, bytes: st.size, blob: null })
         ns.touchedAt = Math.max(ns.touchedAt, st.mtimeMs)
         pocketTotalBytes += st.size
       }
@@ -361,15 +384,23 @@ const evictTag = async (ns, tagHex) => {
   if (POCKET_DIR) await fsp.rm(path.join(nsDir(ns), tagHex), { force: true }).catch(() => {})
 }
 
-/** make room under the relay-wide budget by dropping stalest namespaces (never the one being written) */
+/** eviction order (T-168): a namespace nobody ever collected is worth the least, so never-read ones go first (oldest among them), then the stalest-touched */
+const evictsBefore = (a, b) => {
+  const aRead = a.reads > 0
+  const bRead = b.reads > 0
+  if (aRead !== bRead) return !aRead
+  return a.touchedAt < b.touchedAt
+}
+
+/** make room under the relay-wide budget by dropping namespaces in eviction order (never the one being written) */
 const ensureBudget = async (incomingBytes, protectedKey) => {
   while (pocketTotalBytes + incomingBytes > POCKET_MAX_TOTAL_BYTES) {
-    let stalest = null
+    let victim = null
     for (const [key, ns] of namespaces) {
-      if (key !== protectedKey && (!stalest || ns.touchedAt < stalest.ns.touchedAt)) stalest = { key, ns }
+      if (key !== protectedKey && (!victim || evictsBefore(ns, victim.ns))) victim = { key, ns }
     }
-    if (!stalest) return false
-    await evictNamespace(stalest.key)
+    if (!victim) return false
+    await evictNamespace(victim.key)
   }
   return true
 }
@@ -391,15 +422,24 @@ const handlePocketPut = (request, response, { room, token }) => {
   const now = Date.now()
   if (recentHits(putLog, ip, now) >= POCKET_PUTS_PER_MIN) return pocketJson(response, 429, { error: 'rate limited' })
   recordHit(putLog, ip, now)
+  const nsKey = `${room}/${token}`
+  const existing = namespaces.get(nsKey)
+  // T-168: creating namespaces is what a stranger does by the thousand; a
+  // namespace nobody has collected yet gets the smaller cap (= the full cap
+  // until signed off). Checked before the body so a refused PUT costs nothing.
+  if (!existing && POCKET_NEW_NAMESPACES_PER_HOUR > 0 && recentHits(newNamespaceLog, ip, now) >= POCKET_NEW_NAMESPACES_PER_HOUR) {
+    return pocketJson(response, 429, { error: 'too many new namespaces' })
+  }
+  const maxBytes = existing && existing.reads > 0 ? POCKET_MAX_BYTES : Math.min(POCKET_FIRST_MAX_BYTES, POCKET_MAX_BYTES)
 
   const chunks = []
   let size = 0
   let overflowed = false
   request.on('data', (chunk) => {
     size += chunk.length
-    if (size > POCKET_MAX_BYTES) {
+    if (size > maxBytes) {
       overflowed = true
-      pocketJson(response, 413, { error: 'deposit too big', maxBytes: POCKET_MAX_BYTES })
+      pocketJson(response, 413, { error: 'deposit too big', maxBytes })
       request.destroy()
       return
     }
@@ -416,8 +456,8 @@ const handlePocketPut = (request, response, { room, token }) => {
     ) {
       return pocketJson(response, 400, { error: 'not a deposit envelope' })
     }
-    const nsKey = `${room}/${token}`
-    const ns = map.setIfUndefined(namespaces, nsKey, () => ({ room, token, touchedAt: 0, tags: new Map() }))
+    const created = !namespaces.has(nsKey)
+    const ns = map.setIfUndefined(namespaces, nsKey, () => newNamespace(room, token))
     ns.touchedAt = Date.now()
     const tagHex = blob.subarray(3, 7).toString('hex')
     const replacing = ns.tags.get(tagHex)?.bytes ?? 0
@@ -438,13 +478,18 @@ const handlePocketPut = (request, response, { room, token }) => {
       await fsp.mkdir(nsDir(ns), { recursive: true })
       await fsp.writeFile(path.join(nsDir(ns), tagHex), blob)
     }
+    if (created) recordHit(newNamespaceLog, ip) // only a stored deposit counts as a creation
     pocketJson(response, 200, { stored: true })
   })
 }
 
 const handlePocketGet = async (request, response, { room, token }) => {
   const ns = namespaces.get(`${room}/${token}`)
-  if (ns) ns.touchedAt = Date.now() // touch-on-read: opened spools stay covered
+  if (ns) {
+    ns.touchedAt = Date.now() // touch-on-read: opened spools stay covered
+    ns.reads += 1 // and collected namespaces are evicted last (T-168)
+    if (POCKET_DIR) fsp.writeFile(path.join(nsDir(ns), READS_FILE), String(ns.reads)).catch(() => {})
+  }
   const list = ns ? [...ns.tags.entries()].sort((a, b) => b[1].at - a[1].at) : []
   const deposits = []
   for (const [tagHex, t] of list) {
@@ -461,6 +506,7 @@ setInterval(() => {
     if (ns.touchedAt < expiry) evictNamespace(key)
   }
   pruneHitLog(putLog)
+  pruneHitLog(newNamespaceLog)
 }, POCKET_SWEEP_MS).unref()
 
 // ========== HTTP + UPGRADE ROUTING ==========

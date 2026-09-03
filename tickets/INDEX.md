@@ -172,7 +172,7 @@ Drafted 3 Sep 2026 from the ship review — design record: [docs/M15-ship-review
 | [T-165](T-165-key-travels.md) | Where the key actually goes: the sentence + the address-bar decision — **sign-off** | — | todo |
 | [T-166](T-166-self-host-font.md) | Self-host the font — zero third-party requests | — | todo |
 | [T-167](T-167-static-hosting.md) | Static hosting: leave Vercel, fix the gh-pages 404 — **sign-off, owner at keyboard** | T-160 | todo |
-| [T-168](T-168-pocket-eviction.md) | Pocket eviction order + namespace creation cap — **sign-off** | T-161 | todo |
+| [T-168](T-168-pocket-eviction.md) | Pocket eviction order + namespace creation cap — **sign-off** | T-161 | doing |
 | [T-169](T-169-room-full.md) | Room-full lockout: per-IP room cap; the SDK says "full" | T-161 | doing |
 | [T-170](T-170-relay-backpressure.md) | Backpressure and frame budget on the broadcast path | — | done |
 | [T-171](T-171-security-headers.md) | Security headers on the room | T-166, T-167 | todo |
