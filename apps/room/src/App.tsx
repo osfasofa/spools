@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { DEFAULT_RELAY, parseSpoolLink, stash, type Spool } from 'spools'
+import { DEFAULT_RELAY, buildSpoolLink, generateCode, parseSpoolLink, stash, type Spool } from 'spools'
 import { ActionSheet } from './ActionSheet'
 import { Arrival } from './Arrival'
 import { drawFavicon, pageTitle } from './badge'
@@ -93,6 +93,7 @@ const Settings = ({
   notifState,
   onEnableNotifications,
   onForget,
+  onNewRoom,
   onBack,
 }: {
   spool: Spool
@@ -107,6 +108,8 @@ const Settings = ({
   onEnableNotifications: () => void
   /** the one hard delete, after the ceremony below has been completed (T-163) */
   onForget: () => void
+  /** a fresh keyed room on the same relay, its link copied — the only remedy against a bad actor (T-164) */
+  onNewRoom: () => void
   onBack: () => void
 }) => {
   const [copied, setCopied] = useState(false)
@@ -253,6 +256,16 @@ const Settings = ({
           <div className="caption">the link is the key — share it with people you trust</div>
         </section>
         <section className="settingsSection">
+          <div className="sectionLabel">new room</div>
+          <button className="copyBtn" onClick={onNewRoom}>
+            start a new room
+          </button>
+          <div className="caption">
+            a fresh room with a fresh key, its link copied. this room stays on this device — export or
+            forget it below.
+          </div>
+        </section>
+        <section className="settingsSection">
           <div className="sectionLabel">keepsake</div>
           <button className="copyBtn" onClick={exportRoom}>
             {exported ? 'exported ✓' : 'export this room'}
@@ -319,7 +332,8 @@ const Settings = ({
           <div className="finePrint">
             anyone with the link can edit or delete anything. no push, no server that knows you. rewind
             never forgets. "seen" is live-only — nobody learns what you read while they were away. what
-            you put here is kept by everyone in the room, for as long as they keep it.
+            you put here is kept by everyone in the room, for as long as they keep it. there is no way to
+            remove someone. make a new room and hand the new link only to the people you want.
           </div>
         </section>
       </div>
@@ -358,6 +372,49 @@ export const App = () => {
       setTimeout(() => setInviteCopied(false), 1600)
     })
   }
+
+  // T-164: the way out when someone turns bad — a new spool, handed only to
+  // the people you want. The link is minted here (code + 32 random bytes,
+  // same relay as this room) so the clipboard write happens synchronously
+  // inside the tap — Safari refuses one after an await — and the new page's
+  // ordinary openSpool(link) is what creates the room; no second Spool ever
+  // lives in this page. History does not come along: that's `splice`, parked.
+  const startNewRoom = () => {
+    if (!spool) return
+    const relay = parseSpoolLink(spool.share()).relay ?? DEFAULT_RELAY
+    const link = buildSpoolLink({ code: generateCode(), relay, key: crypto.getRandomValues(new Uint8Array(32)) })
+    const go = (copied: boolean) => {
+      try {
+        sessionStorage.setItem('room-came-from', JSON.stringify({ code: spool.code, copied }))
+      } catch {
+        // no sessionStorage: the arrival notice is a courtesy, not a gate
+      }
+      location.href = link // a fragment change — main.tsx's hashchange reload opens it
+    }
+    let write: Promise<void>
+    try {
+      write = navigator.clipboard.writeText(link)
+    } catch {
+      write = Promise.reject(new Error('no clipboard'))
+    }
+    write.then(
+      () => go(true),
+      () => go(false)
+    )
+  }
+  // …and the arrival on the other side: one notice, consumed on read so a
+  // reload never repeats it
+  const [cameFrom, setCameFrom] = useState<{ code: string; copied: boolean } | null>(() => {
+    try {
+      const raw = sessionStorage.getItem('room-came-from')
+      if (!raw) return null
+      sessionStorage.removeItem('room-came-from')
+      const parsed = JSON.parse(raw) as { code?: unknown; copied?: unknown }
+      return typeof parsed.code === 'string' ? { code: parsed.code, copied: parsed.copied === true } : null
+    } catch {
+      return null
+    }
+  })
 
   // T-162: the first hide on this device gets one honest line — a hide is a
   // soft delete that lands everywhere, but every copy keeps the message and
@@ -658,6 +715,7 @@ export const App = () => {
           void Notification.requestPermission().then(setNotifState)
         }}
         onForget={() => void forgetRoom()}
+        onNewRoom={startNewRoom}
         onBack={() => setView('room')}
       />
     )
@@ -750,6 +808,19 @@ export const App = () => {
         unreadAfter={unreadAfter}
       />
       {inviteCopied ? <div className="notice">link copied — hand it to someone you trust</div> : null}
+      {cameFrom ? (
+        <div className="noticeRow cameFrom">
+          <div className="notice">
+            your old room is still on this device.{' '}
+            {cameFrom.copied
+              ? 'the new link is copied — hand it only to the people you want.'
+              : 'copy the new link from settings → link and hand it only to the people you want.'}
+          </div>
+          <button className="noticeClose" onClick={() => setCameFrom(null)} aria-label="Dismiss">
+            ✕
+          </button>
+        </div>
+      ) : null}
       {hideExplained ? (
         <div className="noticeRow hideExplained">
           <div className="notice">

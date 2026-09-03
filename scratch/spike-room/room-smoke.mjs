@@ -915,6 +915,40 @@ await scenario('16. keepsake: export round-trips through importSpool; forget rem
   return `export ${fileName} (${text.length} B, key absent) reopened in Node with ${back.entries.length}+${back.deleted.length} entries; forget: db + stash row + room-seen gone, seat kept, fresh room on the local relay, old link reopens`
 })
 
+// ---------- T-164: start a new room ----------
+
+await scenario('17. start a new room: one tap lands in a fresh keyed room with its link copied; the old room still opens', async () => {
+  // B is still in the original room. Headless Chrome has no clipboard to
+  // speak of — record what the app hands it, where the next document can read it
+  await b.eval(`navigator.clipboard.writeText = (t) => { localStorage.setItem('__copied', t); return Promise.resolve() }`)
+  await b.eval(`document.querySelector('.headerTitle').click()`)
+  await b.until(`!!document.querySelector('.settingsBody')`, 5_000, 'settings open')
+  const sentence = await b.eval(
+    `document.querySelector('.finePrint').textContent.includes('there is no way to remove someone. make a new room and hand the new link only to the people you want.')`
+  )
+  if (!sentence) throw new Error('the no-removal sentence is missing from the fine print')
+  await b.eval(`[...document.querySelectorAll('button')].find(el => el.textContent === 'start a new room').click()`)
+  await b.until(`!!window.spool && window.spool.code !== '${code}' && location.hash.includes('spool=')`, 20_000, 'a fresh room opened')
+  const fresh = await b.eval(`({ link: window.spool.share(), copied: localStorage.getItem('__copied'), came: sessionStorage.getItem('room-came-from') })`)
+  await b.eval(`localStorage.removeItem('__copied')`)
+  if (fresh.copied !== fresh.link) throw new Error(`copied "${fresh.copied}" is not the new room's link "${fresh.link}"`)
+  const decoded = decodeURIComponent(fresh.link)
+  if (!decoded.includes(`relay=ws://localhost:${RELAY_PORT}/yjs`)) throw new Error(`the new room left the local relay: ${decoded}`)
+  if (!/[&#]k=[A-Za-z0-9_-]{43}$/.test(fresh.link)) throw new Error(`the new room is not keyed: ${fresh.link}`)
+  if (fresh.came !== null) throw new Error('the arrival flag was not consumed on read')
+  await b.until(`document.querySelector('.cameFrom')?.textContent.includes('your old room is still on this device.')`, 10_000, 'arrival notice shows')
+  const copiedLine = await b.eval(`document.querySelector('.cameFrom').textContent.includes('the new link is copied')`)
+  if (!copiedLine) throw new Error('arrival notice does not say the link was copied')
+  await b.eval(`document.querySelector('.cameFrom .noticeClose').click()`)
+  if (await b.eval(`!!document.querySelector('.cameFrom')`)) throw new Error('arrival notice did not dismiss')
+  // the old room still opens from its old link, on the same device, from its own database
+  const old = await Tab.open(linkFor(ORIGINS[1]))
+  await old.until(`document.querySelectorAll('.bubble').length > 0`, 15_000, 'the old room reopens from its link')
+  if (old.errors.length || b.errors.length) throw new Error(`page errors: ${[...old.errors, ...b.errors].join(' | ')}`)
+  await old.close()
+  return `fresh keyed room ${(await b.eval('window.spool.code'))} on the local relay, link copied verbatim, arrival notice shown + dismissed, old room reopens`
+})
+
 await a?.close()
 await b?.close()
 await c?.close()

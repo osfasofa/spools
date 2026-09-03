@@ -61,3 +61,8 @@ away from the button. Review finding F7.
   README's Removed/Remove wording carry T-162 notes.
 - Verified: build green (tsc + vite); headless Chrome smoke 15/15 (see the
   commit for the run).
+- *Addendum (T-164):* the grep now finds one user-facing "remove" — the
+  fine-print sentence T-164 specifies verbatim, "there is no way to remove
+  someone." That is a person, not a message, and it says there is no delete;
+  it is not the lie this ticket closes. Smoke scenario 12 keeps asserting
+  the action sheet itself never says remove.
