@@ -49,6 +49,7 @@ interface Spool {
   readonly deleted: Entry[]          // the complement: soft-deleted only, same handles/sort; restore() brings one back
   readonly whenReady: Promise<void>  // local persistence loaded (same signal open/new await)
   readonly status: 'offline' | 'connecting' | 'connected'
+  readonly roomFull: boolean         // the relay refused the last connection with 1013 "room full" (T-169); clears when one is accepted
   readonly keyFingerprint: string | null  // 8 chars for "same key?" UX; null for keyless spools
   readonly undecryptableFrames: number    // relay frames dropped: someone in the room is on the wrong key / no key (T-051); always 0 for keyless spools
   readonly pocket: PocketState | null     // what the relay's pocket did on open (M10); null = keyless/relayless spool, no pocket by construction
@@ -62,6 +63,7 @@ interface Spool {
   on(event: 'status', cb: (status: Spool['status']) => void): () => void
   on(event: 'undecryptable', cb: (total: number) => void): () => void // fires per dropped frame with the running total — "someone here isn't on your key" UX
   on(event: 'pocket', cb: (state: PocketState) => void): () => void   // additive event (the status union stays closed); never fires for keyless spools
+  on(event: 'full', cb: (reason: string) => void): () => void         // additive (T-169): fires with the relay's close reason on every refused attempt while the room is full
 
   share(): string                    // the shareable link
   rewind(ts: number): EntrySnapshot[]  // the spool as it was at the latest recorded moment ≤ ts; see "rewind()" below
@@ -80,6 +82,8 @@ interface WindInput {
 `wind()` is synchronous and returns the **live Entry handle** immediately (decision: DESIGN_DOC §5) — local-first means there's nothing to await. Sync happens in the background.
 
 `leave()` disconnects and releases resources. Local IndexedDB data is **retained** — a spool is a keepsake. (Deleting local data is a stash/archive concern, M8.)
+
+**A full room says so** (T-169). `spools-relay` closes the 65th connection to a room with code 1013 ("room full"); y-websocket's default would reconnect at once and forever, which an app sees as an endless connecting spinner. The SDK treats 1013 as "stand back": `roomFull` turns true, `on('full')` fires with the close reason, `status` reads `offline` (not `connecting`) while it waits ~30 s, then it tries once more — refused again, it says so again. The moment a connection is accepted, `roomFull` clears. The status union stays closed; this sits beside it, like `pocket`.
 
 ## Events: diff + getter, no replay
 
@@ -219,9 +223,31 @@ interface PocketState {
   phase: PocketPhase
   applied?: number   // deposits merged (once settled)
   dropped?: number   // deposits dropped unapplied — bad envelope or failed authentication (counted, never handed to Yjs)
-  depositError?: 'too-big' | 'budget'  // depositing hit a hard relay limit and stopped: degraded, loudly, to live-only
+  depositError?: 'too-big' | 'budget' | 'rate-limited'  // the relay refused a deposit — see below
 }
 ```
+
+- `depositError`: `too-big` (413) and `budget` (507) are hard relay limits —
+  depositing stops and the spool degrades, loudly, to live-only.
+  `rate-limited` (429, T-178) is the soft one: the final deposit —
+  `leave()`'s flush, or a hidden tab's — was refused through the bounded
+  retry, so the pocket lacks the last changes; it clears on the next deposit
+  the relay accepts. Read it after `await leave()`; it is the one moment the
+  answer matters.
+- **Leaving under a rate limit** (T-178): `leave()` retries a 429'd final
+  deposit three times inside ~5 s (waits of 1 s, then 2 s — the relay's
+  per-IP budget is a sliding minute, so waiting is the remedy) before naming
+  the loss; it never goes quiet. A scheduled deposit that meets a 429 re-arms
+  itself after the min-gap instead of waiting for the next change. Deposits
+  that seal to ≤ 64 KiB go out with `keepalive: true`, so a flush started by
+  `visibilitychange` outlives the tab that started it (bigger ones cannot
+  carry the option — browsers refuse it).
+- **Memory-only clients have no heal** (T-178): deposit-if-ahead repairs a
+  lost deposit on the next open only when local persistence still holds the
+  winds. A `persist: false` spool — a preview, a headless builder, a keeper
+  before its file restore — loses what a refused or interrupted final deposit
+  carried, and a builder that exits without `leave()` has deposited nothing:
+  `await leave()` and read `depositError` before the process goes away.
 
 - `unavailable` covers every kind of nothing: an old relay (detected by the
   §6 envelope rule — a bare `200` is never "empty"), a dead relay, a future
@@ -235,8 +261,9 @@ interface PocketState {
   the last debounce of *pocket coverage* (`sendBeacon` can't carry a real
   spool — the 64 KiB budget vs a measured 94 KB doc). Nothing is ever lost
   locally; the gap is only in what the relay holds for absent friends, and
-  it heals on the next open. `visibilitychange → hidden` narrows it with a
-  best-effort flush.
+  it heals on the next open of a persisted spool. `visibilitychange →
+  hidden` narrows it with a best-effort flush that, for spools sealing to
+  ≤ 64 KiB, rides `keepalive` and so outlives the tab (T-178).
 
 ## Under the hood (M1 shape)
 

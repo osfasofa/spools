@@ -25,7 +25,7 @@ http, as the brief already plans. Review finding F18.
 
 ## Tasks
 
-- [ ] SDK: UUID v4 fallback from `getRandomValues` when `randomUUID` is
+- [x] SDK: UUID v4 fallback from `getRandomValues` when `randomUUID` is
       missing (tested; the id stays a UUID).
 - [x] Clients: clipboard fallback (select-the-text + `execCommand('copy')`,
       or show the link with a long-press hint when the API is absent).
@@ -76,3 +76,39 @@ http, as the brief already plans. Review finding F18.
   UUID fallback (SDK lane), the `apps/client` LAN row + off-grid brief
   asterisk, and the two-device Wi-Fi acceptance (owner) — the ticket stays
   `doing` for those.
+
+### Landed — the SDK half (3 Sep 2026, SDK lane)
+
+- `entry.ts` mints ids through a small `uuid()` helper: the native
+  `crypto.randomUUID` when the context has it, otherwise 16 bytes from
+  `getRandomValues` with the version (`0x40`) and variant (`0x80`) nibbles
+  set — a well-formed RFC 4122 v4 id either way, so nothing downstream
+  (sort tie-breaks, `entry:<id>` body keys, exports) can tell the two apart.
+  Tested in `entry.test.ts` with the `crypto` global stubbed down to
+  `{ getRandomValues }`: 1000 ids, all v4-shaped, all distinct, and `wind()`
+  — the call that threw — works; a second test pins that the native path is
+  still preferred when it exists.
+- Swept the rest of the SDK for other secure-context APIs: none.
+  `getRandomValues` (keys, nonces, the pocket tag), IndexedDB,
+  `BroadcastChannel`, `ws://`, `RTCPeerConnection`, and `fetch` to an http
+  origin all work on a plain-http page; `crypto.subtle` is never used
+  (tweetnacl does the sealing). The pocket's `fetch` to `http://<laptop>`
+  from an `http://` page is same-scheme, so no mixed-content wall there
+  either.
+- Outside the SDK lane, for whoever runs the LAN smoke row:
+  `apps/client/vendor/spools.js` is a vendored SDK build and still carries
+  the bare `crypto.randomUUID()` — run `pnpm client:vendor` (root script) so
+  the static client picks the fallback up before it is served over http.
+- Landed in commit `03bf0ec` (hash filled in by the session's wrap-up
+  commit; it cannot be known from inside the commit itself).
+
+### Remaining — room lane and owner
+
+- Clipboard fallback for the room and mixtape copy-link buttons (room lane).
+- The LAN smoke row in `apps/client/TESTING.md` and the two-devices,
+  no-internet acceptance run (owner, hardware).
+- Folding the asterisk into docs/vessels/off-grid.md §2/§3.
+
+The ticket stays `doing` until those report.
+
+*(Merged 3 Sep 2026: both halves landed — the SDK's `uuid()` in `03bf0ec`, the clipboard fallback in `fa7a02d`, and `apps/client/vendor/spools.js` regenerated in the SDK lane's PR. Still open: the LAN row in `apps/client/TESTING.md`, the off-grid brief's asterisk, and the two-device no-internet acceptance — owner at keyboard.)*

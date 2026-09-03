@@ -34,6 +34,11 @@ That's the whole setup. No config file, no database, no state.
   simply degrades to sync-when-together until deposits accrue again. Honest,
   but it defeats the pocket's purpose during exactly the gaps it exists to
   bridge — give the canonical relay a disk.
+- **Behind either proxy, set `TRUST_PROXY=1`** (`fly.toml` already does;
+  on Railway it's a service variable). Without it the socket address every
+  per-IP limit keys on is the proxy's own, so the whole relay shares one
+  bucket. With it, the client is the rightmost `X-Forwarded-For` hop — the
+  one the proxy appended.
 
 Resource expectations: tiny. The relay does no computation on frames — it's
 a fan-out loop. A hobby-tier instance carries intimate-scale traffic easily.
@@ -53,6 +58,27 @@ signaling endpoint from it (same host, root path). One URL, both jobs.
 Rooms are created on first join and vanish when the last member leaves.
 Crude guards, documented in the source: 8 MiB max frame, 64 connections per
 room.
+
+| knob | default | |
+|---|---|---|
+| `TRUST_PROXY` | *(unset — off)* | behind an edge proxy (Railway, Fly): every per-IP limit keys on the rightmost `X-Forwarded-For` hop, the one the proxy appended, instead of the proxy's own address. Leave it off on a relay exposed directly — there the header is whatever the client wrote |
+| `RELAY_MAX_BUFFERED_BYTES` | `67108864` | a member with more than this queued for it (it stopped reading) is skipped and closed with 1008 "slow consumer"; 0 disables. 64 MiB is eight peers at the 8 MiB frame cap — a cold joiner gets one state frame per peer at once |
+| `RELAY_MAX_FRAMES_PER_SEC` | `300` | per-connection frame budget; over it → closed with 1008 "frame budget exceeded"; 0 disables |
+| `RELAY_MAX_BYTES_PER_MIN` | `134217728` | per-connection byte budget (128 MiB/min — sixteen full-size state frames); same close; 0 disables |
+| `RELAY_CONNS_PER_IP_PER_ROOM` | `0` *(off)* | per-address cap inside one room; over it → closed with 1013 "too many connections from this address". **Enable together with `TRUST_PROXY`**: behind a proxy without it, everyone is one address and the cap would fall on all of them at once |
+
+The close code matters: **1013 means "room full"** to the SDK; **1008** is
+"you broke the relay's policy" (with the reason in the close frame), and a
+healthy connection never sees it. The defaults are sized to the relay's own
+ceilings rather than to typical traffic: a cold joiner has one state frame
+per peer queued for it at once (64 MiB is eight peers at the 8 MiB frame
+cap), a member at the 64-connection guard answers 63 SyncStep1s in one second
+after a relay restart (300/s clears it), and 128 MiB a minute is sixteen
+full-size state frames. Ordinary rooms send one frame per Yjs transaction
+plus awareness and never get near any of these lines. The one they can
+touch: a full-size spool in a room bigger than eight seats, cold-joined over
+a slow link, can trip the buffered cap on arrival — the joiner reconnects
+with backoff and gets the rest.
 
 ## The pocket
 
@@ -80,8 +106,14 @@ POCKET_DIR=/data/pocket npx spools-relay
 | `POCKET_TTL_DAYS` | `60` | namespaces untouched this long are swept; reads refresh the clock |
 | `POCKET_K` | `8` | distinct writer-session tags kept per spool (raised from 4 for group rooms — T-124) |
 | `POCKET_MAX_BYTES` | `8388608` | per-deposit cap (413 above it) |
-| `POCKET_MAX_TOTAL_BYTES` | `1073741824` | relay-wide budget; stalest spools evicted first, 507 when even that can't fit it |
+| `POCKET_MAX_TOTAL_BYTES` | `1073741824` | relay-wide budget. Eviction order: namespaces nobody has ever collected go first (oldest among them), then the stalest-touched; 507 when even that can't fit it |
 | `POCKET_PUTS_PER_MIN` | `24` | per-IP deposit admission (clients self-pace to ~1/min each, so this is ~24 sustained same-NAT devices) |
+| `POCKET_NEW_NAMESPACES_PER_HOUR` | `0` *(off)* | per-IP cap on *new* namespaces (429 "too many new namespaces" past it; deposits into an existing namespace don't count, nor do refused ones). **Enable together with `TRUST_PROXY`** behind a proxy |
+| `POCKET_FIRST_MAX_BYTES` | `= POCKET_MAX_BYTES` | per-deposit cap for a namespace nobody has collected yet (413 above it); after its first read, `POCKET_MAX_BYTES` applies. Equal to it by default — no change until a canonical value is signed off |
+
+In disk mode the read count is a `.reads` file beside a namespace's
+deposits — a plain number, never inside a deposit — restored at boot, so
+both the eviction rank and touch-on-read survive a restart.
 
 ## Point your links at it
 
@@ -103,8 +135,10 @@ Running a relay means you can observe: **room codes** (rendezvous names, not
 secrets), **connection counts**, **traffic volume and timing**, and IP
 addresses — the same metadata any websocket host sees. Running the pocket
 adds: **that a spool has deposits**, their **sizes and times**, an opaque
-per-spool **namespace id** (a one-way hash — it never yields the key), and
-how many distinct writer-session **tags** deposited recently. You still
+per-spool **namespace id** (a one-way hash — it never yields the key), how
+many distinct writer-session **tags** deposited recently, and how many
+times the namespace has been **collected** (a count, kept for eviction
+order). You still
 cannot see content: frames are opaque bytes forwarded unread, deposits are
 ciphertext held unopened, and the key rides in the URL fragment, which
 browsers never transmit to any server, this one included.
@@ -130,7 +164,10 @@ untouched namespaces are swept after **60 days**, **8** writer-session tags per
 spool, **8 MiB** per deposit, **1 GiB** relay-wide. Treat the 60 days as a
 courtesy window, not an archive — the pocket is there to bridge the gap between
 one friend's evening and another's midnight, and the thing that actually keeps
-a spool is a copy on somebody's disk (`export()`).
+a spool is a copy on somebody's disk (`export()`). Under the 1 GiB budget,
+namespaces nobody ever collected are evicted before ones somebody did; the
+creation and first-deposit knobs are at their inert defaults. **A determined
+stranger can still fill the pocket; devices remain the spool's home.**
 
 **Group-scale honesty (T-110/T-111, measured).** The tag ring holds the
 newest deposit from each of the last **8** writer sessions. People writing
@@ -139,10 +176,20 @@ but **nine or more people writing in isolation** (offline, partitioned) can
 silently outrun the ring: the oldest unmerged worldview is evicted, a cold
 joiner won't see it, and only that writer's own return heals it. The per-IP
 deposit budget (**24/min**) covers a couple of dozen same-NAT devices at the
-clients' own 1/min pacing. And the **64 connections per room** guard counts
+clients' own 1/min pacing — per *client* address only where `TRUST_PROXY`
+is set; a relay behind a proxy without it sees one address, and the budget
+becomes one bucket for everyone on it. And the **64 connections per room** guard counts
 tabs, not people; a 65th connection is closed with code 1013 ("room full"),
 which today's SDK experiences as an endless connect/drop cycle — a full room
-looks like a bad connection.
+looks like a bad connection. Room codes are public by design, so one
+address could fill a room to that guard by itself; `RELAY_CONNS_PER_IP_PER_ROOM`
+(off by default — it needs `TRUST_PROXY` behind a proxy) caps that, and the
+extra sockets get 1013 with the reason "too many connections from this
+address". One connection that stops reading, or floods, is closed with
+**1008** and a reason (64 MiB queued, 300 frames/s, 128 MiB/min — the knobs
+above) and the room keeps going for everyone else; nothing is buffered
+without bound and nothing is fanned out past the budget.
 
-Env: `PORT` (default 4444), `HOST` (default 0.0.0.0), pocket knobs above.
-Node ≥ 18. Tests: `pnpm test` (node:test, spawns real instances).
+Env: `PORT` (default 4444), `HOST` (default 0.0.0.0), `TRUST_PROXY` (default
+off), pocket knobs above. Node ≥ 18. Tests: `pnpm test` (node:test, spawns
+real instances).

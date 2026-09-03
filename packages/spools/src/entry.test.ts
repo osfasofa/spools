@@ -3,7 +3,7 @@ import * as Y from 'yjs'
 import { SpoolEngine } from './engine'
 import { Spool } from './spool'
 import { SpoolHistoryError } from './history'
-import type { EntryChange } from './entry'
+import { uuid, type EntryChange } from './entry'
 
 // entry-layer tests need no network: spools are built directly on in-memory
 // engines; "sync" is Y.applyUpdate between docs
@@ -276,5 +276,40 @@ describe('ordering and validation', () => {
     const spool = mkSpool()
     await spool.whenReady
     expect(() => spool.wind({ kind: '' })).toThrow(/kind/)
+  })
+})
+
+describe('ids without randomUUID (T-176): a client served over plain http on a LAN', () => {
+  const V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+
+  it('falls back to getRandomValues; ids stay valid v4 and unique, and wind() works', async () => {
+    const real = globalThis.crypto
+    // an insecure browser context: getRandomValues is there, randomUUID is not
+    vi.stubGlobal('crypto', { getRandomValues: real.getRandomValues.bind(real) })
+    try {
+      expect(typeof crypto.randomUUID).toBe('undefined')
+      const ids = new Set(Array.from({ length: 1000 }, () => uuid()))
+      expect(ids.size).toBe(1000)
+      for (const id of ids) expect(id).toMatch(V4)
+
+      // the call that used to throw on the first message
+      const spool = mkSpool()
+      await spool.whenReady
+      const entry = spool.wind({ kind: 'note', body: 'from the LAN' })
+      expect(entry.id).toMatch(V4)
+      expect(spool.entries).toEqual([entry])
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('uses the native randomUUID when the context has it', () => {
+    const native = vi.spyOn(crypto, 'randomUUID')
+    try {
+      expect(uuid()).toMatch(V4)
+      expect(native).toHaveBeenCalledOnce()
+    } finally {
+      native.mockRestore()
+    }
   })
 })

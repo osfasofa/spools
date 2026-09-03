@@ -35,7 +35,16 @@ export interface SpoolEngineOptions {
   disableBc?: boolean
   /** WebSocket implementation for non-browser environments */
   WebSocketPolyfill?: typeof WebSocket
+  /**
+   * How long to stand back after the relay closes with 1013 ("room full")
+   * before trying again, instead of y-websocket's reconnect-at-once loop
+   * (T-169). Default 30 s; tests shrink it.
+   */
+  roomFullBackoffMs?: number
 }
+
+/** RFC 6455 "try again later" — what spools-relay sends past MAX_CONNS_PER_ROOM */
+export const ROOM_FULL_CLOSE_CODE = 1013
 
 const inBrowser = typeof indexedDB !== 'undefined'
 const hasWebRTC = typeof RTCPeerConnection !== 'undefined'
@@ -62,10 +71,15 @@ export class SpoolEngine {
   #statusListeners = new Set<(status: SpoolStatus) => void>()
   #undecryptable = 0
   #undecryptableListeners = new Set<(total: number) => void>()
+  #roomFull = false
+  #fullListeners = new Set<(reason: string) => void>()
+  #fullTimer: ReturnType<typeof setTimeout> | null = null
+  #roomFullBackoffMs: number
   #left = false
 
   constructor(opts: SpoolEngineOptions) {
     this.code = opts.code
+    this.#roomFullBackoffMs = opts.roomFullBackoffMs ?? 30_000
     // gc:false universally (§5, T-060): rewind() needs deleted content to
     // survive as tombstones, and mixed-gc rooms would give peers different
     // recoverable pasts. Cost measured at +34% doc size on a realistic spool.
@@ -95,11 +109,31 @@ export class SpoolEngine {
       this.#websocket = new WebsocketProvider(opts.relay, opts.code, this.doc, {
         resyncInterval: opts.resyncIntervalMs ?? 20_000,
         disableBc: opts.disableBc ?? false,
+        // 1013 is the relay saying "room full". y-websocket's default would
+        // reconnect at once and forever — the endless spinner of T-169 — so
+        // treat it as terminal for one backoff, then resume below. The
+        // 4400–4499 rule is the provider's own default, kept as is.
+        shouldReconnect: (event) =>
+          event.code !== ROOM_FULL_CLOSE_CODE && !(event.code >= 4400 && event.code < 4500),
         ...(Transport ? { WebSocketPolyfill: Transport } : {}),
       })
       this.#websocket.on('status', ({ status }) => {
         this.#wsStatus = status === 'connected' ? 'connected' : status === 'connecting' ? 'connecting' : 'disconnected'
+        if (status === 'connected') this.#roomFull = false // a seat was there after all
         this.#deriveStatus()
+      })
+      // the close event reaches the provider unchanged through the encrypted
+      // subclass (it overrides send/onmessage only), so this is one path
+      this.#websocket.on('closed', ({ code, reason }) => {
+        if (code !== ROOM_FULL_CLOSE_CODE || this.#left) return
+        this.#roomFull = true
+        for (const cb of this.#fullListeners) cb(reason)
+        // stand back, then let the provider try once more — another 1013
+        // lands right back here
+        this.#fullTimer = setTimeout(() => {
+          this.#fullTimer = null
+          if (!this.#left) this.#websocket?.connect()
+        }, this.#roomFullBackoffMs)
       })
     }
 
@@ -153,6 +187,21 @@ export class SpoolEngine {
     for (const cb of this.#undecryptableListeners) cb(this.#undecryptable)
   }
 
+  /**
+   * The relay refused the last connection with 1013 "room full" (T-169).
+   * The SDK stands back (~30 s) between attempts instead of spinning;
+   * status reads 'offline' meanwhile. Clears when a connection is accepted.
+   */
+  get roomFull(): boolean {
+    return this.#roomFull
+  }
+
+  /** fires with the close reason on every refused attempt */
+  onFull(cb: (reason: string) => void): () => void {
+    this.#fullListeners.add(cb)
+    return () => this.#fullListeners.delete(cb)
+  }
+
   #deriveStatus() {
     const next: SpoolStatus =
       this.#wsStatus === 'connected' || this.#rtcConnected
@@ -174,6 +223,8 @@ export class SpoolEngine {
   async leave(): Promise<void> {
     if (this.#left) return
     this.#left = true
+    if (this.#fullTimer) clearTimeout(this.#fullTimer)
+    this.#fullTimer = null
     await this.#webrtcPending
     this.#webrtc?.destroy()
     this.#websocket?.destroy()
@@ -181,6 +232,7 @@ export class SpoolEngine {
     this.doc.destroy()
     this.#statusListeners.clear()
     this.#undecryptableListeners.clear()
+    this.#fullListeners.clear()
     if (this.#status !== 'offline') {
       this.#status = 'offline'
     }
