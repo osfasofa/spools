@@ -164,7 +164,7 @@ Drafted 3 Sep 2026 from the ship review — design record: [docs/M15-ship-review
 
 | Ticket | Title | Depends | Status |
 |---|---|---|---|
-| [T-160](T-160-relay-hostname.md) | Own the relay hostname (`relay.spools.lol`) — **owner at keyboard** | — | todo |
+| [T-160](T-160-relay-hostname.md) | Own the relay hostname (`relay.spools.lol`) — **owner at keyboard** | — | doing |
 | [T-161](T-161-proxy-aware-rate-limit.md) | Proxy-aware rate limit: the per-IP bucket is global behind Railway | — | doing |
 | [T-162](T-162-hide-not-remove.md) | Hide, not remove — the delete affordance says what it does | — | done |
 | [T-163](T-163-room-export-forget.md) | Export and forget in the room | — | done |

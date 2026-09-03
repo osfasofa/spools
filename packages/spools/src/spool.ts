@@ -10,11 +10,15 @@ import { keyFingerprint } from './crypto'
 import { PocketClient, type PocketState, type PocketTuning } from './pocket'
 
 /**
- * The canonical spools-relay (deployed T-041). A true dumb byte relay — it
- * never parses a frame and holds no documents. fosho's relay carried M1–M3;
- * the fosho dependency ended here.
+ * The canonical spools-relay (deployed T-041), at a hostname we own since
+ * T-160 (3 Sep 2026): links pin the relay they name, so the name had to be
+ * ours before more links went out. The Railway-generated hostname the first
+ * links carry (`spools-relay-production.up.railway.app`) stays enabled on
+ * the same service indefinitely — same process, same rooms, same pocket. A
+ * true dumb byte relay — it never parses a frame and holds no documents.
+ * fosho's relay carried M1–M3; the fosho dependency ended here.
  */
-export const DEFAULT_RELAY = 'wss://spools-relay-production.up.railway.app/yjs'
+export const DEFAULT_RELAY = 'wss://relay.spools.lol/yjs'
 
 /**
  * The one-URL convention (T-040): a relay URL ending in /yjs implies

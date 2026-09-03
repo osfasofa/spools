@@ -16860,7 +16860,7 @@ ${reason}`);
   };
 
   // src/spool.ts
-  var DEFAULT_RELAY = "wss://spools-relay-production.up.railway.app/yjs";
+  var DEFAULT_RELAY = "wss://relay.spools.lol/yjs";
   var deriveSignaling = (relay) => {
     try {
       const url = new URL(relay);

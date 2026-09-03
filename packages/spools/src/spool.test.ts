@@ -95,7 +95,7 @@ it('one-URL convention: /yjs relay implies signaling at the host root (T-040)', 
   const { deriveSignaling } = await import('./spool')
   expect(deriveSignaling('wss://relay.example/yjs')).toEqual(['wss://relay.example/'])
   expect(deriveSignaling('ws://localhost:9401/yjs')).toEqual(['ws://localhost:9401/'])
-  expect(deriveSignaling('wss://spools-relay-production.up.railway.app/yjs')).toEqual([
+  expect(deriveSignaling('wss://relay.spools.lol/yjs')).toEqual([
     'wss://spools-relay-production.up.railway.app/',
   ]) // the default relay needs no special case
   expect(deriveSignaling('wss://relay.example/other')).toBeUndefined()
