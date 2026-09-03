@@ -154,7 +154,7 @@ recorded in T-021's Notes; superseded by this run against the dumb relay.)*
   because a *peer* answers (scenario 4: instant with A online) and waits
   calmly when nobody's home (scenario 5). That's the v1 contract: "syncs when
   we're together" — and since T-041 deployed the dumb relay as the default
-  (`spools-relay-production.up.railway.app`), it's the live behavior too.
+  (`relay.spools.lol`; the first links carry `spools-relay-production.up.railway.app`, which stays enabled), it's the live behavior too.
 - **`status: 'connected'` means "relay reachable", not "peer present".**
   Scenario 5 shows `connected` with nobody home. Truthful but easy to
   misread; a peer-presence signal (awareness) is unexposed SDK surface today.
