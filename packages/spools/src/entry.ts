@@ -23,6 +23,22 @@ export interface EntryChange {
 
 const ENTRIES = 'entries'
 const bodyKey = (id: string) => `entry:${id}`
+
+/**
+ * @internal An RFC 4122 v4 id. Browsers expose `crypto.randomUUID` only in
+ * secure contexts (https or localhost), so a client served from
+ * `http://192.168.x.x` — the off-grid kit's whole premise — has just
+ * `getRandomValues` (T-176). Same shape either way: 122 random bits with
+ * the version and variant nibbles set.
+ */
+export const uuid = (): string => {
+  if (typeof crypto.randomUUID === 'function') return crypto.randomUUID()
+  const b = crypto.getRandomValues(new Uint8Array(16))
+  b[6] = (b[6] & 0x0f) | 0x40 // version 4
+  b[8] = (b[8] & 0x3f) | 0x80 // RFC 4122 variant
+  const hex = Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('')
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`
+}
 /** createdAt with id tie-break — deterministic across peers */
 const byCreation = (a: Entry, b: Entry) => a.createdAt - b.createdAt || (a.id < b.id ? -1 : 1)
 
@@ -178,7 +194,7 @@ export class EntryStore {
     if (typeof input.kind !== 'string' || input.kind === '') {
       throw new Error('wind() needs a non-empty kind')
     }
-    const id = crypto.randomUUID()
+    const id = uuid()
     this.doc.transact(() => {
       const meta = new Y.Map<unknown>()
       meta.set('id', id)

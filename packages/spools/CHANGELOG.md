@@ -1,5 +1,9 @@
 # spools changelog
 
+## Unreleased
+
+- `wind()` mints ids without `crypto.randomUUID`: a page served over plain http (a LAN relay, the off-grid kit) has only `getRandomValues`, and ids stay RFC 4122 v4 either way (T-176).
+
 ## 0.1.0 — 2026-08-16
 
 - The real SDK, matching SPEC v1.1 and SDK-API.md: links/codes, `wind`/entries/events, encryption at rest and over both transports, `rewind`, `export`/stash, the pocket client, `get awareness()`. (0.0.1 was the T-011-era core: links and codes only.)
