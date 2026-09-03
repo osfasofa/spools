@@ -18,6 +18,9 @@ import { readFile } from 'node:fs/promises'
 import { randomBytes } from 'node:crypto'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+// the built SDK, for the export round-trip (T-163): importSpool runs in plain
+// Node with persist:false and no relay — the file must open where no browser is
+import { importSpool } from '../../packages/spools/dist/index.js'
 
 const CHROME = process.env.CHROME_BIN ?? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
 const CDP_PORT = 9347
@@ -836,6 +839,80 @@ await scenario('8. truly empty room: calm verdict, invite affordance, non-blocki
   if (e.errors.length) throw new Error(`page errors: ${e.errors.join(' | ')}`)
   await e.close()
   return 'nobody-here → really-empty → invite + honest sentence; naming prompt ignorable and dismissible'
+})
+
+// ---------- T-163: keepsake — export, and the one hard delete ----------
+
+await scenario('16. keepsake: export round-trips through importSpool; forget removes the database and the stash row', async () => {
+  await a.eval(`document.querySelector('.headerTitle').click()`)
+  await a.until(`!!document.querySelector('.settingsBody')`, 5_000, 'settings open')
+  const permanence = await a.eval(
+    `document.querySelector('.finePrint').textContent.includes('kept by everyone in the room, for as long as they keep it')`
+  )
+  if (!permanence) throw new Error('the permanence sentence is missing from the fine print')
+
+  // export: capture the anchor download instead of letting headless Chrome
+  // write a file, then read the blob back inside the page
+  await a.eval(`(() => {
+    window.__download = null
+    HTMLAnchorElement.prototype.click = function () { window.__download = { href: this.href, name: this.download } }
+  })()`)
+  await a.eval(`[...document.querySelectorAll('button')].find(el => el.textContent === 'export this room').click()`)
+  await a.until(`!!window.__download`, 5_000, 'export produced a download')
+  const fileName = await a.eval(`window.__download.name`)
+  if (fileName !== `${code}.spool.json`) throw new Error(`download named "${fileName}"`)
+  const text = await a.eval(`fetch(window.__download.href).then(r => r.text())`)
+  const file = JSON.parse(text)
+  if (file.format !== 'spool-export' || file.code !== code) throw new Error(`bad export header: ${file.format} / ${file.code}`)
+  if (text.includes(keyB64)) throw new Error('the key is in the export file')
+  const live = await a.eval(`({ n: window.spool.entries.length, d: window.spool.deleted.length, msgs: window.spool.entries.filter(e => e.kind === 'message').map(e => e.body).sort() })`)
+  const back = await importSpool(text, { persist: false })
+  const backMsgs = back.entries.filter((e) => e.kind === 'message').map((e) => e.body).sort()
+  const same = back.entries.length === live.n && back.deleted.length === live.d && JSON.stringify(backMsgs) === JSON.stringify(live.msgs)
+  await back.leave()
+  if (!same) throw new Error(`import differs: ${back.entries.length}/${back.deleted.length} vs live ${live.n}/${live.d}`)
+
+  // forget: confirm twice, the second step typed. Nothing happens until the
+  // code matches; the seat survives; the room-local last-seen goes
+  const seatBefore = await a.eval(`localStorage.getItem('spool-seat')`)
+  const seenBefore = await a.eval(`localStorage.getItem('room-seen:${code}')`)
+  if (!seenBefore) throw new Error('precondition: A has no room-seen key to clear')
+  const dbsBefore = await a.eval(`indexedDB.databases().then(l => l.map(d => d.name))`)
+  if (!dbsBefore.includes(code)) throw new Error('precondition: the room database is not there to forget')
+  await a.eval(`[...document.querySelectorAll('button')].find(el => el.textContent === 'forget this room on this device').click()`)
+  await a.until(`document.querySelector('.confirmCard')?.textContent.includes('gone from this device only')`, 5_000, 'first confirmation carries the honest copy')
+  await a.eval(`[...document.querySelectorAll('button')].find(el => el.textContent === 'yes, forget it').click()`)
+  await a.until(`!!document.querySelector('.codeInput')`, 5_000, 'second confirmation asks for the room code')
+  const setCode = (value) => a.eval(`(() => { const input = document.querySelector('.codeInput'); (${SET_INPUT})(input, ${JSON.stringify(value)}) })()`)
+  if (!(await a.eval(`document.querySelector('.forgetBtn').disabled`))) throw new Error('forget enabled before any code was typed')
+  await setCode('wrong-code-000')
+  if (!(await a.eval(`document.querySelector('.forgetBtn').disabled`))) throw new Error('forget enabled on a wrong code')
+  await setCode(code)
+  await a.until(`!document.querySelector('.forgetBtn').disabled`, 2_000, 'the typed code arms the button')
+  await a.eval(`document.querySelector('.forgetBtn').click()`)
+  // the bare URL opens a fresh room on the SAME (local) relay — never the default
+  await a.until(`!!window.spool && window.spool.code !== '${code}' && location.hash.includes('spool=')`, 20_000, 'a fresh room opened on the bare url')
+  const newLink = decodeURIComponent(await a.eval(`window.spool.share()`))
+  if (!newLink.includes(`relay=ws://localhost:${RELAY_PORT}/yjs`)) throw new Error(`the fresh room left the local relay: ${newLink}`)
+  const after = await a.eval(`({
+    seat: localStorage.getItem('spool-seat'),
+    seen: localStorage.getItem('room-seen:${code}'),
+    stash: Object.keys(JSON.parse(localStorage.getItem('spools:stash') ?? '{}')),
+  })`)
+  if (after.seat !== seatBefore) throw new Error('spool-seat changed across forget')
+  if (after.seen !== null) throw new Error('room-seen key survived forget')
+  if (after.stash.includes(code)) throw new Error('stash registry row survived forget')
+  const dbsAfter = await a.eval(`indexedDB.databases().then(l => l.map(d => d.name))`)
+  if (dbsAfter.includes(code)) throw new Error('the room database survived forget')
+  // everyone else keeps their copy: B is untouched, and the old link still
+  // opens on this device — the room comes back from B / the pocket
+  const bCount = await b.eval(`window.spool.entries.filter(e => e.kind === 'message').length`)
+  if (bCount === 0) throw new Error("B's copy vanished")
+  const again = await Tab.open(linkFor(ORIGINS[0]))
+  await again.until(`document.querySelectorAll('.bubble').length > 0`, 20_000, 'the old link reopens from the others')
+  if (again.errors.length || a.errors.length) throw new Error(`page errors: ${[...again.errors, ...a.errors].join(' | ')}`)
+  await again.close()
+  return `export ${fileName} (${text.length} B, key absent) reopened in Node with ${back.entries.length}+${back.deleted.length} entries; forget: db + stash row + room-seen gone, seat kept, fresh room on the local relay, old link reopens`
 })
 
 await a?.close()

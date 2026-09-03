@@ -167,7 +167,7 @@ Drafted 3 Sep 2026 from the ship review — design record: [docs/M15-ship-review
 | [T-160](T-160-relay-hostname.md) | Own the relay hostname (`relay.spools.lol`) — **owner at keyboard** | — | todo |
 | [T-161](T-161-proxy-aware-rate-limit.md) | Proxy-aware rate limit: the per-IP bucket is global behind Railway | — | todo |
 | [T-162](T-162-hide-not-remove.md) | Hide, not remove — the delete affordance says what it does | — | done |
-| [T-163](T-163-room-export-forget.md) | Export and forget in the room | — | todo |
+| [T-163](T-163-room-export-forget.md) | Export and forget in the room | — | done |
 | [T-164](T-164-start-a-new-room.md) | Start a new room — the way out when someone turns bad | — | todo |
 | [T-165](T-165-key-travels.md) | Where the key actually goes: the sentence + the address-bar decision — **sign-off** | — | todo |
 | [T-166](T-166-self-host-font.md) | Self-host the font — zero third-party requests | — | todo |

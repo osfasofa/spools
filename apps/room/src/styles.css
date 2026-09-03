@@ -783,9 +783,59 @@ body {
   border-color: var(--ac);
 }
 
+.copyBtn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
 .caption {
   font-size: 11px;
   color: var(--dim);
+}
+
+.mono {
+  font-family: var(--mono);
+}
+
+/* keepsake (T-163): export, and the one hard delete with its ceremony */
+.keepsakeRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.confirmCard {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--sf);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--tx);
+}
+
+.codeInput {
+  background: var(--bg);
+  border: 1px solid var(--ln);
+  border-radius: var(--radius);
+  color: var(--tx);
+  font-family: var(--mono);
+  font-size: 16px; /* ≥16px on inputs — iOS auto-zoom (see .composerInput) */
+  padding: 10px 14px;
+  min-height: 44px;
+  outline: none;
+}
+
+.codeInput:focus {
+  border-color: var(--ac);
+}
+
+.forgetBtn:not(:disabled) {
+  background: var(--ac);
+  color: var(--acTx);
+  border-color: var(--ac);
 }
 
 .finePrint {

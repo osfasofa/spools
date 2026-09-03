@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { Spool } from 'spools'
+import { DEFAULT_RELAY, parseSpoolLink, stash, type Spool } from 'spools'
 import { ActionSheet } from './ActionSheet'
 import { Arrival } from './Arrival'
 import { drawFavicon, pageTitle } from './badge'
@@ -92,6 +92,7 @@ const Settings = ({
   onToggleMute,
   notifState,
   onEnableNotifications,
+  onForget,
   onBack,
 }: {
   spool: Spool
@@ -104,9 +105,34 @@ const Settings = ({
   onToggleMute: () => void
   notifState: string
   onEnableNotifications: () => void
+  /** the one hard delete, after the ceremony below has been completed (T-163) */
+  onForget: () => void
   onBack: () => void
 }) => {
   const [copied, setCopied] = useState(false)
+  // T-163 keepsake: export is a plain file download; forget is the one hard
+  // delete in the system and owes confirm-twice ceremony (stash docstring) —
+  // step 1 says what it does, step 2 has you type the room code
+  const [exported, setExported] = useState(false)
+  const [forgetStep, setForgetStep] = useState<0 | 1 | 2>(0)
+  const [forgetTyped, setForgetTyped] = useState('')
+  const exportRoom = () => {
+    const blob = new Blob([spool.export()], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${spool.code}.spool.json`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 10_000)
+    setExported(true)
+    setTimeout(() => setExported(false), 1600)
+  }
+  const keepIt = () => {
+    setForgetStep(0)
+    setForgetTyped('')
+  }
   const [nameDraft, setNameDraft] = useState(roomName)
   const [nameEditing, setNameEditing] = useState(false)
   useEffect(() => {
@@ -227,10 +253,73 @@ const Settings = ({
           <div className="caption">the link is the key — share it with people you trust</div>
         </section>
         <section className="settingsSection">
+          <div className="sectionLabel">keepsake</div>
+          <button className="copyBtn" onClick={exportRoom}>
+            {exported ? 'exported ✓' : 'export this room'}
+          </button>
+          <div className="caption">
+            everything here, as a file you can read without any software. the key is never in the file.
+          </div>
+          {forgetStep === 0 ? (
+            <button className="copyBtn" onClick={() => setForgetStep(1)}>
+              forget this room on this device
+            </button>
+          ) : (
+            <div className="confirmCard">
+              <div>
+                gone from this device only — everyone else keeps their copy, and the relay's pocket keeps
+                sealed copies for up to 60 days.
+              </div>
+              {forgetStep === 1 ? (
+                <div className="keepsakeRow">
+                  <button className="copyBtn" onClick={() => setForgetStep(2)}>
+                    yes, forget it
+                  </button>
+                  <button className="copyBtn" onClick={keepIt}>
+                    keep it
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <label className="caption" htmlFor="forgetCode">
+                    type the room code to confirm: <span className="mono">{spool.code}</span>
+                  </label>
+                  <input
+                    id="forgetCode"
+                    className="codeInput"
+                    value={forgetTyped}
+                    placeholder={spool.code}
+                    autoCapitalize="off"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    onInput={(ev) => {
+                      const value = ev.currentTarget.value
+                      setForgetTyped(value)
+                    }}
+                  />
+                  <div className="keepsakeRow">
+                    <button
+                      className="copyBtn forgetBtn"
+                      disabled={forgetTyped.trim() !== spool.code}
+                      onClick={onForget}
+                    >
+                      forget
+                    </button>
+                    <button className="copyBtn" onClick={keepIt}>
+                      keep it
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </section>
+        <section className="settingsSection">
           <div className="sectionLabel">fine print</div>
           <div className="finePrint">
             anyone with the link can edit or delete anything. no push, no server that knows you. rewind
-            never forgets. "seen" is live-only — nobody learns what you read while they were away.
+            never forgets. "seen" is live-only — nobody learns what you read while they were away. what
+            you put here is kept by everyone in the room, for as long as they keep it.
           </div>
         </section>
       </div>
@@ -475,6 +564,51 @@ export const App = () => {
     return () => clearTimeout(t)
   }, [pocket?.phase])
 
+  // T-163: forget. useRoom owns the spool's lifetime and leave() is
+  // idempotent end to end (engine #left guard; history/pocket/store destroys
+  // are re-entrant), so leaving here and letting the page go is safe: a
+  // navigation never unmounts React, and a second leave() would be a no-op
+  // anyway. Order: leave() closes the database (forget rejects while it's
+  // open) → the one hard delete → the room-local key → the bare URL, on the
+  // same relay when it isn't the default. `spool-seat` is never touched.
+  const [forgetState, setForgetState] = useState<
+    { phase: 'idle' } | { phase: 'working' } | { phase: 'failed'; message: string }
+  >({ phase: 'idle' })
+  const forgetRoom = async () => {
+    if (!spool) return
+    const code = spool.code
+    const relay = parseSpoolLink(spool.share()).relay
+    setForgetState({ phase: 'working' })
+    try {
+      await spool.leave()
+      // the closing connection can still trip deleteDatabase's `blocked` for a
+      // beat after close() — retry briefly before calling it another tab's
+      let lastErr: unknown = null
+      for (let attempt = 0; attempt < 6; attempt++) {
+        try {
+          await stash.forget(code)
+          lastErr = null
+          break
+        } catch (err) {
+          lastErr = err
+          await new Promise((r) => setTimeout(r, 250))
+        }
+      }
+      if (lastErr !== null) throw lastErr
+      localStorage.removeItem(`room-seen:${code}`)
+      const bare = location.origin + location.pathname
+      location.replace(relay && relay !== DEFAULT_RELAY ? `${bare}#relay=${encodeURIComponent(relay)}` : bare)
+    } catch (err) {
+      const raw = err instanceof Error ? err.message : String(err)
+      setForgetState({
+        phase: 'failed',
+        message: /still open/.test(raw)
+          ? 'this room is still open in another tab on this device — close it and try again.'
+          : raw,
+      })
+    }
+  }
+
   if (error) {
     return (
       <div className="screen">
@@ -487,6 +621,21 @@ export const App = () => {
     )
   }
   if (!spool) return <div className="screen loading">opening the room…</div>
+  if (forgetState.phase === 'working')
+    return <div className="screen loading">forgetting this room on this device…</div>
+  if (forgetState.phase === 'failed')
+    return (
+      <div className="screen">
+        <div className="errorCard">
+          <h2>couldn't forget this room</h2>
+          <p>{forgetState.message}</p>
+          <p className="caption">nothing was deleted. reopen the room and try again.</p>
+          <button className="copyBtn" onClick={() => location.reload()}>
+            reopen the room
+          </button>
+        </div>
+      </div>
+    )
 
   if (view === 'settings')
     return (
@@ -508,6 +657,7 @@ export const App = () => {
           // a button, never an ambush — permission is asked only here
           void Notification.requestPermission().then(setNotifState)
         }}
+        onForget={() => void forgetRoom()}
         onBack={() => setView('room')}
       />
     )
