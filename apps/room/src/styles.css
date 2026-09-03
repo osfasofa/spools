@@ -811,6 +811,18 @@ body {
   border-color: var(--ac);
 }
 
+/* the whole link, when no copy path worked (T-176): wraps, selects as one */
+.linkFull {
+  display: block;
+  margin: 6px 0;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--tx);
+  overflow-wrap: anywhere;
+  -webkit-user-select: all;
+  user-select: all;
+}
+
 .copyBtn:disabled {
   opacity: 0.45;
   cursor: default;

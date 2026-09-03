@@ -3,6 +3,7 @@ import { DEFAULT_RELAY, buildSpoolLink, generateCode, parseSpoolLink, stash, typ
 import { ActionSheet } from './ActionSheet'
 import { Arrival } from './Arrival'
 import { drawFavicon, pageTitle } from './badge'
+import { copyText } from './clipboard'
 import { Composer } from './Composer'
 import { MessageList, seatOf, type ParentRef, type Rec } from './MessageList'
 import { normalizeEmoji, rememberEmoji } from './emoji'
@@ -162,12 +163,28 @@ const Settings = ({
   // handwriting; it syncs nothing (owner-approved cut)
   const [theme, setTheme] = useState(currentTheme)
   const link = spool.share()
+  // T-176: no Clipboard API (plain http on a LAN) → execCommand; no copy at
+  // all → show the whole link, pre-selected, with a long-press hint
+  const [copyHint, setCopyHint] = useState(false)
+  const fullLinkRef = useRef<HTMLSpanElement>(null)
   const copy = () => {
-    void navigator.clipboard.writeText(link).then(() => {
-      setCopied(true)
-      setTimeout(() => setCopied(false), 1600)
+    void copyText(link).then((ok) => {
+      if (ok) {
+        setCopied(true)
+        setTimeout(() => setCopied(false), 1600)
+      } else {
+        setCopyHint(true)
+      }
     })
   }
+  useEffect(() => {
+    if (!copyHint || !fullLinkRef.current) return
+    const range = document.createRange()
+    range.selectNodeContents(fullLinkRef.current)
+    const selection = getSelection()
+    selection?.removeAllRanges()
+    selection?.addRange(range)
+  }, [copyHint])
   return (
     <div className="screen">
       <header className="header">
@@ -280,6 +297,14 @@ const Settings = ({
               {copied ? 'copied ✓' : 'copy'}
             </button>
           </div>
+          {copyHint ? (
+            <div className="caption">
+              copy didn't work here — long-press or select the link to copy it.
+              <span className="linkFull" ref={fullLinkRef}>
+                {link}
+              </span>
+            </div>
+          ) : null}
           <div className="caption">the link is the key — share it with people you trust</div>
           <div className="caption keyTravels">{KEY_TRAVELS}</div>
         </section>
@@ -393,11 +418,18 @@ export const App = () => {
   }
 
   const [inviteCopied, setInviteCopied] = useState(false)
+  /** the link shown in the feed when no copy path worked (T-176) */
+  const [copyFallback, setCopyFallback] = useState<string | null>(null)
   const invite = () => {
     if (!spool) return
-    void navigator.clipboard.writeText(spool.share()).then(() => {
-      setInviteCopied(true)
-      setTimeout(() => setInviteCopied(false), 4000) // long enough to read where the key goes (T-165)
+    const link = spool.share()
+    void copyText(link).then((ok) => {
+      if (ok) {
+        setInviteCopied(true)
+        setTimeout(() => setInviteCopied(false), 4000) // long enough to read where the key goes (T-165)
+      } else {
+        setCopyFallback(link)
+      }
     })
   }
 
@@ -419,16 +451,7 @@ export const App = () => {
       }
       location.href = link // a fragment change — main.tsx's hashchange reload opens it
     }
-    let write: Promise<void>
-    try {
-      write = navigator.clipboard.writeText(link)
-    } catch {
-      write = Promise.reject(new Error('no clipboard'))
-    }
-    write.then(
-      () => go(true),
-      () => go(false)
-    )
+    void copyText(link).then(go) // synchronous first step, inside the tap (T-176)
   }
   // …and the arrival on the other side: one notice, consumed on read so a
   // reload never repeats it
@@ -849,6 +872,18 @@ export const App = () => {
       />
       {inviteCopied ? (
         <div className="notice linkCopied">link copied — hand it to someone you trust. {KEY_TRAVELS}</div>
+      ) : null}
+      {copyFallback ? (
+        <div className="noticeRow copyFallback">
+          <div className="notice">
+            copy didn't work here — long-press or select the link to copy it.
+            <span className="linkFull">{copyFallback}</span>
+            {KEY_TRAVELS}
+          </div>
+          <button className="noticeClose" onClick={() => setCopyFallback(null)} aria-label="Dismiss">
+            ✕
+          </button>
+        </div>
       ) : null}
       {cameFrom ? (
         <div className="noticeRow cameFrom">

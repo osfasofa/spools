@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { stash } from 'spools'
 import { Cassette } from './Cassette'
+import { copyText } from './clipboard'
 import { useSpool } from './useSpool'
 
 /**
@@ -186,6 +187,8 @@ export const App = () => {
   }, [spool, entries, rewindTs])
 
   const [copied, setCopied] = useState(false)
+  /** the link shown in place when no copy path worked — plain http on a LAN has no Clipboard API (T-176) */
+  const [copyFallback, setCopyFallback] = useState<string | null>(null)
   const [nameDraft, setNameDraft] = useState(author)
 
   if (error) {
@@ -202,9 +205,14 @@ export const App = () => {
   if (!spool) return <main className="page loading">finding the tape…</main>
 
   const share = () => {
-    void navigator.clipboard.writeText(spool.share()).then(() => {
-      setCopied(true)
-      setTimeout(() => setCopied(false), 1600)
+    const link = spool.share()
+    void copyText(link).then((ok) => {
+      if (ok) {
+        setCopied(true)
+        setTimeout(() => setCopied(false), 1600)
+      } else {
+        setCopyFallback(link)
+      }
     })
   }
 
@@ -258,6 +266,13 @@ export const App = () => {
           {copied ? 'link copied ✓' : '⤴ hand this tape to someone'}
         </button>
       </div>
+
+      {copyFallback ? (
+        <p className="copyFallback">
+          copy didn't work here — long-press or select the link to copy it.
+          <span className="linkFull">{copyFallback}</span>
+        </p>
+      ) : null}
 
       {rewinding ? (
         <div className="memoryBar">

@@ -1090,6 +1090,41 @@ await scenario('19. notifications carry the name, not the text, unless this devi
   return `default body "${first.body}" (no text); after opting in: "${second.body}"`
 })
 
+// ---------- T-176: copy without the Clipboard API ----------
+
+await scenario('20. copy without the Clipboard API: execCommand fallback, then the long-press hint', async () => {
+  // plain http on a LAN is not a secure context: navigator.clipboard is
+  // simply absent. Stand in for that, and for execCommand's verdict
+  const NO_CLIPBOARD = `
+    Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true })
+    window.__exec = []
+    document.execCommand = (cmd) => { window.__exec.push(cmd); return window.__execOk !== false }
+  `
+  const t = await Tab.open(linkFor(ORIGINS[2]), { patch: NO_CLIPBOARD })
+  await t.ready()
+  await t.eval(`document.querySelector('.headerTitle').click()`)
+  await t.until(`!!document.querySelector('.settingsBody')`, 5_000, 'settings open')
+  const copyBtn = `[...document.querySelectorAll('.copyBtn')].find(el => el.textContent === 'copy')`
+  await t.eval(`${copyBtn}.click()`)
+  await t.until(`[...document.querySelectorAll('.copyBtn')].some(el => el.textContent === 'copied ✓')`, 5_000, 'the execCommand path reports copied')
+  const execs = await t.eval(`window.__exec`)
+  if (!execs.includes('copy')) throw new Error(`execCommand('copy') was not used: ${JSON.stringify(execs)}`)
+  const focusBack = await t.eval(`document.activeElement === ${copyBtn} || document.activeElement === document.body`)
+  if (!focusBack) throw new Error('the off-screen textarea kept focus')
+  // nothing works at all: the whole link is shown, pre-selected, with the hint
+  await t.eval(`window.__execOk = false`)
+  await sleep(1_700) // "copied ✓" reverts to "copy"
+  await t.eval(`${copyBtn}.click()`)
+  await t.until(`document.querySelector('.settingsBody').textContent.includes('long-press or select the link to copy it')`, 5_000, 'the hint shows')
+  const shown = await t.eval(`document.querySelector('.linkFull')?.textContent === window.spool.share()`)
+  if (!shown) throw new Error('the full link is not shown for a manual copy')
+  const selected = await t.eval(`getSelection().toString() === window.spool.share()`)
+  if (!selected) throw new Error('the shown link is not pre-selected')
+  if (t.errors.length) throw new Error(`page errors: ${t.errors.join(' | ')}`)
+  await t.close()
+  return 'no navigator.clipboard → execCommand("copy") → "copied ✓"; execCommand false → full link shown + selected + hint; 0 page errors'
+})
+
 await a?.close()
 await b?.close()
 await c?.close()
