@@ -11,6 +11,9 @@ primary_region = "iad"
 
 [env]
   POCKET_DIR = "/data/pocket"
+  # Fly's proxy fronts every request, so the client is the rightmost
+  # X-Forwarded-For hop, never the socket address (T-161)
+  TRUST_PROXY = "1"
 
 [[mounts]]
   source = "pocket_data"
