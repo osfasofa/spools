@@ -39,6 +39,13 @@ and re-importable anywhere. On start it restores from that file and lets the
 room fill in the rest. `kill -9` loses at most a couple of seconds of
 debounce; the peers still hold everything, and the next sync heals it.
 
+One gap to know about (T-178): the keeper is a memory-only client
+(`persist: false`), so the SDK's deposit-if-ahead heal has nothing local to
+work from — a final pocket deposit the relay refuses at shutdown (the SDK
+names it `depositError: 'rate-limited'`) stays out of the pocket until a
+peer syncs or the keeper restarts from its file, which lands before the
+pocket check settles and re-deposits what the file holds.
+
 ## What it logs
 
 Connection state, entry counts, the spool code, and the key's short

@@ -189,7 +189,7 @@ Opened 3 Sep 2026. Seven repos now consume `spools` from the registry, and two o
 
 | Ticket | Title | Depends | Status |
 |---|---|---|---|
-| [T-178](T-178-pocket-deposit-loss.md) | Pocket deposits can be lost at leave — syrup + manyhands evidence | T-161 | todo |
+| [T-178](T-178-pocket-deposit-loss.md) | Pocket deposits can be lost at leave — syrup + manyhands evidence | T-161 | doing |
 | [T-179](T-179-stash-remember.md) | `stash.remember` — a vessel mirrors the stash's private format — **sign-off** | — | todo |
 | [T-180](T-180-splice-gate.md) | `splice()` — the gate review — **sign-off** | — | todo |
 

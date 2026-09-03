@@ -3,6 +3,9 @@
 ## Unreleased
 
 - `wind()` mints ids without `crypto.randomUUID`: a page served over plain http (a LAN relay, the off-grid kit) has only `getRandomValues`, and ids stay RFC 4122 v4 either way (T-176).
+- `leave()` retries a rate-limited (429) final deposit three times inside ~5 s and, failing that, says so: `PocketState.depositError` gains `'rate-limited'`, which clears on the next accepted deposit. A scheduled deposit that meets a 429 re-arms after the min-gap on its own (T-178).
+- Deposits sealing to ≤ 64 KiB go out with `keepalive: true`, so a flush started by `visibilitychange` outlives its tab (T-178).
+- Docs name the `persist: false` gap: memory-only clients have no deposit-if-ahead heal, so `await leave()` and read `depositError` (T-178).
 
 ## 0.1.0 — 2026-08-16
 

@@ -233,7 +233,13 @@ export class Spool {
     return buildSpoolLink({ code: this.code, relay: this.#relay, key: this.#key, base })
   }
 
-  /** disconnect and release resources; local data is retained (a spool is a keepsake) */
+  /**
+   * Disconnect and release resources; local data is retained (a spool is a
+   * keepsake). The final pocket deposit goes out first — a 429 is retried
+   * inside a few seconds and then named on `pocket` as
+   * `depositError: 'rate-limited'` (T-178) — so `leave()` may take ~3 s
+   * under a rate limit; it never blocks on a refused deposit for longer.
+   */
   async leave(): Promise<void> {
     this.#history.flush() // stamp the final moment first, so the final deposit carries it
     await this.#pocket?.flush().catch(() => {}) // the last deposit goes out while the doc is still alive

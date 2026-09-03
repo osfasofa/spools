@@ -219,9 +219,31 @@ interface PocketState {
   phase: PocketPhase
   applied?: number   // deposits merged (once settled)
   dropped?: number   // deposits dropped unapplied — bad envelope or failed authentication (counted, never handed to Yjs)
-  depositError?: 'too-big' | 'budget'  // depositing hit a hard relay limit and stopped: degraded, loudly, to live-only
+  depositError?: 'too-big' | 'budget' | 'rate-limited'  // the relay refused a deposit — see below
 }
 ```
+
+- `depositError`: `too-big` (413) and `budget` (507) are hard relay limits —
+  depositing stops and the spool degrades, loudly, to live-only.
+  `rate-limited` (429, T-178) is the soft one: the final deposit —
+  `leave()`'s flush, or a hidden tab's — was refused through the bounded
+  retry, so the pocket lacks the last changes; it clears on the next deposit
+  the relay accepts. Read it after `await leave()`; it is the one moment the
+  answer matters.
+- **Leaving under a rate limit** (T-178): `leave()` retries a 429'd final
+  deposit three times inside ~5 s (waits of 1 s, then 2 s — the relay's
+  per-IP budget is a sliding minute, so waiting is the remedy) before naming
+  the loss; it never goes quiet. A scheduled deposit that meets a 429 re-arms
+  itself after the min-gap instead of waiting for the next change. Deposits
+  that seal to ≤ 64 KiB go out with `keepalive: true`, so a flush started by
+  `visibilitychange` outlives the tab that started it (bigger ones cannot
+  carry the option — browsers refuse it).
+- **Memory-only clients have no heal** (T-178): deposit-if-ahead repairs a
+  lost deposit on the next open only when local persistence still holds the
+  winds. A `persist: false` spool — a preview, a headless builder, a keeper
+  before its file restore — loses what a refused or interrupted final deposit
+  carried, and a builder that exits without `leave()` has deposited nothing:
+  `await leave()` and read `depositError` before the process goes away.
 
 - `unavailable` covers every kind of nothing: an old relay (detected by the
   §6 envelope rule — a bare `200` is never "empty"), a dead relay, a future
@@ -235,8 +257,9 @@ interface PocketState {
   the last debounce of *pocket coverage* (`sendBeacon` can't carry a real
   spool — the 64 KiB budget vs a measured 94 KB doc). Nothing is ever lost
   locally; the gap is only in what the relay holds for absent friends, and
-  it heals on the next open. `visibilitychange → hidden` narrows it with a
-  best-effort flush.
+  it heals on the next open of a persisted spool. `visibilitychange →
+  hidden` narrows it with a best-effort flush that, for spools sealing to
+  ≤ 64 KiB, rides `keepalive` and so outlives the tab (T-178).
 
 ## Under the hood (M1 shape)
 
