@@ -454,12 +454,12 @@ await scenario('10. replies: quote, jump, and orphan stubs', async () => {
   // tap-to-jump exists and doesn't throw (structural lookup, small feed)
   await a.eval(`${bubbleSel('replying to the first thing')}.querySelector('.replyQuote').click()`)
 
-  // orphan 1: parent soft-deleted → quote degrades to "removed"
+  // orphan 1: parent hidden (soft-deleted) → quote degrades to "hidden"
   await a.eval(`window.spool.entries.find((e) => e.kind === 'message' && e.body === 'hello from A').delete()`)
   await b.until(
-    `(() => { const bub = ${bubbleSel('replying to the first thing')}; return bub?.querySelector('.replyQuote')?.textContent === 'removed' })()`,
+    `(() => { const bub = ${bubbleSel('replying to the first thing')}; return bub?.querySelector('.replyQuote')?.textContent === 'hidden' })()`,
     10_000,
-    'deleted parent renders the removed stub'
+    'hidden parent renders the hidden stub'
   )
   // orphan 2: parent that never synced → "not synced yet"
   await b.eval(`window.spool.wind({ kind: 'message', body: 'reply into the void', data: { seat: localStorage.getItem('spool-seat') }, parent: 'never-going-to-exist' })`)
@@ -471,7 +471,7 @@ await scenario('10. replies: quote, jump, and orphan stubs', async () => {
   // restore the deleted message so later scenarios see a stable world
   await a.eval(`window.spool.deleted.find((e) => e.body === 'hello from A')?.restore()`)
   if (a.errors.length || b.errors.length) throw new Error(`page errors: ${[...a.errors, ...b.errors].join(' | ')}`)
-  return 'quote resolves via profiles; jump works; removed + not-synced stubs render; 0 page errors'
+  return 'quote resolves via profiles; jump works; hidden + not-synced stubs render; 0 page errors'
 })
 
 // ---------- T-119: presence ----------
@@ -523,9 +523,9 @@ await scenario('11. presence: dots for everyone, typing transitions, zero doc by
   return `3 dots → typing bubble → idle clear (0 doc bytes moved) → send clears → close dropped in ~${((Date.now() - t0) / 1000).toFixed(1)} s`
 })
 
-// ---------- T-120: edit, delete, the honest contract ----------
+// ---------- T-120: edit, hide (soft delete), the honest contract ----------
 
-await scenario('12. edit-own, tombstones, restore, cross-writer honesty', async () => {
+await scenario('12. edit-own, hide for everyone, restore, cross-writer honesty', async () => {
   // B edits its own message through the sheet: prefilled draft → rewrite
   await b.eval(`${bubbleSel('done thinking')}.click()`)
   await b.until(`[...document.querySelectorAll('.sheetAction')].some(el => el.textContent.includes('edit'))`, 5_000, 'own message offers edit')
@@ -548,11 +548,27 @@ await scenario('12. edit-own, tombstones, restore, cross-writer honesty', async 
     'A sees the edit + marker'
   )
 
-  // B removes a message → tombstone on A, never a silent vanish
+  // B hides a message → tombstone on A, never a silent vanish. The label
+  // says what the mechanism does (T-162): no user-facing string says remove
   await b.eval(`${bubbleSel('reply into the void')}.click()`)
-  await b.until(`[...document.querySelectorAll('.sheetAction')].some(el => el.textContent.includes('remove'))`, 5_000, 'own message offers remove')
-  await b.eval(`[...document.querySelectorAll('.sheetAction')].find(el => el.textContent.includes('remove')).click()`)
+  await b.until(`[...document.querySelectorAll('.sheetAction')].some(el => el.textContent.includes('hide for everyone'))`, 5_000, 'own message offers "hide for everyone"')
+  const removeWord = await b.eval(`[...document.querySelectorAll('.sheetAction')].some(el => /remove/i.test(el.textContent))`)
+  if (removeWord) throw new Error('the action sheet still says "remove" — T-162 says hide')
+  await b.eval(`[...document.querySelectorAll('.sheetAction')].find(el => el.textContent.includes('hide for everyone')).click()`)
   await a.until(`!!document.querySelector('.tombstone')`, 10_000, 'tombstone renders on A')
+  const tombstoneText = await a.eval(`document.querySelector('.tombstone').textContent`)
+  if (tombstoneText !== 'hidden · anyone can restore') throw new Error(`tombstone reads "${tombstoneText}"`)
+  // the first hide on a device explains itself, once (localStorage-gated)
+  await b.until(
+    `document.querySelector('.hideExplained')?.textContent.includes('every copy keeps it and rewind still shows it')`,
+    5_000,
+    'the one-time hide explainer shows on the hiding device'
+  )
+  const explained = await b.eval(`localStorage.getItem('room-hide-explained')`)
+  if (explained !== '1') throw new Error(`room-hide-explained is ${explained}, expected "1"`)
+  await b.eval(`document.querySelector('.noticeClose').click()`)
+  const explainerGone = await b.eval(`!document.querySelector('.hideExplained')`)
+  if (!explainerGone) throw new Error('the hide explainer did not dismiss')
 
   // anyone can restore from the tombstone's sheet (the honest contract cuts both ways)
   await a.eval(`document.querySelector('.tombstone').click()`)
@@ -584,7 +600,7 @@ await scenario('12. edit-own, tombstones, restore, cross-writer honesty', async 
   )
   await a.eval(`document.querySelector('.headerBtn').click()`)
   if (a.errors.length || b.errors.length) throw new Error(`page errors: ${[...a.errors, ...b.errors].join(' | ')}`)
-  return `edit prefilled+marked; tombstone → restore round-trip; cross-writer edit attributed ("${attributed}"); honest sentence present`
+  return `edit prefilled+marked; hide → "hidden · anyone can restore" → restore round-trip; explainer shown once; cross-writer edit attributed ("${attributed}"); honest sentence present`
 })
 
 // ---------- T-121: ephemeral read receipts (the D4 decision) ----------

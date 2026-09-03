@@ -270,6 +270,16 @@ export const App = () => {
     })
   }
 
+  // T-162: the first hide on this device gets one honest line — a hide is a
+  // soft delete that lands everywhere, but every copy keeps the message and
+  // rewind still shows it (MANIFESTO §2: no delete that doesn't delete)
+  const [hideExplained, setHideExplained] = useState(false)
+  const explainHideOnce = () => {
+    if (localStorage.getItem('room-hide-explained') === '1') return
+    localStorage.setItem('room-hide-explained', '1')
+    setHideExplained(true)
+  }
+
   // T-118: the two social gestures — both pure parent mechanics
   const [sheetFor, setSheetFor] = useState<Rec | null>(null)
   const [replyTo, setReplyTo] = useState<Rec | null>(null)
@@ -325,7 +335,7 @@ export const App = () => {
   const resolveParent = (id: string): ParentRef => {
     const rec = parentIndex.live.get(id)
     if (rec) return { kind: 'ok', seat: seatOf(rec), body: rec.body }
-    return parentIndex.deleted.has(id) ? { kind: 'removed' } : { kind: 'missing' }
+    return parentIndex.deleted.has(id) ? { kind: 'hidden' } : { kind: 'missing' }
   }
 
   const myReactionsOn = (rec: Rec): Set<string> => {
@@ -590,6 +600,16 @@ export const App = () => {
         unreadAfter={unreadAfter}
       />
       {inviteCopied ? <div className="notice">link copied — hand it to someone you trust</div> : null}
+      {hideExplained ? (
+        <div className="noticeRow hideExplained">
+          <div className="notice">
+            this hides it everywhere, but every copy keeps it and rewind still shows it.
+          </div>
+          <button className="noticeClose" onClick={() => setHideExplained(false)} aria-label="Dismiss">
+            ✕
+          </button>
+        </div>
+      ) : null}
       {!profiles.get(SEAT) && !namePromptDismissed ? (
         <div className="namePrompt">
           <button className="namePromptText" onClick={() => setView('settings')}>
@@ -636,7 +656,7 @@ export const App = () => {
           const isMine = seatOf(sheetFor) === SEAT
           return (
             <ActionSheet
-              preview={`${resolveName(seatOf(sheetFor))} — ${isTombstone ? 'removed' : `${sheetFor.body.slice(0, 48)}${sheetFor.body.length > 48 ? '…' : ''}`}`}
+              preview={`${resolveName(seatOf(sheetFor))} — ${isTombstone ? 'hidden' : `${sheetFor.body.slice(0, 48)}${sheetFor.body.length > 48 ? '…' : ''}`}`}
               myReactions={isTombstone ? undefined : myReactionsOn(sheetFor)}
               onReact={isTombstone ? undefined : (emoji) => toggleReaction(sheetFor.id, emoji)}
               actions={
@@ -667,8 +687,13 @@ export const App = () => {
                               },
                             },
                             {
-                              label: '✕ remove',
-                              run: () => entries.find((e) => e.id === sheetFor.id)?.delete(),
+                              // the label says what the mechanism does: a
+                              // soft hide anyone can restore (T-162)
+                              label: '✕ hide for everyone',
+                              run: () => {
+                                entries.find((e) => e.id === sheetFor.id)?.delete()
+                                explainHideOnce()
+                              },
                             },
                           ]
                         : []),
