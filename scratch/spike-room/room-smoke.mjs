@@ -1037,6 +1037,59 @@ await scenario('18. a fresh room load contacts only its own origin and the relay
   return `${n.requests.length} requests + ${n.sockets.length} sockets, all on the page origin or the relay; ${fonts.length} woff2 from ./fonts`
 })
 
+// ---------- T-173: notification text stays out of the OS ----------
+
+await scenario('19. notifications carry the name, not the text, unless this device opts in', async () => {
+  // a stand-in Notification that records what the app hands the OS, installed
+  // before the app reads Notification.permission; the reader tab opens on
+  // C's origin, the sender on B's, both back in the original room
+  const NOTIF_STUB = `
+    window.__notifs = []
+    window.Notification = class {
+      constructor(title, opts) { window.__notifs.push({ title, body: opts?.body ?? '' }) }
+      static get permission() { return 'granted' }
+      static requestPermission() { return Promise.resolve('granted') }
+    }
+  `
+  const reader = await Tab.open(linkFor(ORIGINS[2]), { patch: NOTIF_STUB })
+  await reader.ready()
+  await reader.until(`document.querySelectorAll('.bubble').length > 0`, 20_000, 'reader has the room')
+  const sender = await Tab.open(linkFor(ORIGINS[1]))
+  await sender.ready()
+  await sender.until(`document.querySelectorAll('.bubble').length > 0`, 20_000, 'sender has the room')
+  await sender.call('Page.bringToFront')
+  await sleep(500)
+  await reader.eval(`window.__notifs = []`)
+  await sender.typeAndSend('the secret ingredient is love')
+  await reader.until(`window.__notifs.length > 0`, 10_000, 'a notification fires for the hidden reader')
+  const first = await reader.eval(`window.__notifs[window.__notifs.length - 1]`)
+  if (!/ said something$/.test(first.body)) throw new Error(`default body is "${first.body}", expected "<name> said something"`)
+  if (/secret|love/.test(first.body) || /secret|love/.test(first.title)) throw new Error(`message text leaked into the notification: ${JSON.stringify(first)}`)
+
+  // opt in, per device: the toggle in settings, then the same message shape carries the text
+  await reader.call('Page.bringToFront')
+  await sleep(300)
+  await reader.eval(`document.querySelector('.headerTitle').click()`)
+  await reader.until(`!!document.querySelector('.notifTextToggle')`, 5_000, 'toggle in settings')
+  const caption = await reader.eval(`document.querySelector('.settingsBody').textContent.includes('notifications go through your OS and may be kept in its history.')`)
+  if (!caption) throw new Error('the OS-history caption is missing')
+  await reader.eval(`document.querySelector('.notifTextToggle').click()`)
+  const stored = await reader.eval(`localStorage.getItem('room-notif-text')`)
+  if (stored !== '1') throw new Error(`room-notif-text is ${stored}`)
+  await reader.eval(`document.querySelector('.headerBtn').click()`)
+  await sender.call('Page.bringToFront')
+  await sleep(500)
+  await reader.eval(`window.__notifs = []`)
+  await sender.typeAndSend('the second secret is butter')
+  await reader.until(`window.__notifs.length > 0`, 10_000, 'a notification fires after opting in')
+  const second = await reader.eval(`window.__notifs[window.__notifs.length - 1]`)
+  if (!second.body.includes('the second secret is butter')) throw new Error(`opted-in body is "${second.body}"`)
+  if (reader.errors.length || sender.errors.length) throw new Error(`page errors: ${[...reader.errors, ...sender.errors].join(' | ')}`)
+  await sender.close()
+  await reader.close()
+  return `default body "${first.body}" (no text); after opting in: "${second.body}"`
+})
+
 await a?.close()
 await b?.close()
 await c?.close()

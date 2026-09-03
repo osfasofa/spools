@@ -104,6 +104,8 @@ const Settings = ({
   onToggleMute,
   notifState,
   onEnableNotifications,
+  notifText,
+  onToggleNotifText,
   onForget,
   onNewRoom,
   onBack,
@@ -118,6 +120,9 @@ const Settings = ({
   onToggleMute: () => void
   notifState: string
   onEnableNotifications: () => void
+  /** per-device: put the message text in the OS notification (T-173); default off */
+  notifText: boolean
+  onToggleNotifText: () => void
   /** the one hard delete, after the ceremony below has been completed (T-163) */
   onForget: () => void
   /** a fresh keyed room on the same relay, its link copied — the only remedy against a bad actor (T-164) */
@@ -258,6 +263,10 @@ const Settings = ({
           <button className="copyBtn" onClick={onToggleMute}>
             {muted ? 'unmute this device' : 'mute this device'}
           </button>
+          <button className="copyBtn notifTextToggle" onClick={onToggleNotifText} aria-pressed={notifText}>
+            {notifText ? '✓ ' : ''}show message text in notifications
+          </button>
+          <div className="caption">notifications go through your OS and may be kept in its history.</div>
           <div className="caption">
             this room can only reach you while it's open somewhere — there is no server to call you
             back.
@@ -542,6 +551,10 @@ export const App = () => {
   const [notifState, setNotifState] = useState(() =>
     typeof Notification !== 'undefined' ? Notification.permission : 'unsupported'
   )
+  // T-173: a notification carries the sender's name, not the message —
+  // macOS and Android keep notification history and some of it syncs — unless
+  // this device opted in. Per-device, like mute.
+  const [notifText, setNotifText] = useState(() => localStorage.getItem('room-notif-text') === '1')
   const seenMsgCount = useRef<number | null>(null)
   useEffect(() => {
     const others = entries.filter((e) => e.kind === 'message' && seatOf(e) !== SEAT)
@@ -555,13 +568,15 @@ export const App = () => {
     setUnread((n) => n + fresh)
     const latest = others[others.length - 1]
     if (!muted && notifState === 'granted' && latest) {
-      // tag collapses the pile into one — this is a nudge, not a feed
+      // tag collapses the pile into one — this is a nudge, not a feed. The
+      // body is the name alone unless this device opted into the text (T-173)
+      const name = nameFor(profileTable(entries), seatOf(latest))
       new Notification(roomName || 'a room', {
-        body: `${nameFor(profileTable(entries), seatOf(latest))}: ${latest.body.slice(0, 80)}`,
+        body: notifText ? `${name}: ${latest.body.slice(0, 80)}` : `${name} said something`,
         tag: `room-${spool?.code ?? ''}`,
       })
     }
-  }, [entries, muted, notifState, roomName, spool])
+  }, [entries, muted, notifState, notifText, roomName, spool])
   useEffect(() => {
     const onVisible = () => {
       if (document.visibilityState === 'visible') setUnread(0)
@@ -732,6 +747,12 @@ export const App = () => {
         onEnableNotifications={() => {
           // a button, never an ambush — permission is asked only here
           void Notification.requestPermission().then(setNotifState)
+        }}
+        notifText={notifText}
+        onToggleNotifText={() => {
+          const next = !notifText
+          localStorage.setItem('room-notif-text', next ? '1' : '0')
+          setNotifText(next)
         }}
         onForget={() => void forgetRoom()}
         onNewRoom={startNewRoom}
