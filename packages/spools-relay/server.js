@@ -582,4 +582,8 @@ server.listen(port, host, () => {
   console.log(`spools-relay listening on ${host}:${port}`)
   console.log(`  relay:     ws://localhost:${port}/yjs/{room}`)
   console.log(`  signaling: ws://localhost:${port}/`)
+  // said out loud at boot so an operator can read it off the host's logs:
+  // behind a proxy this must be on, or every per-IP limit is one bucket
+  console.log(`  trust proxy: ${TRUST_PROXY ? 'on — client = rightmost X-Forwarded-For hop' : 'off — client = socket address'}`)
+  console.log(`  pocket: ${POCKET_DIR ? `on disk at ${POCKET_DIR}` : 'in memory'}`)
 })
