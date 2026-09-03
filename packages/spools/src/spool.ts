@@ -139,6 +139,17 @@ export class Spool {
   }
 
   /**
+   * The relay refused the last connection with 1013 "room full" (T-169):
+   * the room is at the relay's per-room cap. The SDK stands back (~30 s)
+   * between attempts instead of spinning, and `status` reads 'offline'
+   * meanwhile; clears the moment a connection is accepted. Watch refusals
+   * via on('full'). The status union stays closed — this is beside it.
+   */
+  get roomFull(): boolean {
+    return this.#engine.roomFull
+  }
+
+  /**
    * What the pocket did on open: `checking` → `applied` / `empty` /
    * `unavailable` (old relay, no relay, dead relay — all degrade to v1
    * behavior). null for keyless or relayless spools, which have no pocket
@@ -167,13 +178,15 @@ export class Spool {
   on(event: 'status', cb: (status: SpoolStatus) => void): () => void
   on(event: 'undecryptable', cb: (total: number) => void): () => void
   on(event: 'pocket', cb: (state: PocketState) => void): () => void
+  on(event: 'full', cb: (reason: string) => void): () => void
   on(
-    event: 'entry' | 'status' | 'undecryptable' | 'pocket',
+    event: 'entry' | 'status' | 'undecryptable' | 'pocket' | 'full',
     cb:
       | ((change: EntryChange) => void)
       | ((status: SpoolStatus) => void)
       | ((total: number) => void)
       | ((state: PocketState) => void)
+      | ((reason: string) => void)
   ): () => void {
     if (event === 'entry') return this.#store.onEntry(cb as (change: EntryChange) => void)
     if (event === 'status') return this.#engine.onStatus(cb as (status: SpoolStatus) => void)
@@ -181,6 +194,9 @@ export class Spool {
     // additive event (the status union stays closed); keyless spools have no
     // pocket, so the subscription is a valid no-op that never fires
     if (event === 'pocket') return this.#pocket?.onState(cb as (state: PocketState) => void) ?? (() => {})
+    // additive too (T-169): fires with the relay's close reason on every
+    // refused attempt while the room is full
+    if (event === 'full') return this.#engine.onFull(cb as (reason: string) => void)
     throw new Error(`unknown event: ${String(event)}`)
   }
 

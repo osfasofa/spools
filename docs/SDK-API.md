@@ -49,6 +49,7 @@ interface Spool {
   readonly deleted: Entry[]          // the complement: soft-deleted only, same handles/sort; restore() brings one back
   readonly whenReady: Promise<void>  // local persistence loaded (same signal open/new await)
   readonly status: 'offline' | 'connecting' | 'connected'
+  readonly roomFull: boolean         // the relay refused the last connection with 1013 "room full" (T-169); clears when one is accepted
   readonly keyFingerprint: string | null  // 8 chars for "same key?" UX; null for keyless spools
   readonly undecryptableFrames: number    // relay frames dropped: someone in the room is on the wrong key / no key (T-051); always 0 for keyless spools
   readonly pocket: PocketState | null     // what the relay's pocket did on open (M10); null = keyless/relayless spool, no pocket by construction
@@ -62,6 +63,7 @@ interface Spool {
   on(event: 'status', cb: (status: Spool['status']) => void): () => void
   on(event: 'undecryptable', cb: (total: number) => void): () => void // fires per dropped frame with the running total — "someone here isn't on your key" UX
   on(event: 'pocket', cb: (state: PocketState) => void): () => void   // additive event (the status union stays closed); never fires for keyless spools
+  on(event: 'full', cb: (reason: string) => void): () => void         // additive (T-169): fires with the relay's close reason on every refused attempt while the room is full
 
   share(): string                    // the shareable link
   rewind(ts: number): EntrySnapshot[]  // the spool as it was at the latest recorded moment ≤ ts; see "rewind()" below
@@ -80,6 +82,8 @@ interface WindInput {
 `wind()` is synchronous and returns the **live Entry handle** immediately (decision: DESIGN_DOC §5) — local-first means there's nothing to await. Sync happens in the background.
 
 `leave()` disconnects and releases resources. Local IndexedDB data is **retained** — a spool is a keepsake. (Deleting local data is a stash/archive concern, M8.)
+
+**A full room says so** (T-169). `spools-relay` closes the 65th connection to a room with code 1013 ("room full"); y-websocket's default would reconnect at once and forever, which an app sees as an endless connecting spinner. The SDK treats 1013 as "stand back": `roomFull` turns true, `on('full')` fires with the close reason, `status` reads `offline` (not `connecting`) while it waits ~30 s, then it tries once more — refused again, it says so again. The moment a connection is accepted, `roomFull` clears. The status union stays closed; this sits beside it, like `pocket`.
 
 ## Events: diff + getter, no replay
 
