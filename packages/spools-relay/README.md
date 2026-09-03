@@ -65,6 +65,7 @@ room.
 | `RELAY_MAX_BUFFERED_BYTES` | `16777216` | a member with more than this queued for it (it stopped reading) is skipped and closed with 1008 "slow consumer"; 0 disables |
 | `RELAY_MAX_FRAMES_PER_SEC` | `60` | per-connection frame budget; over it → closed with 1008 "frame budget exceeded"; 0 disables |
 | `RELAY_MAX_BYTES_PER_MIN` | `33554432` | per-connection byte budget (32 MiB/min); same close; 0 disables |
+| `RELAY_CONNS_PER_IP_PER_ROOM` | `0` *(off)* | per-address cap inside one room; over it → closed with 1013 "too many connections from this address". **Enable together with `TRUST_PROXY`**: behind a proxy without it, everyone is one address and the cap would fall on all of them at once |
 
 The close code matters: **1013 means "room full"** to the SDK; **1008** is
 "you broke the relay's policy" (with the reason in the close frame), and a
@@ -165,10 +166,14 @@ is set; a relay behind a proxy without it sees one address, and the budget
 becomes one bucket for everyone on it. And the **64 connections per room** guard counts
 tabs, not people; a 65th connection is closed with code 1013 ("room full"),
 which today's SDK experiences as an endless connect/drop cycle — a full room
-looks like a bad connection. One connection that stops reading, or floods,
-is closed with **1008** and a reason (16 MiB queued, 60 frames/s, 32 MiB/min
-— the knobs above) and the room keeps going for everyone else; nothing is
-buffered without bound and nothing is fanned out past the budget.
+looks like a bad connection. Room codes are public by design, so one
+address could fill a room to that guard by itself; `RELAY_CONNS_PER_IP_PER_ROOM`
+(off by default — it needs `TRUST_PROXY` behind a proxy) caps that, and the
+extra sockets get 1013 with the reason "too many connections from this
+address". One connection that stops reading, or floods, is closed with
+**1008** and a reason (16 MiB queued, 60 frames/s, 32 MiB/min — the knobs
+above) and the room keeps going for everyone else; nothing is buffered
+without bound and nothing is fanned out past the budget.
 
 Env: `PORT` (default 4444), `HOST` (default 0.0.0.0), `TRUST_PROXY` (default
 off), pocket knobs above. Node ≥ 18. Tests: `pnpm test` (node:test, spawns

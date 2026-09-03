@@ -7,6 +7,7 @@
 - `fly.toml` now sets `TRUST_PROXY=1`.
 - Backpressure on the broadcast path (T-170): a member with more than `RELAY_MAX_BUFFERED_BYTES` (16 MiB) queued for it is skipped and closed with 1008 "slow consumer" instead of buffering without bound.
 - Per-connection frame budget (T-170): over `RELAY_MAX_FRAMES_PER_SEC` (60) or `RELAY_MAX_BYTES_PER_MIN` (32 MiB) → closed with 1008 "frame budget exceeded"; the room keeps going for everyone else. 0 disables any of the three.
+- `RELAY_CONNS_PER_IP_PER_ROOM` (default 0 = off; enable with `TRUST_PROXY`): per-address cap inside a room, over it → 1013 "too many connections from this address" (T-169, relay half).
 
 ## 0.2.0 — 2026-08-16
 

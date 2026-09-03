@@ -54,6 +54,13 @@ const MAX_CONNS_PER_ROOM = 64
 const RELAY_MAX_BUFFERED_BYTES = Number(process.env.RELAY_MAX_BUFFERED_BYTES ?? 16 * 1024 * 1024)
 const RELAY_MAX_FRAMES_PER_SEC = Number(process.env.RELAY_MAX_FRAMES_PER_SEC ?? 60)
 const RELAY_MAX_BYTES_PER_MIN = Number(process.env.RELAY_MAX_BYTES_PER_MIN ?? 32 * 1024 * 1024)
+// Per-address cap per room (T-169). Codes are public by design (every URL,
+// every screenshot), so without this one address can fill a room up to the
+// 64 guard and lock everyone else out. Default 0 = off: behind a proxy
+// without TRUST_PROXY every client IS the proxy's address, and a cap that
+// was on by default would fall on all of them at once. Enable it together
+// with TRUST_PROXY. Over the cap → 1013 (the SDK's "full") with its own reason.
+const RELAY_CONNS_PER_IP_PER_ROOM = Number(process.env.RELAY_CONNS_PER_IP_PER_ROOM ?? 0)
 
 // Pocket knobs (T-101). Memory by default — npx-and-done stays npx-and-done,
 // and a restart degrades to exactly v1 semantics. POCKET_DIR makes deposits
@@ -152,12 +159,24 @@ const keepAlive = (conn) => {
 
 /** room name → Set of connections. Created on first join, GC'd when empty. */
 const rooms = new Map()
+/** connection → client address, only kept while a per-address cap is on (T-169) */
+const memberAddress = new WeakMap()
 
-const onBroadcastConnection = (conn, roomName) => {
+const onBroadcastConnection = (conn, roomName, request) => {
   const members = map.setIfUndefined(rooms, roomName, () => new Set())
   if (members.size >= MAX_CONNS_PER_ROOM) {
     conn.close(1013, 'room full')
     return
+  }
+  if (RELAY_CONNS_PER_IP_PER_ROOM > 0) {
+    const address = clientIp(request)
+    let fromHere = 0
+    for (const peer of members) if (memberAddress.get(peer) === address) fromHere++
+    if (fromHere >= RELAY_CONNS_PER_IP_PER_ROOM) {
+      conn.close(1013, 'too many connections from this address')
+      return
+    }
+    memberAddress.set(conn, address)
   }
   members.add(conn)
   const pingInterval = keepAlive(conn)
@@ -500,7 +519,7 @@ server.on('upgrade', (request, socket, head) => {
   const pathname = new URL(request.url, 'http://relay').pathname
   if (pathname.startsWith('/yjs/') && pathname.length > '/yjs/'.length) {
     const roomName = pathname.slice('/yjs/'.length)
-    broadcastWss.handleUpgrade(request, socket, head, (ws) => onBroadcastConnection(ws, roomName))
+    broadcastWss.handleUpgrade(request, socket, head, (ws) => onBroadcastConnection(ws, roomName, request))
   } else if (pathname === '/') {
     signalingWss.handleUpgrade(request, socket, head, (ws) => signalingWss.emit('connection', ws, request))
   } else {

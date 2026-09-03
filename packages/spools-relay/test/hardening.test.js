@@ -10,14 +10,16 @@ const pool = relayPool(15300)
 const startRelay = pool.start
 after(pool.stop)
 
+/** resolves { code, reason } when the socket closes */
+const closedWith = (ws) => new Promise((r) => ws.once('close', (code, reason) => r({ code, reason: reason.toString() })))
+/** resolves once open; `ws.closed` is armed before that, so a refusal right after the handshake can't be missed */
 const openSocket = (port, room, headers = {}) =>
   new Promise((resolve, reject) => {
     const ws = new WebSocket(`ws://127.0.0.1:${port}/yjs/${room}`, { headers })
+    ws.closed = closedWith(ws)
     ws.once('open', () => resolve(ws))
     ws.once('error', reject)
   })
-/** resolves { code, reason } when the socket closes */
-const closedWith = (ws) => new Promise((r) => ws.once('close', (code, reason) => r({ code, reason: reason.toString() })))
 const withTimeout = (promise, ms, what) =>
   Promise.race([promise, sleep(ms).then(() => Promise.reject(new Error(`timed out waiting for ${what}`)))])
 const health = async (base) => (await fetch(base)).json()
@@ -140,4 +142,50 @@ test('ordinary traffic is untouched on the stock knobs: three seats at 30 frames
   assert.equal(anyClosed, false)
   assert.deepEqual(got, [60, 60, 60], 'each seat heard the other two, every frame')
   seats.forEach((s) => s.close())
+})
+
+// ---------- T-169 (relay half): per-address cap per room ----------
+
+test('per-IP-per-room cap with TRUST_PROXY: a third socket from one forwarded address gets 1013 with its own reason; another address still gets in', async () => {
+  const { base, port } = await startRelay({ TRUST_PROXY: '1', RELAY_CONNS_PER_IP_PER_ROOM: '2' })
+  const from = (xff) => ({ 'x-forwarded-for': xff })
+  const a1 = await openSocket(port, 'r', from('203.0.113.1'))
+  const a2 = await openSocket(port, 'r', from('203.0.113.1'))
+  const a3 = await openSocket(port, 'r', from('203.0.113.1'))
+  const { code, reason } = await withTimeout(a3.closed, 5_000, 'the third socket to be refused')
+  assert.equal(code, 1013, 'the SDK reads 1013 as "full"')
+  assert.equal(reason, 'too many connections from this address')
+  const b1 = await openSocket(port, 'r', from('203.0.113.2'))
+  await sleep(50)
+  assert.equal((await health(base)).relay.connections, 3, 'two from the first address, one from the second')
+  // the cap is per room: the same address opens another room freely
+  const elsewhere = await openSocket(port, 'other', from('203.0.113.1'))
+  await sleep(50)
+  assert.equal((await health(base)).relay.connections, 4)
+  // and a slot frees when one leaves
+  a1.close()
+  await sleep(100)
+  const a4 = await openSocket(port, 'r', from('203.0.113.1'))
+  await sleep(100)
+  assert.equal(a4.readyState, WebSocket.OPEN, 'a freed slot is a slot again')
+  for (const s of [a2, a4, b1, elsewhere]) s.close()
+})
+
+test('per-IP-per-room cap is off by default, and without TRUST_PROXY the header cannot buy a fresh address', async () => {
+  const stock = await startRelay()
+  const three = await Promise.all([openSocket(stock.port, 'r'), openSocket(stock.port, 'r'), openSocket(stock.port, 'r')])
+  await sleep(50)
+  assert.equal((await health(stock.base)).relay.connections, 3, 'stock knobs: no per-address cap at all')
+  three.forEach((s) => s.close())
+
+  const capped = await startRelay({ RELAY_CONNS_PER_IP_PER_ROOM: '2' })
+  const from = (xff) => ({ 'x-forwarded-for': xff })
+  const c1 = await openSocket(capped.port, 'r', from('203.0.113.1'))
+  const c2 = await openSocket(capped.port, 'r', from('203.0.113.2'))
+  const c3 = await openSocket(capped.port, 'r', from('203.0.113.3'))
+  const { code, reason } = await withTimeout(c3.closed, 5_000, 'the third socket to be refused')
+  assert.equal(code, 1013)
+  assert.equal(reason, 'too many connections from this address')
+  c1.close()
+  c2.close()
 })
