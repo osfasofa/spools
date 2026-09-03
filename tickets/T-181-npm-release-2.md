@@ -85,3 +85,10 @@ git tag spools@0.2.0 spools-relay@0.3.0 spools-keeper@0.1.1 && git push --tags
   `spools-keeper@0.1.1` pushed at the prep commit. The one wall was T-130's
   second one again: an expired npm session shows as `404 Not Found - PUT`;
   `npm login` fixed it, and the browser-QR step ran once per package.
+- Lab note, for honesty: the tags landed a few minutes *after* the "done"
+  commit above, not with it — one `git tag` call given three names creates
+  nothing ("too many arguments"), and the script's `set -e` didn't stop on
+  it. Re-done one tag per command at the prep commit `d44d2ce` and verified
+  with `git ls-remote --tags`. The keeper install check also ran once before
+  the registry had propagated 0.1.1 (about fifteen seconds); the re-run,
+  exit code checked, resolved `spools@0.2.0` via `spools-keeper@0.1.1`.
