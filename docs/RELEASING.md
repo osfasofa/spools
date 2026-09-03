@@ -34,7 +34,7 @@ Package versions are **not** protocol claims. An SDK 0.3.0 and an SDK 0.9.0 that
 
 Apps (`apps/*`) are `private: true` and never publish. Version numbers there are decorative.
 
-**Second execution, 3 Sep 2026 (T-181):** `spools` 0.1.0 → **0.2.0** (default relay now `relay.spools.lol`; `roomFull` + `on('full')`; `depositError: 'rate-limited'`; uuid fallback — a default changed, so the minor lane), `spools-relay` 0.2.0 → **0.3.0** (broadcast guards on by default, `TRUST_PROXY`, eviction order — behavior, so minor), `spools-keeper` 0.1.0 → **0.1.1** (docs + the dependency range). Same liturgy below, same order.
+**Second execution, 3 Sep 2026 (T-181):** `spools` 0.1.0 → **0.2.0** (default relay now `relay.spools.lol`; `roomFull` + `on('full')`; `depositError: 'rate-limited'`; uuid fallback — a default changed, so the minor lane), `spools-relay` 0.2.0 → **0.3.0** (broadcast guards on by default, `TRUST_PROXY`, eviction order — behavior, so minor), `spools-keeper` 0.1.0 → **0.1.1** (docs + the dependency range). Same liturgy below, same order. *Shipped 3 Sep 2026, registry-verified (T-181).*
 
 ## Publish mechanics (the boring liturgy)
 

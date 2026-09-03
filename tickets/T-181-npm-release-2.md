@@ -1,7 +1,7 @@
 ---
 id: T-181
 title: "npm release: SDK 0.2.0, relay 0.3.0, keeper 0.1.1 — owner at keyboard"
-status: todo
+status: done
 milestone: M15
 depends: [T-160]
 ---
@@ -58,8 +58,8 @@ git tag spools@0.2.0 spools-relay@0.3.0 spools-keeper@0.1.1 && git push --tags
 - [x] Versions, CHANGELOG headings, README status line, RELEASING note (prep, 3 Sep 2026).
 - [x] `pnpm pack` dry-run ×3 eyeballed; keeper tarball's dependency rewritten to `^0.2.0` (see Notes).
 - [x] Fresh-dir tarball smoke: the SDK from its tarball mints a `relay.spools.lol` link in Node 24 (see Notes).
-- [ ] **Publish ×3, owner at keyboard.**
-- [ ] `npm view` sanity ×3; tags pushed; this ticket and INDEX record the shipped versions.
+- [x] **Publish ×3, owner at keyboard.**
+- [x] `npm view` sanity ×3; tags pushed; this ticket and INDEX record the shipped versions.
 
 ## Acceptance criteria
 
@@ -75,3 +75,13 @@ git tag spools@0.2.0 spools-relay@0.3.0 spools-keeper@0.1.1 && git push --tags
   tarball into an empty project (peers auto-installed), `newSpool({ persist:
   false })` minted `…&relay=wss%3A%2F%2Frelay.spools.lol%2Fyjs&k=…`. Only the
   publish itself remains — hardware key.
+- **Shipped, 3 Sep 2026, owner at keyboard:** `spools-relay@0.3.0`
+  (11:42 UTC), `spools@0.2.0`, `spools-keeper@0.1.1`, in that order; all
+  three verified on the registry from a second machine. The registry's
+  `spools@0.2.0` tarball defaults to `wss://relay.spools.lol/yjs` (checked by
+  reading `dist/index.js` out of the downloaded tarball), and a fresh
+  `npm i spools-keeper@0.1.1` into an empty project resolved `spools@0.2.0`
+  — the publish order held. Tags `spools@0.2.0`, `spools-relay@0.3.0`,
+  `spools-keeper@0.1.1` pushed at the prep commit. The one wall was T-130's
+  second one again: an expired npm session shows as `404 Not Found - PUT`;
+  `npm login` fixed it, and the browser-QR step ran once per package.
