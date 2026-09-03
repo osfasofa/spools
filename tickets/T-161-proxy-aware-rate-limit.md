@@ -1,7 +1,7 @@
 ---
 id: T-161
 title: "Proxy-aware rate limit: the per-IP bucket is global behind Railway"
-status: doing
+status: done
 milestone: M15
 depends: []
 ---
@@ -25,7 +25,7 @@ finding F2.
 
 ## Tasks
 
-- [ ] Verify first: one temporary log line on PUT printing `remoteAddress` and
+- [x] Verify first: one temporary log line on PUT printing `remoteAddress` and
       `x-forwarded-for` (never the room or token — the relay doesn't chat about
       rendezvous names). Deploy, deposit once from a browser, read the log,
       remove the line. **Owner at keyboard** — see Notes for the exact line.
@@ -35,7 +35,7 @@ finding F2.
       and for whatever T-169/T-170 add.
 - [x] While here: bound `putLog` on insert (drop entries older than a minute)
       instead of only in the hourly sweep.
-- [ ] Set `TRUST_PROXY=1` on the canonical relay (owner at keyboard, Railway
+- [x] Set `TRUST_PROXY=1` on the canonical relay (owner at keyboard, Railway
       variables) — **owner at keyboard, still unset**; the knob is in the
       README table and `fly.toml`.
 - [x] Test (node:test, real instance): with `TRUST_PROXY`, two `X-Forwarded-For`
@@ -92,3 +92,18 @@ finding F2.
   the service variables. Until that flip, the canonical relay still runs
   one shared 24/min bucket — this ticket stays `doing` until the log line
   has been seen and the variable is set.
+- **Done in production, 3 Sep 2026.** The canonical relay had been running
+  the August code (`railway up`, 18 days earlier, via CLI — the service does
+  not watch GitHub), so the flag did not exist there until the current
+  `server.js` was deployed: `railway variables --set TRUST_PROXY=1`, then
+  `railway up --ci` from `packages/spools-relay`, from the owner's machine
+  with the owner's login. The temporary log line the ticket asked for was
+  replaced by a permanent boot line (`trust proxy: on — client = rightmost
+  X-Forwarded-For hop`), read back from Railway's logs after the deploy,
+  with `pocket: on disk at /data/pocket` beside it — the volume survived
+  the deploy (775 namespaces, 1 253 deposits, up from the morning's counts).
+  Live rooms reconnected (3 connections a few seconds after), the pocket
+  envelope and a websocket upgrade answered on `relay.spools.lol`, and the
+  Railway-generated hostname still serves both (health 200, websocket open)
+  — the T-160 promise holds after the custom domain took the public-domain
+  slot.
