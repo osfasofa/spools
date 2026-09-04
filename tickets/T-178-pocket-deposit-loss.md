@@ -277,4 +277,35 @@ during `pagehide` of a page that was gone before the response.
 - Tell syrup and manyhands (owner) — and pass on the ring point:
   verify-and-retry cannot beat `POCKET_K`.
 
-The ticket stays `doing` until those report.
+### Note for syrup and manyhands (draft, 4 Sep 2026 — owner to send)
+
+> `spools@0.2.1` (when it's on the registry) closes the pocket losses you
+> each worked around. Three things changed, all in the SDK, nothing in your
+> code needed except deleting the workaround:
+>
+> 1. **A 429 on the way out is retried and then named.** `leave()` tries
+>    three times inside ~5 s; if the relay still refuses, `spool.pocket`
+>    reads `depositError: 'rate-limited'` after `await leave()`. It never
+>    goes quiet. (syrup's "solar moons vanished twice"; some of manyhands'
+>    0–4 of 80.)
+> 2. **Winding right after open and leaving at once no longer loses the
+>    wind.** The scheduler used to arm only after the pocket's GET answered;
+>    a fast open-wind-leave deposited nothing. Now the flush waits for that
+>    check (≤ 3 s) and deposits regardless. (Probably the rest of the
+>    0–4 of 80, and any builder that leaves inside the GET's round trip.)
+> 3. **Unload flushes ride `pagehide` as well as `visibilitychange`**, with
+>    `keepalive` on deposits ≤ 64 KiB — a tab or headless context that was
+>    never visible still deposits on close.
+>
+> Still true, and not a bug: a process that exits without `await leave()`
+> deposits nothing — `persist: false` has nothing to heal from. And
+> manyhands: verify-and-retry can't beat the ring. `POCKET_K` is 8 per
+> spool; 80 isolated writers will always lose ~72 deposits' worth to
+> eviction, by design. Fewer isolated writers, or let them meet in the room,
+> is the only fix.
+>
+> Drop the fresh-context-per-room and verify-and-retry workarounds once
+> you're on 0.2.1; if anything still vanishes, the ticket is T-178 in
+> `osfasofa/spools` and I want the repro.
+
+The ticket stays `doing` until the sign-off lands and the note is sent.
