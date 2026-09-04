@@ -178,6 +178,12 @@ is relay-side it becomes evidence for a relay ticket, not a fix here.
   `WebSocket is not defined`. The `engines >= 22` line is load-bearing;
   run the keeper from a directory where Node 24 is pinned, or with the
   full path.
+- **Second night started 2026-09-04T22:39:19Z** (15:39 PDT) by the owner,
+  on the new build, same `~/pegboard`, under `caffeinate -i`. Both spools
+  restored from their files (3 and 31 entries), both connected within
+  ~120 ms, the keyed one's first stamped line from the pocket:
+  `pocket: applied (8 deposits)`. The old keeper's SIGTERM save and leave
+  went cleanly (the files it left were the ones restored). Read from here.
 - Drafted 4 Sep 2026 from T-182's follow-ons #1 and #2, with the SDK and
   relay facts above verified in source the same afternoon. The keeper from
   T-182's run was still up (PID 2668, eleven hours and counting) when this
