@@ -242,6 +242,12 @@ interface PocketState {
   that seal to ≤ 64 KiB go out with `keepalive: true`, so a flush started by
   `visibilitychange` outlives the tab that started it (bigger ones cannot
   carry the option — browsers refuse it).
+- **Leaving before the check settles** (T-178, mechanism 5): a wind made
+  while the pocket is still `checking` is remembered, and a `leave()` that
+  comes before the check settles waits for it — up to ~3 s — so the final
+  deposit carries the pocket's state too; past that bound it deposits what
+  it has rather than nothing. A `leave()` against a relay whose pocket never
+  answers therefore costs at most ~3 s and still deposits.
 - **Memory-only clients have no heal** (T-178): deposit-if-ahead repairs a
   lost deposit on the next open only when local persistence still holds the
   winds. A `persist: false` spool — a preview, a headless builder, a keeper

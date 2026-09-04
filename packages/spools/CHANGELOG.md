@@ -1,5 +1,10 @@
 # spools changelog
 
+## 0.2.1 — unreleased
+
+- A wind made before the pocket's open-time check settles is no longer lost when `leave()` comes first: the flush waits for the check (up to ~3 s, `settleWaitMs` for tests) so the deposit carries the pocket's state too, and past the bound deposits what it has. Found by the keeper's first real run; the fifth T-178 mechanism.
+- A pocket check aborted by `leave()` no longer reports `unavailable` after teardown; `checking` stays the last word.
+
 ## 0.2.0 — 2026-09-03
 
 - `DEFAULT_RELAY` is now `wss://relay.spools.lol/yjs` — a hostname the project owns (T-160). Links minted against the old default (`spools-relay-production.up.railway.app`) keep working: that hostname stays enabled on the same service indefinitely. Migration: none; links carry their own `relay=`.

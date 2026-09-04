@@ -55,11 +55,15 @@ const depositCount = async (relayHttp: string, code: string, token: string) => {
   return (json.deposits ?? []).length as number
 }
 
-/** a stub relay with an empty pocket whose PUTs answer `statuses` in order, the last one repeating (T-178) */
-const startStubRelay = async (statuses: number[]) => {
+/**
+ * a stub relay with an empty pocket whose PUTs answer `statuses` in order, the
+ * last one repeating (T-178); `hangGet` never answers the open-time fetch
+ */
+const startStubRelay = async (statuses: number[], { hangGet = false } = {}) => {
   const port = nextPort++
   const puts: number[] = []
   const server = http.createServer((req, res) => {
+    if (req.method === 'GET' && hangGet) return // the check that never settles
     if (req.method === 'PUT') {
       const status = statuses[Math.min(puts.length, statuses.length - 1)]
       puts.push(status)
@@ -226,6 +230,46 @@ it("leave() flushes the last debounce window — the tab-close story's honest ha
   expect(await depositCount(relay.http, code, token)).toBe(0) // debounce hasn't elapsed
   await a.leave()
   expect(await depositCount(relay.http, code, token)).toBe(1) // the flush carried it out
+})
+
+it('a wind before the pocket check settles is still carried out by leave() (T-178, mechanism 5)', async () => {
+  // T-182's wall: mint, wind, leave — all before the pocket's GET answered.
+  // The scheduler arms only at settle; the flush used to return early unarmed.
+  const relay = await startRealRelay()
+  const code = generateCode()
+  const key = generateKey()
+  const token = deriveToken(key)
+  const engine = new SpoolEngine({ code, relay: relay.ws, key, persist: false })
+  const a = new Spool(engine, relay.ws, key, 'a', { debounceMs: 10, minGapMs: 10 }, { debounceMs: 60_000, minGapMs: 0 })
+  a.wind({ kind: 'track', body: 'straight in' }) // no settled(a)
+  expect(a.pocket?.phase).toBe('checking')
+  const t0 = Date.now()
+  await a.leave()
+  expect(Date.now() - t0).toBeLessThan(2_000) // the check settled on its own; nobody waited out the bound
+  expect(await depositCount(relay.http, code, token)).toBe(1)
+})
+
+it('when the check never settles, leave() waits only the bound and deposits what it has (T-178)', async () => {
+  const stub = await startStubRelay([200], { hangGet: true })
+  const code = generateCode()
+  const key = generateKey()
+  const engine = new SpoolEngine({ code, relay: stub.ws, key, persist: false })
+  const a = new Spool(
+    engine,
+    stub.ws,
+    key,
+    'a',
+    { debounceMs: 10, minGapMs: 10 },
+    { debounceMs: 60_000, minGapMs: 0, settleWaitMs: 100 }
+  )
+  a.wind({ kind: 'track', body: 'straight in' })
+  const t0 = Date.now()
+  await a.leave()
+  const took = Date.now() - t0
+  expect(took).toBeGreaterThanOrEqual(90)
+  expect(took).toBeLessThan(1_500)
+  expect(stub.puts).toEqual([200]) // deposited blind rather than not at all
+  expect(a.pocket?.phase).toBe('checking') // honest: the check never came back before we left
 })
 
 it('a deposit the relay refuses as too big degrades loudly to live-only', async () => {

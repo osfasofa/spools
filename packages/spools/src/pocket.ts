@@ -61,6 +61,8 @@ export interface PocketTuning {
   flushRetries?: number
   /** wait before a flush's first retry, doubling per retry; default 1 s (tries at +0, +1 s, +3 s) */
   flushBackoffMs?: number
+  /** how long a flush waits for the open-time check to settle before depositing what it has; default 3 s */
+  settleWaitMs?: number
 }
 
 /**
@@ -71,6 +73,12 @@ export interface PocketTuning {
 export const KEEPALIVE_MAX_BYTES = 64 * 1024
 
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
+/** a sleep that never keeps a process alive on its own (a race's losing side) */
+const bounded = (ms: number): Promise<void> =>
+  new Promise((r) => {
+    const t = setTimeout(r, ms)
+    ;(t as { unref?: () => void }).unref?.()
+  })
 
 /** the state minus its depositError — the heal after a 'rate-limited' flush (T-178) */
 const withoutError = ({ depositError: _cleared, ...rest }: PocketState): PocketState => rest
@@ -176,6 +184,8 @@ export class PocketClient {
   #minGapMs: number
   #flushRetries: number
   #flushBackoffMs: number
+  #settleWaitMs: number
+  #started: Promise<void> | null = null
   #armed = false
   #dirty = false
   /** the last PUT was answered 429 — what flush()'s bounded retry reads */
@@ -197,6 +207,7 @@ export class PocketClient {
     this.#minGapMs = opts.tuning?.minGapMs ?? 60_000
     this.#flushRetries = opts.tuning?.flushRetries ?? 2
     this.#flushBackoffMs = opts.tuning?.flushBackoffMs ?? 1_000
+    this.#settleWaitMs = opts.tuning?.settleWaitMs ?? 3_000
     this.#doc.on('afterTransaction', this.#onTransaction)
     if (typeof document !== 'undefined') {
       // a hidden tab may never come back — flush what's pending (a real PUT,
@@ -228,8 +239,12 @@ export class PocketClient {
     for (const cb of this.#listeners) cb(state)
   }
 
-  /** fetch → verify envelope → decrypt → merge after local persistence loads */
-  async start(): Promise<void> {
+  /** fetch → verify envelope → decrypt → merge after local persistence loads; once */
+  start(): Promise<void> {
+    return (this.#started ??= this.#start())
+  }
+
+  async #start(): Promise<void> {
     if (!this.#origin || unavailableOrigins.has(this.#origin)) {
       this.#set({ phase: 'unavailable' })
       return
@@ -242,6 +257,7 @@ export class PocketClient {
       })
       json = await res.json()
     } catch {
+      if (this.#destroyed) return // we left mid-check: leave 'checking' as the honest last word
       this.#set({ phase: 'unavailable' })
       return
     }
@@ -292,10 +308,11 @@ export class PocketClient {
     const ahead = this.#isAheadOf(appliedUpdates)
     const halfTtl = (this.#fetched.ttlDays * 86_400_000) / 2
     const stale = this.#fetched.newestAt > 0 && Date.now() - this.#fetched.newestAt > halfTtl
-    if (ahead || (stale && this.#docHasState())) {
-      this.#dirty = true
-      void this.#deposit()
-    }
+    // winds made before now left `dirty` set; the state-vector check is the
+    // truth about whether they need carrying (another device may already
+    // have deposited them), so it decides, not the flag
+    this.#dirty = ahead || (stale && this.#docHasState())
+    if (this.#dirty) void this.#deposit()
   }
 
   /** does the local doc hold anything beyond what the given updates carry? */
@@ -321,9 +338,11 @@ export class PocketClient {
     // tr.local alone is the whole self-feed guard: pocket-applied updates
     // arrive under POCKET_TX_ORIGIN (remote), and depositing itself never
     // writes the doc — unlike HistoryLog there is no in-doc log to exclude
-    if (!this.#armed || this.#destroyed || !tr.local) return
+    if (this.#destroyed || !tr.local) return
+    // before the open-time check settles nothing is scheduled — but the wind
+    // is remembered, so a flush() that comes first still carries it (T-178)
     this.#dirty = true
-    this.#schedule()
+    if (this.#armed) this.#schedule()
   }
 
   #schedule(): void {
@@ -405,8 +424,15 @@ export class PocketClient {
       clearTimeout(this.#timer)
       this.#timer = null
     }
+    if (!this.#armed && this.#dirty && this.#started) {
+      // leave() before the open-time check settled (T-182's wall): wait a
+      // bounded moment so the deposit carries the pocket's state too —
+      // past the bound, deposit what we have rather than nothing
+      await Promise.race([this.#started, bounded(this.#settleWaitMs)])
+      if (this.#state.phase === 'unavailable') return // no pocket to carry it to
+    }
     if (this.#inflight) await this.#inflight
-    if (!this.#dirty || !this.#armed) return
+    if (!this.#dirty) return
     await this.#deposit()
     // three tries inside a few seconds: the relay's remedy for 429 is waiting
     for (let i = 0; i < this.#flushRetries && this.#rateLimited && !this.#destroyed; i++) {

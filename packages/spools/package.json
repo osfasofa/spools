@@ -1,6 +1,6 @@
 {
   "name": "spools",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Intimate, local-first, P2P shared documents. An artifact that can change, that's passed around.",
   "license": "MIT",
   "repository": {

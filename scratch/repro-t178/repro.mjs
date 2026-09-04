@@ -121,6 +121,29 @@ console.log(`relay: ${RELAY}\n`)
   relay.kill()
 }
 
+// ---- S5: mechanism 5 — leave() before the open-time pocket check settles ----
+// T-182's wall: a script minted a keyed spool, wound once, and left as soon
+// as the socket said connected — before the pocket's GET had answered. The
+// scheduler arms only when that GET settles; winds before then set nothing
+// dirty, and flush() returns early when unarmed. Nothing is deposited.
+{
+  const relay = await startRelay()
+  const w = await newSpool({ relay: relay.ws, persist: false, author: 'w' })
+  w.wind({ kind: 'note', body: 'S5 before settle' }) // no settled(w): straight in
+  const phaseAtLeave = w.pocket?.phase
+  const t0 = Date.now()
+  await w.leave()
+  verdict(
+    'S5 leave() before the pocket check settles',
+    ['S5 before settle'],
+    await readBack(w.share('')),
+    w.pocket?.depositError,
+    undefined,
+    `phase at leave: ${phaseAtLeave}; leave() ${Date.now() - t0} ms`
+  )
+  relay.kill()
+}
+
 // ---- S2: mechanism 1 — the final PUT answered 429 ----
 const s2 = async (waitForWindow) => {
   const relay = await startRelay({ POCKET_PUTS_PER_MIN: '1' })

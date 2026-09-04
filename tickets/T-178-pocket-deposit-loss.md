@@ -46,6 +46,11 @@ should tell them apart:
 4. **The ring, by design.** More than `POCKET_K` isolated writers outrun the
    ring (documented in the relay README). N=80 may be partly this; the
    repro must separate it from 1–3.
+5. **`leave()` before the open-time check settles** *(added 4 Sep 2026,
+   from T-182's wall)*. The deposit scheduler arms only when the pocket's
+   GET has answered; a wind before that set nothing dirty, and `flush()`
+   returned early when unarmed. A client that opens, winds, and leaves
+   inside the GET's round trip deposits nothing — silently.
 
 ## Tasks
 
@@ -129,6 +134,50 @@ Mechanism verdicts:
    N=80 is at least partly this — 80 headless seats is 10× `POCKET_K` — and
    their verify-and-retry workaround masks the ring as much as the 429.
 
+### Mechanism 5 — found by the wall (4 Sep 2026, SDK lane)
+
+T-182's first real run minted a keyed spool from a script: `newSpool`,
+`wind`, wait for `status === 'connected'`, `share()`, `leave()`. The entry
+never reached the pocket; the keeper that opened the spool a minute later
+saw nothing, and a laptop client the next morning saw `before=0`. Yet
+T-183's first stamped line from the same spool read
+`pocket: applied (8 deposits)` — the pocket was working. S1 said "leave()
+inside the debounce is OK". The difference: S1 awaited `settled()` first;
+the mint script left as soon as the *socket* said connected, which on the
+canonical relay is faster than the pocket's GET.
+
+Reading `pocket.ts`: `#armed` is set only at the end of `start()`;
+`#onTransaction` returned early when unarmed, so `#dirty` never went true;
+`#flushNow` returned early on `!this.#armed`. Three lines, one silent loss.
+
+| scenario | wound | pocket | verdict (before) | verdict (after) |
+|---|---|---|---|---|
+| S5 leave() before the pocket check settles | 1 | 0 → 1 | **SILENT LOSS** — `leave()` 2 ms, phase `checking` | **OK** |
+
+**The fix (this commit):** winds are remembered (`#dirty`) even before the
+scheduler is armed; a flush that finds the check unsettled waits for it —
+`Promise.race([started, bounded(settleWaitMs)])`, default 3 s — so the
+deposit carries the pocket's state too; past the bound it deposits what it
+has (a partial deposit beats none; the ring risk of a thin deposit evicting
+a fuller one is why the wait comes first). At settle, the state-vector
+check decides `#dirty`, not the flag — another device may already have
+deposited those winds. If the check settled to `unavailable`, no blind PUT.
+A check aborted by teardown no longer reports `unavailable` after the fact.
+
+Two tests: the real relay (settles on its own; `leave()` < 2 s; one
+deposit) and a stub whose GET never answers (`settleWaitMs: 100`;
+`leave()` ≈ 100 ms; one PUT; phase honestly still `checking`). All 118 SDK
+tests green; the repro's other seven scenarios unchanged.
+
+Why the vessels didn't name this one: syrup's builders and manyhands'
+swarm both open-wind-leave fast against the canonical relay, whose GET
+round trip is tens to hundreds of ms — exactly the window. Some of the
+"0–4 of 80" was probably this, not the 429.
+
+Not done here, noted: the deposit PUT carries no abort signal, so a relay
+that black-holes TCP could hold `leave()` open past the bound. Pre-existing;
+the GET has one. A follow-on if it ever bites.
+
 ### What shipped (SDK)
 
 - `flush()` — `leave()`'s and the hidden tab's — retries a 429 with
@@ -179,6 +228,8 @@ Mechanism verdicts:
   flake in one of the real-relay tests (the relay-restart one is the usual
   suspect), not a regression — but if it recurs, capture the name.
 - Landed in commit `824431d` (filled in by the wrap-up commit).
+- Mechanism 5 landed 4 Sep 2026 (the commit after this line was written);
+  SDK version → 0.2.1, **unreleased**.
 
 ### Remaining
 
