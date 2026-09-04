@@ -242,3 +242,21 @@ name. Owner decides yes / not yet.
   ticket. The keeper is still running as this note is written.
 - Open for the owner: whether M17 is the right home or this should sit
   under M15's "before it goes wider" rail instead.
+
+### Follow-ons (the owner picks; none filed)
+
+1. **Keeper narration.** Timestamps on every log line; one line on open
+   saying what the pocket did (`pocket: applied` / `empty` /
+   `unavailable`); a periodic one-liner per spool with entries held and
+   reconnects so far. Counts-only, still. Would have answered every
+   question this run raised.
+2. **The fifty reconnects.** With timestamps in hand, read the cadence
+   against the canonical relay's proxy idle timeout, the relay's ping/pong,
+   and the SDK's resync interval. Zero entries were lost, so this is
+   curiosity until it isn't.
+3. **Publish 0.2.0.** Owner at keyboard, T-181's liturgy: relay unchanged,
+   SDK unchanged, `pnpm publish` in `packages/spools-keeper`, tag
+   `spools-keeper@0.2.0`.
+4. **Move B, the wall.** `../brand/riffs/pegboard.md` §3 — a separate
+   vessel or reference app that reads the same links file. Not a keeper
+   feature.
