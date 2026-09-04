@@ -1,7 +1,7 @@
 ---
 id: T-182
 title: "spools-keeper holds many: the links file (pegboard, move A)"
-status: todo
+status: doing
 milestone: M17
 depends: [T-181]
 ---
@@ -83,32 +83,32 @@ name. Owner decides yes / not yet.
 
 ## Tasks
 
-- [ ] Refactor `keeper.js`: the parse → restore-or-open → export → narrate
+- [x] Refactor `keeper.js`: the parse → restore-or-open → export → narrate
       loop becomes `keep(link, { file })` returning `{ spool, save, close }`;
       module-level state (`timer`, `lastSaveAt`, `saving`) moves inside.
       Behaviour of the single-link form is byte-for-byte unchanged (same
       default file, same log lines).
-- [ ] `--links <file>`: read, strip comments/blank lines, `keep()` each.
+- [x] `--links <file>`: read, strip comments/blank lines, `keep()` each.
       Mutually exclusive with a positional link (usage error if both).
-- [ ] `--dir <path>` for the links form; default is the links file's
+- [x] `--dir <path>` for the links form; default is the links file's
       directory. `--file` is rejected with the links form (it names one
       file; there are many).
-- [ ] Per-spool failure isolation (decision 4). One summary line at start:
+- [x] Per-spool failure isolation (decision 4). One summary line at start:
       `keeping N spools from <file> (M failed)`.
-- [ ] Shutdown: SIGINT/SIGTERM saves and `leave()`s every spool, in
+- [x] Shutdown: SIGINT/SIGTERM saves and `leave()`s every spool, in
       parallel, then exits. One spool's shutdown hiccup doesn't skip the
       others.
-- [ ] Tests (`test/keeper.test.js`, extend the existing harness): two
+- [x] Tests (`test/keeper.test.js`, extend the existing harness): two
       keyless spools on one keeper against the real relay; writers wind and
       leave; cold readers converge on both from the keeper alone; kill -9;
       restart from the two files; a third device converges on both. Plus:
       a links file with one garbage line starts, logs the failure, keeps
       the other. Remember the T-107 gotcha — wait for `relay.connections ≥ 1`
       after restart before opening the probe.
-- [ ] README: the links form, the exports-beside-the-file rule, the
+- [x] README: the links form, the exports-beside-the-file rule, the
       restart-to-reload rule, and the key ring sentence (decision 5).
-- [ ] README: the hippo sentence — **sign-off** (decision 6).
-- [ ] `CHANGELOG.md` + version → `0.2.0` (new CLI surface; publishing is
+- [x] README: the hippo sentence — **sign-off** (decision 6).
+- [x] `CHANGELOG.md` + version → `0.2.0` (new CLI surface; publishing is
       its own owner-at-keyboard ticket, T-181 precedent).
 - [ ] **Owner at keyboard, the actual point:** run it. A links file with
       two or three real spools on a machine that stays on, through at least
@@ -148,6 +148,38 @@ name. Owner decides yes / not yet.
 - Drafted 4 Sep 2026 from the brand riff, before any code. The refactor is
   the only real risk to the single-link form; the test suite's existing
   midnight scenario is the regression guard.
-- Open for the owner: decision 6 (the hippo sentence), and whether M17 is
-  the right home or this should sit under M15's "before it goes wider" rail
-  instead.
+- Owner signed off on decision 6 the same day: the hippo sentence is in the
+  README (one sentence, no name, no emoji, no art). `hippo.md` §7's first
+  open thread is answered — the keeper wears the animal.
+- Built 4 Sep 2026, same session. `keeper.js` went from 118 to 200 lines;
+  the per-spool loop is `keep(link, { file, dir })` and the single-link form
+  logs exactly what 0.1.1 logged. Tests: the T-107 scenario unchanged in
+  substance (relay moved to a `before` hook), plus the list scenario — two
+  keyless spools, a comment, a garbage line, a duplicate, cold readers on
+  both, kill -9, restart from both files, third devices converge, SIGTERM
+  exits 0 with both files saved. Both green in ~10 s against the real relay.
+- **Surprise, the comment rule.** A spool link *starts with `#`*
+  (`#spool=…`), so "`#` is a comment" would eat every link. The rule is
+  "hash then whitespace or end of line" — `# the wall` is a comment,
+  `#spool=…` is a link. Documented in the README and the file header.
+- **Surprise, the leak.** The first test run failed its own "logs never
+  carry a link" assertion: the SDK's `SpoolLinkError` message echoes up to
+  40 characters of the offending text (and 12 of a malformed key). Fine on
+  stderr for the single form, where the user typed it — wrong for a list,
+  where the log would replay the file. The list form now reports a bad line
+  by number only. The acceptance line "never the links file's contents" is
+  tested (`doesNotMatch /this is not a link/`).
+- Duplicates are skipped by code, not by string — two spellings of the same
+  link (with and without a relay, say) count as one peg.
+- `relay.connections` on the health endpoint counts one socket per spool, so
+  the restart wait uses `≥ 2` for two spools; the T-107 gotcha generalises.
+- `pnpm pack` still ships only `keeper.js` + README + LICENSE; version is
+  0.2.0, **unreleased** — publishing is an owner-at-keyboard ticket in the
+  T-181 mould, after the overnight run.
+- **Still open, and the only thing between `doing` and `done`:** the
+  owner's overnight run. Suggested shape: a `~/pegboard` file with two or
+  three real spools (one keyless, one keyed, so the pocket path is exercised
+  too) on a machine that stays on; in the morning, paste the log's shape
+  (not its links) and the `ls` of the directory here.
+- Open for the owner: whether M17 is the right home or this should sit
+  under M15's "before it goes wider" rail instead.

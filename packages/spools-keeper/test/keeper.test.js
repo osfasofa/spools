@@ -2,10 +2,14 @@
 // real relay, so the pocket (keyed-only) is structurally out of the picture
 // and the keeper is the one thing bridging the gap. Also: kill -9 restart
 // from the export file.
-import { test, after } from 'node:test'
+//
+// T-182: the same scenario with a links file — two spools on one keeper, a
+// garbage line and a duplicate on the list, kill -9 restart from both files,
+// and a clean SIGTERM that saves and leaves every spool.
+import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
-import { mkdtemp, readFile } from 'node:fs/promises'
+import { mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -15,6 +19,7 @@ const here = dirname(fileURLToPath(import.meta.url))
 const RELAY = join(here, '..', '..', 'spools-relay', 'server.js')
 const KEEPER = join(here, '..', 'keeper.js')
 const PORT = 15700
+const WS = `ws://127.0.0.1:${PORT}/yjs`
 
 const children = []
 const spools = []
@@ -31,17 +36,50 @@ const until = async (fn, ms = 8000) => {
   }
   return fn()
 }
+const health = async () => (await fetch(`http://127.0.0.1:${PORT}/`)).json()
+const entriesIn = async (file) => {
+  try {
+    return JSON.parse(await readFile(file, 'utf8')).entries.length
+  } catch {
+    return -1
+  }
+}
 
-const spawnKeeper = (link, file) => {
-  const child = spawn(process.execPath, [KEEPER, link, '--file', file], { stdio: ['ignore', 'pipe', 'pipe'] })
-  child.stdout.on('data', () => {})
+// spawn a keeper with the given args; stdout is collected for assertions
+const spawnKeeper = (...args) => {
+  const child = spawn(process.execPath, [KEEPER, ...args], { stdio: ['ignore', 'pipe', 'pipe'] })
+  child.out = ''
+  child.stdout.on('data', (d) => (child.out += d))
   child.stderr.on('data', (d) => process.stderr.write(`[keeper stderr] ${d}`))
   children.push(child)
   return child
 }
 
-test('midnight with only a keeper: keyless spool, no pocket, kill -9 restart', async () => {
-  // relay up
+// a keyless spool with n entries, wound by author; returns { spool, link }
+const wind = async (author, n) => {
+  const s = await newSpool({ relay: WS, persist: false, encrypted: false, author })
+  spools.push(s)
+  for (let i = 1; i <= n; i++) s.wind({ kind: 'track', body: `${author} ${i}` })
+  return { spool: s, link: s.share('') }
+}
+const leave = async (s) => {
+  await s.leave()
+  spools.splice(spools.indexOf(s), 1)
+}
+// cold-open a link and wait for n entries
+const converges = async (link, author, n, ms) => {
+  const s = await openSpool(link, { persist: false, author })
+  spools.push(s)
+  const ok = await until(() => s.entries.length === n, ms)
+  await leave(s)
+  return ok
+}
+// after a keeper restart, wait until its socket(s) are actually in the room —
+// otherwise a probe's first SyncStep1 lands in an empty room and its next
+// re-ask is a full resync interval away
+const reconnected = (n) => until(async () => (await health()).relay.connections >= n, 10_000)
+
+before(async () => {
   const relay = spawn(process.execPath, [RELAY], {
     env: { ...process.env, PORT: String(PORT), HOST: '127.0.0.1' },
     stdio: 'ignore',
@@ -54,31 +92,20 @@ test('midnight with only a keeper: keyless spool, no pocket, kill -9 restart', a
       return false
     }
   })
+})
 
+test('midnight with only a keeper: keyless spool, no pocket, kill -9 restart', async () => {
   // 9 pm: A winds three tracks on a KEYLESS spool (no pocket exists for it)
-  const a = await newSpool({ relay: `ws://127.0.0.1:${PORT}/yjs`, persist: false, encrypted: false, author: 'a' })
-  spools.push(a)
-  const link = a.share('')
-  for (let i = 1; i <= 3; i++) a.wind({ kind: 'track', body: `Track ${i}` })
+  const { spool: a, link } = await wind('a', 3)
 
   // the household keeper joins, syncs from A live, and saves its file
   const dir = await mkdtemp(join(tmpdir(), 'keeper-'))
   const file = join(dir, `${a.code}.spool.json`)
-  const keeper = spawnKeeper(link, file)
-  assert.ok(
-    await until(async () => {
-      try {
-        return JSON.parse(await readFile(file, 'utf8')).entries.length === 3
-      } catch {
-        return false
-      }
-    }, 15_000),
-    'keeper synced from A and exported its file'
-  )
+  const keeper = spawnKeeper(link, '--file', file)
+  assert.ok(await until(async () => (await entriesIn(file)) === 3, 15_000), 'keeper synced from A and exported its file')
 
   // A closes the laptop — from here, only the keeper holds the spool online
-  await a.leave()
-  spools.splice(spools.indexOf(a), 1)
+  await leave(a)
 
   // midnight: B cold-opens; the keeper answers its SyncStep1 like any peer
   const b = await openSpool(link, { persist: false, author: 'b' })
@@ -86,29 +113,71 @@ test('midnight with only a keeper: keyless spool, no pocket, kill -9 restart', a
   assert.ok(await until(() => b.entries.length === 3), 'B converged from the keeper alone')
   assert.deepEqual(
     b.entries.map((e) => e.body).sort(),
-    ['Track 1', 'Track 2', 'Track 3']
+    ['a 1', 'a 2', 'a 3']
   )
-  await b.leave()
-  spools.splice(spools.indexOf(b), 1)
+  await leave(b)
 
   // power cut: kill -9, no clean shutdown — then restart from the file
   keeper.kill('SIGKILL')
   await sleep(300)
-  spawnKeeper(link, file)
-  // wait until the keeper's socket is actually in the room (relay health
-  // counts connections) — otherwise C's first SyncStep1 lands in an empty
-  // room and its next re-ask is a full resync interval away
-  assert.ok(
-    await until(async () => {
-      const health = await (await fetch(`http://127.0.0.1:${PORT}/`)).json()
-      return health.relay.connections >= 1
-    }, 10_000),
-    'restarted keeper reconnected'
-  )
+  spawnKeeper(link, '--file', file)
+  assert.ok(await reconnected(1), 'restarted keeper reconnected')
 
   // a third device cold-opens against the restarted keeper
-  const c = await openSpool(link, { persist: false, author: 'c' })
-  spools.push(c)
   // 25 s: covers one client resync interval in case the first ask raced
-  assert.ok(await until(() => c.entries.length === 3, 25_000), 'C converged from the restarted keeper')
+  assert.ok(await converges(link, 'c', 3, 25_000), 'C converged from the restarted keeper')
+
+  children.forEach((c) => c !== children[0] && c.kill('SIGKILL'))
+  await until(async () => (await health()).relay.connections === 0, 5_000)
+})
+
+test('a links file: two spools on one keeper, garbage and duplicate lines, kill -9, clean SIGTERM', async () => {
+  // two households' worth of keyless spools
+  const { spool: a1, link: link1 } = await wind('a1', 2)
+  const { spool: a2, link: link2 } = await wind('a2', 3)
+
+  // the list: a comment, a link, a garbage line, another link, a duplicate
+  const dir = await mkdtemp(join(tmpdir(), 'pegboard-'))
+  const list = join(dir, 'pegboard')
+  await writeFile(list, ['# the wall', link1, '', 'this is not a link', link2, link1, ''].join('\n'))
+  const file1 = join(dir, `${a1.code}.spool.json`)
+  const file2 = join(dir, `${a2.code}.spool.json`)
+
+  const keeper = spawnKeeper('--links', list)
+  assert.ok(
+    await until(async () => (await entriesIn(file1)) === 2 && (await entriesIn(file2)) === 3, 15_000),
+    'keeper synced both spools and exported a file for each, beside the list'
+  )
+  assert.match(keeper.out, /\[keeper line 4\] skipped — that's not a spool link/)
+  assert.match(keeper.out, new RegExp(`\\[keeper line 6\\] skipped — ${a1.code} is already on the list`))
+  assert.match(keeper.out, /\[keeper\] keeping 2 spools from .*pegboard \(1 failed\)/)
+  // logs never carry a link, nor the list's contents
+  assert.doesNotMatch(keeper.out, /spool=/)
+  assert.doesNotMatch(keeper.out, /this is not a link/)
+
+  // both writers close their laptops
+  await leave(a1)
+  await leave(a2)
+
+  // midnight, twice: cold readers converge on each from the keeper alone
+  assert.ok(await converges(link1, 'b1', 2), 'B1 converged on spool 1 from the keeper alone')
+  assert.ok(await converges(link2, 'b2', 3), 'B2 converged on spool 2 from the keeper alone')
+
+  // power cut, then restart from the same list — both files restore
+  keeper.kill('SIGKILL')
+  await sleep(300)
+  const again = spawnKeeper('--links', list)
+  assert.ok(await reconnected(2), 'restarted keeper reconnected both spools')
+  assert.ok(await until(() => /restored 2 entries/.test(again.out) && /restored 3 entries/.test(again.out)), 'both restored from file')
+  assert.ok(await converges(link1, 'c1', 2, 25_000), 'C1 converged from the restarted keeper')
+  assert.ok(await converges(link2, 'c2', 3, 25_000), 'C2 converged from the restarted keeper')
+
+  // clean shutdown: every spool saves and leaves, exit 0
+  const exited = new Promise((r) => again.on('exit', r))
+  again.kill('SIGTERM')
+  assert.equal(await exited, 0, 'SIGTERM exits 0')
+  assert.match(again.out, new RegExp(`\\[keeper ${a1.code}\\] SIGTERM — saving and leaving`))
+  assert.match(again.out, new RegExp(`\\[keeper ${a2.code}\\] SIGTERM — saving and leaving`))
+  assert.equal(await entriesIn(file1), 2)
+  assert.equal(await entriesIn(file2), 3)
 })

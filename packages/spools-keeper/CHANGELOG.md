@@ -1,5 +1,11 @@
 # spools-keeper changelog
 
+## 0.2.0 — unreleased
+
+- `--links <file>`: one keeper holds every spool on a list (one link per line, `# ` comments), one export file per spool beside the list (`--dir <path>` to choose). A bad line is skipped by number; the rest stay kept. Edit the list and restart to change it (T-182).
+- The single-link form is unchanged.
+- README: the key ring sentence — a keeper holding a list holds every key on it — and the keeper's animal.
+
 ## 0.1.1 — 2026-09-03
 
 - README: the memory-only gap — a final deposit refused at shutdown stays out of the pocket until a peer syncs or the keeper restarts from its file (T-178).

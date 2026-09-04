@@ -8,7 +8,20 @@ and your spool is answered even when everyone's laptops are shut.
 npx spools-keeper '#spool=amber-cassette-042&relay=wss%3A%2F%2F…&k=…'
 ```
 
-(Quote the link — it contains `&`.) That's the whole setup.
+(Quote the link — it contains `&`.) That's the whole setup for one spool.
+
+For the handful you actually care about, put the links in a file, one per
+line, and hand the keeper the file:
+
+```sh
+npx spools-keeper --links ~/pegboard
+```
+
+A line starting with `# ` (hash, space) is a comment; a bare `#spool=…` is
+a link. Blank lines and duplicates are ignored; a line that isn't a link is
+logged by line number and skipped, and the rest stay kept. To hang a new
+spool on the wall or take one down, edit the file and restart the keeper —
+shutdown saves and leaves every spool cleanly, so a restart costs nothing.
 
 ## What it is
 
@@ -21,6 +34,17 @@ It holds the key because you handed it the link — and the link *is* the key
 exchange. Nothing about the protocol, the relay, or the spec changes because
 a keeper exists; it was a conformant client before it was written.
 
+A keeper holding a list holds every key on it. That is the same sentence at
+a larger size, and it's worth saying plainly: the machine running your
+pegboard is your key ring. Whoever walks out the door with it — or with
+the links file, or with the export files beside it — has everything on the
+wall, exactly as if you'd handed them each link yourself. Run it on
+hardware you'd trust with the links, because that's what you're doing.
+
+If this family of software has an animal, it's this one. The keeper is the
+hippo: asleep in the river, surfacing to breathe without waking, holding
+the reels for everyone whose device is asleep.
+
 ## Why you'd run one instead of (or beside) the pocket
 
 - **Keyless spools.** The relay's pocket is keyed-only — ciphertext or
@@ -32,12 +56,16 @@ a keeper exists; it was a conformant client before it was written.
 
 ## Durability
 
-The keeper keeps the spool in memory and exports it to a file
-(`./<code>.spool.json` by default, `--file <path>` to choose), debounced on
+The keeper keeps each spool in memory and exports it to a file, debounced on
 idle — the same portable format `spool.export()` produces, readable by hand
 and re-importable anywhere. On start it restores from that file and lets the
 room fill in the rest. `kill -9` loses at most a couple of seconds of
 debounce; the peers still hold everything, and the next sync heals it.
+
+Where the files go: with one link, `./<code>.spool.json` (`--file <path>` to
+choose). With `--links`, one `<code>.spool.json` per spool *beside the links
+file* (`--dir <path>` to choose) — so listing that directory is the
+inventory of the wall.
 
 One gap to know about (T-178): the keeper is a memory-only client
 (`persist: false`), so the SDK's deposit-if-ahead heal has nothing local to
@@ -49,7 +77,8 @@ pocket check settles and re-deposits what the file holds.
 ## What it logs
 
 Connection state, entry counts, the spool code, and the key's short
-fingerprint. Never content, never the key, never the full link.
+fingerprint. Never content, never the key, never the full link — and with
+`--links`, never a line of the file; a bad line is reported by number.
 
 ---
 

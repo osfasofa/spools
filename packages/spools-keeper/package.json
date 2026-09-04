@@ -1,6 +1,6 @@
 {
   "name": "spools-keeper",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "A headless always-on peer for a spool. Your hardware, your key, nobody's server.",
   "license": "MIT",
   "repository": {

@@ -200,7 +200,7 @@ Opened 4 Sep 2026 from the brand repo's second riff (`../brand/riffs/pegboard.md
 
 | Ticket | Title | Depends | Status |
 |---|---|---|---|
-| [T-182](T-182-keeper-pegboard.md) | `spools-keeper --links`: hold many spools from a file — **sign-off** on the hippo line, **owner at keyboard** for the first real run | T-181 | todo |
+| [T-182](T-182-keeper-pegboard.md) | `spools-keeper --links`: hold many spools from a file — **sign-off** on the hippo line, **owner at keyboard** for the first real run | T-181 | doing |
 
 ## Parked (no ticket until evidence demands one)
 
