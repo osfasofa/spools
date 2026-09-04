@@ -1,7 +1,7 @@
 ---
 id: T-182
 title: "spools-keeper holds many: the links file (pegboard, move A)"
-status: doing
+status: done
 milestone: M17
 depends: [T-181]
 ---
@@ -110,7 +110,7 @@ name. Owner decides yes / not yet.
 - [x] README: the hippo sentence — **sign-off** (decision 6).
 - [x] `CHANGELOG.md` + version → `0.2.0` (new CLI surface; publishing is
       its own owner-at-keyboard ticket, T-181 precedent).
-- [ ] **Owner at keyboard, the actual point:** run it. A links file with
+- [x] **Owner at keyboard, the actual point:** run it. A links file with
       two or three real spools on a machine that stays on, through at least
       one night. Record in Notes what the logs said in the morning, what
       the export files looked like, and whether anything about the shape
@@ -203,5 +203,42 @@ name. Owner decides yes / not yet.
     that recurs overnight.
   Both spools then took one entry wound from a laptop client, logged
   `1 entries held`, and exported (~790 bytes each) within the debounce.
+- **The run, closed 4 Sep 2026, 15:05 local — owner's verdict: "I think
+  this worked."** Eleven hours and seven minutes from 03:57, through the
+  rest of the night and the whole morning, on the owner's laptop under
+  `caffeinate -i`. The owner used both spools from the room client while it
+  ran; a fresh cold client at 05:19 converged on the keyless spool in
+  317 ms from the keeper alone (no pocket exists for it — the clean proof)
+  and on the keyed one in 206 ms (entangled with the pocket on a cold open;
+  the test suite is where those two are separated). The morning's shape:
+
+  | | keyless `jade-echo-236` | keyed `hidden-echo-280` |
+  |---|---|---|
+  | entries held (log) | 3 | 31 |
+  | entries in export file | 3 | 31 |
+  | export size | 2.1 KB | 23.3 KB |
+  | socket drops → reconnects | 21 | 29 |
+  | save failures / hiccups / undecryptable | 0 | 0 |
+
+  `ls ~`: `pegboard` (262 B, mode 600), the two `.spool.json` files beside
+  it. The log is 191 lines, counts and codes only.
+- **Finding: fifty reconnects in eleven hours.** Each spool's socket
+  dropped and came back on its own schedule (21 vs 29 — not the network,
+  or they'd move together), roughly every 13–20 minutes, always
+  `offline → connecting → connected`, never a lost entry. Whether that is
+  the canonical relay's proxy closing idle sockets, the relay's own
+  ping/pong, or the SDK's resync is not knowable from this log — because
+  **the keeper's log has no timestamps** (finding two). Both are cheap
+  follow-ons, with the pocket-state line from the night's first note: a
+  narration ticket for the keeper — timestamps, `pocket: applied/empty` on
+  open, and a reconnect count in a periodic one-liner — would have answered
+  every question this run raised without changing what it holds. Not filed
+  as a ticket here; the owner picks.
+- Nothing about the shape was wrong. Restart-to-reload was never needed in
+  eleven hours; the file beside the list was the right default; the key
+  ring sentence read true the moment `cat ~/pegboard` showed the keyed link
+  with its key on the second line.
+- 0.2.0 stays **unreleased** — publishing is its own owner-at-keyboard
+  ticket. The keeper is still running as this note is written.
 - Open for the owner: whether M17 is the right home or this should sit
   under M15's "before it goes wider" rail instead.
