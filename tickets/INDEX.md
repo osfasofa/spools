@@ -194,6 +194,14 @@ Opened 3 Sep 2026. Seven repos now consume `spools` from the registry, and two o
 | [T-179](T-179-stash-remember.md) | `stash.remember` — a vessel mirrors the stash's private format — **sign-off** | — | todo |
 | [T-180](T-180-splice-gate.md) | `splice()` — the gate review — **sign-off** | — | todo |
 
+## M17 — the pegboard (the keeper's first real run)
+
+Opened 4 Sep 2026 from the brand repo's second riff (`../brand/riffs/pegboard.md`, downstream of `hippo.md`). The keeper has shipped twice and never been run for real; the riff split the owner's "walls full of spools" image into move A (the keeper holds many — a links file, one export per spool, still 100-odd boring lines) and move B (the wall you look at — a client, which lives beside the keeper, never inside it). This rail is move A only. It carries one **sign-off** (whether the keeper's README gets the hippo now) and one **owner at keyboard** step that is the whole point: leave it running overnight holding real spools.
+
+| Ticket | Title | Depends | Status |
+|---|---|---|---|
+| [T-182](T-182-keeper-pegboard.md) | `spools-keeper --links`: hold many spools from a file — **sign-off** on the hippo line, **owner at keyboard** for the first real run | T-181 | todo |
+
 ## Parked (no ticket until evidence demands one)
 
 - Structured `data` field for immutable kinds — T-030 records the verdict.

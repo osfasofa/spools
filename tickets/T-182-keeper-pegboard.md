@@ -1,0 +1,153 @@
+---
+id: T-182
+title: "spools-keeper holds many: the links file (pegboard, move A)"
+status: todo
+milestone: M17
+depends: [T-181]
+---
+
+## Goal
+
+`npx spools-keeper --links <file>` — one keeper process holding every spool
+on a list, one export file per spool, the same member-who-never-sleeps to
+each room. Move A of the pegboard riff (`../brand/riffs/pegboard.md`): the
+keeper grows a list and nothing else. Zero protocol/relay/spec change; the
+wall you look at (move B) is a separate thing and is **not** this ticket.
+
+## Context
+
+The keeper has shipped twice (0.1.0, 0.1.1) and has never been run for
+real — seconds inside its own test, a minute in two release preflights,
+never a night on a shelf holding a spool anyone cares about. One reason is
+shape: one link, one process, one file is right for a proof and wrong for
+a life. Nobody cares about one spool; they care about a handful, and not
+the same handful forever.
+
+The brand riff already settled the order (`hippo.md` §4, `pegboard.md`
+§3–5): behaviour first, face second. This is the behaviour. It is also,
+by the riff's reading, the ticket where the keeper gets the animal — a
+README sentence, maybe a log line — which is the owner's call and is
+marked **sign-off** below.
+
+`keeper.js` today is 118 lines: parse one link → restore-or-open → debounced
+export → quiet log → clean `leave()` on signal. Everything below is that
+loop, run N times, with the per-spool state that is currently module-level
+pulled into a function.
+
+## Decisions to make (trade-offs first, then a lean)
+
+**1. The list's shape.** One link per line, `#` comments and blank lines
+ignored. That's it — no petnames, no JSON. Petnames are the wall's
+business (move B) and the keeper already names a spool by its code in
+every log line. *Costs:* nothing. *Bakes in:* the file is exactly as
+sharable as a text file, by hand, which is the point. *Stays flexible:* a
+future wall can keep its own petname map keyed by code without the keeper
+ever learning the word.
+
+**2. Where the exports go.** Default: `<code>.spool.json` beside the links
+file. `--dir <path>` overrides. *Alternative:* keep today's cwd default.
+*Lean:* beside the links file — a pegboard and its spools live on one wall,
+and `ls` of that directory *is* the inventory. The single-link form keeps
+its current default so nothing published breaks.
+
+**3. Picking up changes.** Options, cheapest first:
+   - *Restart.* Edit the file, `kill -TERM`, start again. Shutdown already
+     saves and `leave()`s (pocket flush included), so it's safe. Zero code.
+   - *SIGHUP re-reads.* New links open; links removed get a final save and
+     a `leave()`; existing ones are untouched. ~20 lines.
+   - *`fs.watch`.* Reacts to the editor's save. Platform-flaky, and reacts
+     to half-written files.
+   *Lean:* restart for this ticket, SIGHUP as a follow-on if the owner's
+   first real run finds restarting annoying. Hanging a spool on the wall is
+   an occasional act; it can cost a restart.
+
+**4. One bad peg.** A malformed link, a relay that won't answer, a file
+that won't parse: log it under that spool's prefix and keep the rest
+running. The process only exits non-zero if *nothing* on the list could be
+opened. *Alternative:* fail fast on any bad line. *Lean:* keep the rest
+running — a keeper that drops the whole wall because one link rotted is
+the opposite of the thing it's for.
+
+**5. The key ring sentence — README, not code.** `pegboard.md` §7: a
+machine holding every link you care about is the keeper's honesty sentence
+multiplied. The README says, at the new size, what walking out the door
+with that machine means, before the flag ships. Needs no sign-off; it's
+the existing sentence at scale.
+
+**6. The animal — sign-off.** `hippo.md` §7 asked whether the keeper gets
+the hippo formally now or after a season; `pegboard.md` §5 says this is the
+ticket where it could. Smallest honest version: one sentence in the README
+(*the keeper is the hippo: asleep in the river, surfacing to breathe
+without waking, holding the reels*). No emoji in logs, no ASCII art, no
+name. Owner decides yes / not yet.
+
+## Tasks
+
+- [ ] Refactor `keeper.js`: the parse → restore-or-open → export → narrate
+      loop becomes `keep(link, { file })` returning `{ spool, save, close }`;
+      module-level state (`timer`, `lastSaveAt`, `saving`) moves inside.
+      Behaviour of the single-link form is byte-for-byte unchanged (same
+      default file, same log lines).
+- [ ] `--links <file>`: read, strip comments/blank lines, `keep()` each.
+      Mutually exclusive with a positional link (usage error if both).
+- [ ] `--dir <path>` for the links form; default is the links file's
+      directory. `--file` is rejected with the links form (it names one
+      file; there are many).
+- [ ] Per-spool failure isolation (decision 4). One summary line at start:
+      `keeping N spools from <file> (M failed)`.
+- [ ] Shutdown: SIGINT/SIGTERM saves and `leave()`s every spool, in
+      parallel, then exits. One spool's shutdown hiccup doesn't skip the
+      others.
+- [ ] Tests (`test/keeper.test.js`, extend the existing harness): two
+      keyless spools on one keeper against the real relay; writers wind and
+      leave; cold readers converge on both from the keeper alone; kill -9;
+      restart from the two files; a third device converges on both. Plus:
+      a links file with one garbage line starts, logs the failure, keeps
+      the other. Remember the T-107 gotcha — wait for `relay.connections ≥ 1`
+      after restart before opening the probe.
+- [ ] README: the links form, the exports-beside-the-file rule, the
+      restart-to-reload rule, and the key ring sentence (decision 5).
+- [ ] README: the hippo sentence — **sign-off** (decision 6).
+- [ ] `CHANGELOG.md` + version → `0.2.0` (new CLI surface; publishing is
+      its own owner-at-keyboard ticket, T-181 precedent).
+- [ ] **Owner at keyboard, the actual point:** run it. A links file with
+      two or three real spools on a machine that stays on, through at least
+      one night. Record in Notes what the logs said in the morning, what
+      the export files looked like, and whether anything about the shape
+      was wrong. This is the keeper's first real run.
+
+## Acceptance criteria
+
+- `npx spools-keeper '<link>'` behaves exactly as 0.1.1 did.
+- `npx spools-keeper --links <file>` holds every spool on the list; a cold
+  device converges on any of them from the keeper alone, with no pocket
+  involved (keyless spools prove it structurally).
+- kill -9 loses at most the debounce window on each spool; restart resumes
+  every spool from its file.
+- One bad line in the list does not stop the others; the failure is in the
+  log under that spool's prefix.
+- Logs still carry counts, codes, and fingerprints only — never content,
+  never a key, never a full link, and never the links file's contents.
+- The owner's overnight run happened and its Notes entry exists. Until it
+  does, this ticket is not done, whatever the tests say.
+
+## Out of scope (say it so nobody drifts)
+
+- The wall (move B): any page, port, or stylesheet. Not in this package,
+  not in this ticket.
+- The list as a spool of spools (`kind: 'spool'` shelf). That is the
+  capability-store fork `docs/spools-of-spools.md` prices; it queues at the
+  gate with evidence, after the file form has lived a while.
+- Petnames, status dots, "last touched." The wall's vocabulary, not the
+  keeper's.
+- Any change to the SDK, the relay, or SPEC. If one turns out to be needed,
+  that's evidence — stop and file it, don't widen here.
+
+## Notes / open questions
+
+- Drafted 4 Sep 2026 from the brand riff, before any code. The refactor is
+  the only real risk to the single-link form; the test suite's existing
+  midnight scenario is the regression guard.
+- Open for the owner: decision 6 (the hippo sentence), and whether M17 is
+  the right home or this should sit under M15's "before it goes wider" rail
+  instead.
