@@ -76,9 +76,20 @@ pocket check settles and re-deposits what the file holds.
 
 ## What it logs
 
-Connection state, entry counts, the spool code, and the key's short
-fingerprint. Never content, never the key, never the full link — and with
-`--links`, never a line of the file; a bad line is reported by number.
+Every line carries an ISO UTC timestamp. Then, per spool: connection state,
+entry counts, the spool code, and the key's short fingerprint; for a keyed
+spool, what the pocket did on open (`pocket: applied (2 deposits)`,
+`pocket: empty`, `pocket: unavailable`) and any deposit the relay refuses;
+for a socket that drops and comes back, which reconnect it was and how long
+it was down (`relay: connected — reconnect #7 after 3.2 s offline`). Every
+ten minutes, one line for the whole wall says it's still up:
+
+```
+2026-09-05T03:12:00.412Z [keeper] up 11h07m · jade-echo-236 3 held, 21 reconnects · hidden-echo-280 31 held, 29 reconnects
+```
+
+Never content, never the key, never the full link — and with `--links`,
+never a line of the file; a bad line is reported by number.
 
 ---
 

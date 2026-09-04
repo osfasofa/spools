@@ -25,6 +25,9 @@
 //
 // Quote the link — it contains & characters. Logs carry counts, codes, and
 // key fingerprints only: never content, never the key, never the full link.
+// Every line is stamped (ISO UTC); a keyed spool says what the pocket did
+// on open; a reconnect says which one and how long the socket was down; a
+// heartbeat every ten minutes says the wall is still up.
 
 import { readFile, writeFile, rename } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
@@ -33,6 +36,10 @@ import { openSpool, importSpool, parseSpoolLink, DEFAULT_RELAY } from 'spools'
 
 const SAVE_DEBOUNCE_MS = 2_000
 const SAVE_MIN_GAP_MS = 10_000
+const HEARTBEAT_MS = Number(process.env.KEEPER_HEARTBEAT_MS) || 10 * 60_000
+
+// every line through here: ISO UTC stamp, then the text
+const say = (msg) => console.log(`${new Date().toISOString()} ${msg}`)
 
 // ---- argv ----
 const argv = process.argv.slice(2)
@@ -63,7 +70,7 @@ const keep = async (rawLink, { file: fileArg, dir } = {}) => {
   const parsed = parseSpoolLink(rawLink) // throws SpoolLinkError on garbage
   const file = fileArg ?? join(dir ?? '.', `${parsed.code}.spool.json`)
   const relay = parsed.relay ?? DEFAULT_RELAY
-  const log = (msg) => console.log(`[keeper ${parsed.code}] ${msg}`)
+  const log = (msg) => say(`[keeper ${parsed.code}] ${msg}`)
   const restored = existsSync(file)
 
   // an existing file is the spool's last exported state — importSpool
@@ -110,10 +117,52 @@ const keep = async (rawLink, { file: fileArg, dir } = {}) => {
   spool.doc.on('update', scheduleSave)
 
   // quiet narration: counts only
-  spool.on('status', (s) => log(`relay: ${s}`))
   spool.on('entry', () => log(`${spool.entries.length} entries held`))
   spool.on('undecryptable', (n) => log(`${n} frames ignored (someone isn't on this key)`))
+  spool.on('full', (reason) => log(`room full: ${reason}`))
+
+  // status, with reconnects counted and timed per spool: a drop after the
+  // first connect starts the clock; the next connect is a reconnect
+  let reconnects = 0
+  let everConnected = false
+  let downSince = null
+  spool.on('status', (s) => {
+    if (s === 'connected') {
+      if (downSince) {
+        reconnects++
+        log(`relay: connected — reconnect #${reconnects} after ${((Date.now() - downSince) / 1000).toFixed(1)} s offline`)
+        downSince = null
+      } else {
+        log('relay: connected')
+      }
+      everConnected = true
+    } else {
+      if (everConnected && !downSince) downSince = Date.now()
+      log(`relay: ${s}`)
+    }
+  })
   log(`relay: ${spool.status}`)
+
+  // the pocket's verdict, once, in the SDK's words; and any deposit refusal
+  // as it happens — the subscription outlives close() so a refused final
+  // deposit (T-178) is narrated too. Keyless spools have no pocket: silent.
+  let pocketTold = false
+  let lastDepositError
+  const tellPocket = (p) => {
+    if (!p) return
+    if (!pocketTold && p.phase !== 'checking') {
+      pocketTold = true
+      const applied = p.phase === 'applied' ? ` (${p.applied} deposit${p.applied === 1 ? '' : 's'})` : ''
+      const dropped = p.dropped ? `, ${p.dropped} dropped` : ''
+      log(`pocket: ${p.phase}${applied}${dropped}`)
+    }
+    if (p.depositError !== lastDepositError) {
+      lastDepositError = p.depositError
+      if (p.depositError) log(`pocket: deposit refused (${p.depositError})`)
+    }
+  }
+  tellPocket(spool.pocket)
+  spool.on('pocket', tellPocket)
 
   // final save, then leave (flushes the pocket too, if keyed)
   const close = async (signal) => {
@@ -127,7 +176,7 @@ const keep = async (rawLink, { file: fileArg, dir } = {}) => {
     }
   }
 
-  return { spool, save, close }
+  return { spool, save, close, reconnects: () => reconnects }
 }
 
 // ---- one link, or a list of them ----
@@ -164,23 +213,23 @@ if (link) {
     } catch {
       // no err.message here: the SDK echoes the offending text, and the
       // list's contents stay out of the log — the line number is enough
-      console.log(`[keeper ${at}] skipped — that's not a spool link`)
+      say(`[keeper ${at}] skipped — that's not a spool link`)
       failed++
       continue
     }
     if (seen.has(code)) {
-      console.log(`[keeper ${at}] skipped — ${code} is already on the list`)
+      say(`[keeper ${at}] skipped — ${code} is already on the list`)
       continue
     }
     seen.add(code)
     try {
       kept.push(await keep(line, { dir }))
     } catch (err) {
-      console.log(`[keeper ${code}] skipped — couldn't open: ${err.message}`)
+      say(`[keeper ${code}] skipped — couldn't open: ${err.message}`)
       failed++
     }
   }
-  console.log(`[keeper] keeping ${kept.length} spool${kept.length === 1 ? '' : 's'} from ${linksFile}` +
+  say(`[keeper] keeping ${kept.length} spool${kept.length === 1 ? '' : 's'} from ${linksFile}` +
     `${failed ? ` (${failed} failed)` : ''}`)
   if (kept.length === 0) {
     console.error(tried ? 'nothing on the list could be opened' : `nothing on the list: ${linksFile}`)
@@ -188,11 +237,24 @@ if (link) {
   }
 }
 
+// ---- heartbeat: one line for the whole wall, so silence is never ambiguous ----
+const startedAt = Date.now()
+const uptime = () => {
+  const m = Math.floor((Date.now() - startedAt) / 60_000)
+  return `${Math.floor(m / 60)}h${String(m % 60).padStart(2, '0')}m`
+}
+const heartbeat = setInterval(() => {
+  const pegs = kept.map((k) => `${k.spool.code} ${k.spool.entries.length} held, ${k.reconnects()} reconnects`)
+  say(`[keeper] up ${uptime()} · ${pegs.join(' · ')}`)
+}, HEARTBEAT_MS)
+heartbeat.unref()
+
 // ---- clean shutdown: every spool saves and leaves, in parallel, then exit ----
 let closing = false
 const closeAll = async (signal) => {
   if (closing) return
   closing = true
+  clearInterval(heartbeat)
   await Promise.allSettled(kept.map((k) => k.close(signal)))
   process.exit(0)
 }

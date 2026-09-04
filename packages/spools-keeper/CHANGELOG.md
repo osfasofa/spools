@@ -5,6 +5,7 @@
 - `--links <file>`: one keeper holds every spool on a list (one link per line, `# ` comments), one export file per spool beside the list (`--dir <path>` to choose). A bad line is skipped by number; the rest stay kept. Edit the list and restart to change it (T-182).
 - The single-link form is unchanged.
 - README: the key ring sentence — a keeper holding a list holds every key on it — and the keeper's animal.
+- Narration (T-183): every line stamped (ISO UTC); a keyed spool says what the pocket did on open and names any refused deposit; a reconnect says which one and how long the socket was down; a heartbeat line every ten minutes for the whole wall. Still counts-only.
 
 ## 0.1.1 — 2026-09-03
 

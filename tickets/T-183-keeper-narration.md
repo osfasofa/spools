@@ -1,7 +1,7 @@
 ---
 id: T-183
 title: "spools-keeper narration: timestamps, the pocket's verdict, a heartbeat"
-status: todo
+status: doing
 milestone: M17
 depends: [T-182]
 ---
@@ -105,23 +105,23 @@ is relay-side it becomes evidence for a relay ticket, not a fix here.
 
 ## Tasks
 
-- [ ] `stamp()` helper in `keeper.js`; every `console.log` goes through it,
+- [x] `stamp()` helper in `keeper.js`; every `console.log` goes through it,
       the list-level sites included (decision 1).
-- [ ] Pocket verdict on open; deposit refusal narrated after `leave()`
+- [x] Pocket verdict on open; deposit refusal narrated after `leave()`
       (decision 2).
-- [ ] Per-spool reconnect counter and offline duration on the `status`
+- [x] Per-spool reconnect counter and offline duration on the `status`
       line; `full` subscription (decision 3).
-- [ ] Wall-level heartbeat, 10 min, `unref()`'d, `KEEPER_HEARTBEAT_MS`
+- [x] Wall-level heartbeat, 10 min, `unref()`'d, `KEEPER_HEARTBEAT_MS`
       override for tests (decision 4).
-- [ ] Tests, extending `test/keeper.test.js`: every stdout line matches
+- [x] Tests, extending `test/keeper.test.js`: every stdout line matches
       `^\d{4}-\d\d-\d\dT\S+Z \[keeper`; a keyed spool on the local relay logs
       `pocket: empty` on open; stopping and restarting the local relay yields
       `reconnect #1 after … offline` on each spool; a heartbeat line appears
       with `KEEPER_HEARTBEAT_MS=500`. The two existing scenarios stay green.
-- [ ] README "What it logs": timestamps, the pocket's verdict, reconnect
+- [x] README "What it logs": timestamps, the pocket's verdict, reconnect
       counts, the heartbeat — and the standing rule, unchanged: never
       content, never the key, never the full link, never a line of the list.
-- [ ] `CHANGELOG.md`: fold into the **unreleased 0.2.0** entry. No bump.
+- [x] `CHANGELOG.md`: fold into the **unreleased 0.2.0** entry. No bump.
 - [ ] **Owner at keyboard:** stop the running wall
       (`pkill -TERM -f "keeper.js --links"` — shutdown saves and leaves),
       restart on the new build under `caffeinate -i`, read the next ~12 h.
@@ -153,6 +153,31 @@ is relay-side it becomes evidence for a relay ticket, not a fix here.
 
 ## Notes / open questions
 
+- Built 4 Sep 2026, same afternoon as the draft. `keeper.js` is 262 lines;
+  the narration is all inside `keep()` except the heartbeat, which is
+  wall-level by design. Three tests green in ~15 s: the two T-182 scenarios
+  now also assert every line is stamped and that keyless spools say nothing
+  about the pocket; the new one runs a keyed spool on the local relay, sees
+  `pocket: empty` on open, kills and restarts the relay, sees
+  `reconnect #1 after N.N s offline`, sees the heartbeat count it, and
+  checks no heartbeat fires after SIGTERM begins.
+- First real line from the canonical relay, on the T-182 wall's keyed spool
+  (a second keeper beside the running one, for five seconds):
+  `pocket: applied (8 deposits)`. So the pocket *is* holding that spool —
+  eight deposits' worth — which makes the vanished first entry from T-182's
+  first minute more interesting, not less: the pocket was working; that one
+  deposit didn't land. Still T-178's shape.
+- **Gotcha, recorded for the owner's restart:** `kill -TERM` aimed at a
+  `mise x -- node …` wrapper does not reach node — the wrapper exits 143
+  and the keeper keeps running. The start command in T-182 already
+  sidesteps this by resolving node's path first
+  (`"$(mise x -- which node)" keeper.js …`); `pkill -TERM -f "keeper.js --links"`
+  matches the node process itself, so it's fine.
+- Also confirmed in passing: outside the repo, `mise x -- node` resolves an
+  older Node with no global `WebSocket`, and the keeper dies with
+  `WebSocket is not defined`. The `engines >= 22` line is load-bearing;
+  run the keeper from a directory where Node 24 is pinned, or with the
+  full path.
 - Drafted 4 Sep 2026 from T-182's follow-ons #1 and #2, with the SDK and
   relay facts above verified in source the same afternoon. The keeper from
   T-182's run was still up (PID 2668, eleven hours and counting) when this
