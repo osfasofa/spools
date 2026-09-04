@@ -1,0 +1,49 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>T-178 unload demo</title>
+<!--
+  T-178, mechanism 2: a tab closed inside the pocket's 10 s debounce.
+  Open with #relay=ws://127.0.0.1:15900/yjs (a LOCAL relay, never the
+  canonical one). Add &auto=1&link=<urlencoded link> for the deterministic
+  variant: open that link, wind, navigate away in the same tick.
+  Serve scratch/ with python3 -m http.server so ../smoke-t011 resolves.
+  (Plain mode: a LOCAL relay, never the
+  canonical one). The page mints a keyed, persist:false spool, waits for
+  the pocket check to settle (so mechanism 5 is out of the picture), winds
+  once, and shows the link. Close the tab within 10 s. Then read the link
+  back cold with read.mjs: one entry = the visibilitychange flush rode
+  keepalive out of the closing tab; zero = it was cancelled at unload.
+-->
+<style>body{font:16px system-ui;margin:2rem;max-width:60ch}code{word-break:break-all}</style>
+<h1>T-178 unload demo</h1>
+<p id="status">minting…</p>
+<p><code id="link"></code></p>
+<script type="module">
+  import { newSpool, openSpool } from '../smoke-t011/engine.js'
+  const p = new URLSearchParams(location.hash.slice(1))
+  const relay = p.get('relay')
+  const status = (t) => (document.getElementById('status').textContent = t)
+  if (!relay) { status('no #relay= in the hash'); throw new Error('no relay') }
+  // #link= opens a link minted outside (so the reader knows it without the
+  // page having to say it); otherwise mint here
+  const s = p.get('link')
+    ? await openSpool(p.get('link'), { persist: false, author: 'tab' })
+    : await newSpool({ relay, persist: false, author: 'tab' })
+  await new Promise((r) => {
+    const c = (st) => { if (st && st.phase !== 'checking') r() }
+    s.on('pocket', c); c(s.pocket)
+  })
+  const link = s.share('')
+  console.log(`T178 link ${link}`)
+  s.wind({ kind: 'note', body: 'wound in a tab, closed inside the debounce' })
+  if (p.get('auto')) {
+    // deterministic variant: unload in the same tick as the wind — nothing
+    // but the visibilitychange/pagehide flush riding keepalive can carry it
+    location.replace('about:blank')
+  } else {
+    document.getElementById('link').textContent = link
+    status(`pocket ${s.pocket?.phase}; wound 1 at ${new Date().toISOString()}; visibility ${document.visibilityState} — close this tab within 10 s`)
+    document.addEventListener('visibilitychange', () => status(`visibilitychange → ${document.visibilityState} at ${new Date().toISOString()}`))
+    window.demo = s
+  }
+</script>

@@ -81,6 +81,11 @@ const bounded = (ms: number): Promise<void> =>
   })
 
 /** the state minus its depositError — the heal after a 'rate-limited' flush (T-178) */
+/** the window, where pagehide is dispatched; a test may stand one in on globalThis */
+const pageTarget = (): EventTarget | null => {
+  const g = globalThis as { addEventListener?: unknown }
+  return typeof g.addEventListener === 'function' ? (globalThis as unknown as EventTarget) : null
+}
 const withoutError = ({ depositError: _cleared, ...rest }: PocketState): PocketState => rest
 
 /** @internal token = base64url(SHA-512("spool-pocket-v1" ‖ key)[0..12)) — derived by clients only */
@@ -195,6 +200,7 @@ export class PocketClient {
   #inflight: Promise<void> | null = null
   #flushing: Promise<void> | null = null
   #onVisibility: (() => void) | null = null
+  #onPageHide: (() => void) | null = null
 
   constructor(opts: PocketClientOptions) {
     this.#origin = pocketOrigin(opts.relay)
@@ -217,6 +223,13 @@ export class PocketClient {
         if (document.visibilityState === 'hidden' && this.#dirty) void this.flush()
       }
       document.addEventListener('visibilitychange', this.#onVisibility)
+      // pagehide is the unload signal proper: it fires on every navigation
+      // away and every close — including for a tab that was never visible,
+      // which gets no visibilitychange at all (T-178, seen in the browser)
+      this.#onPageHide = () => {
+        if (this.#dirty) void this.flush()
+      }
+      pageTarget()?.addEventListener('pagehide', this.#onPageHide)
     }
   }
 
@@ -449,6 +462,7 @@ export class PocketClient {
     this.#timer = null
     this.#doc.off('afterTransaction', this.#onTransaction)
     if (this.#onVisibility) document.removeEventListener('visibilitychange', this.#onVisibility)
+    if (this.#onPageHide) pageTarget()?.removeEventListener('pagehide', this.#onPageHide)
     this.#abort.abort()
     this.#listeners.clear()
   }

@@ -65,6 +65,8 @@ should tell them apart:
       closed; this is additive either way). *Shipped the state field; the
       sign-off on the alternative is still the owner's — see Notes.*
 - [x] `keepalive: true` on the flush PUT when the sealed blob is ≤ 64 KiB.
+- [x] Browser demonstration of the unload case (`scratch/repro-t178/unload.html`
+      + `read.mjs`) — and the `pagehide` hook it turned out to need.
 - [x] Docs: SDK-API pocket section and the keeper README name the
       persist:false gap plainly.
 - [ ] Tell syrup and manyhands to drop their workarounds once shipped.
@@ -178,6 +180,41 @@ Not done here, noted: the deposit PUT carries no abort signal, so a relay
 that black-holes TCP could hold `leave()` open past the bound. Pre-existing;
 the GET has one. A follow-on if it ever bites.
 
+### The browser demonstration — and what it found (4 Sep 2026)
+
+`scratch/repro-t178/unload.html`, served from `scratch/` with
+`python3 -m http.server`, importing the smoke bundle; a local relay on
+127.0.0.1:15900; Chrome driven from this session; `read.mjs` opens the link
+cold afterwards and counts. `#auto=1&link=…` is the deterministic variant:
+the page opens a pre-minted keyed link, waits for the pocket check to
+settle (mechanism 5 out of the picture), winds once, and navigates away
+**in the same tick** — nothing but an unload flush riding `keepalive` can
+carry that wind.
+
+| run | bundle | what happened | deposit |
+|---|---|---|---|
+| A: wind, close by hand ~7 s later | before | landed — but the relay showed the deposit *before* the close: the terminal covering Chrome's window had made the tab `hidden`, and that `visibilitychange` flushed it | landed, not by unload |
+| B: same-tick navigate away | before | **lost.** connections 1 → 0, deposits unchanged, cold read 0 | **lost** |
+| C: same-tick navigate away | after | **landed.** deposits 3 → 4, cold read 1: "wound in a tab, closed inside the debounce" | landed |
+
+The page reported `document.visibilityState === 'hidden'` from its first
+line — Chrome's automation tab group lives in an unfocused window. So in run
+B no `visibilitychange` could ever fire, and `visibilitychange` was the
+SDK's *only* unload hook. `pagehide` is the unload signal proper: every
+navigation away, every close, whether or not the tab was ever visible.
+The SDK now listens for both (`pageTarget()` resolves the window; a test
+stands one in on `globalThis`). One new unit test: a hidden-from-birth
+document, a wind, a dispatched `pagehide`, one PUT.
+
+Honest sizing of the gap: a person can't wind in a tab they can't see, so
+the realistic hit is dirty state left over from a failed hidden-flush (a
+429 that re-armed, a network blip) and then a close with no second
+`visibilitychange`. Narrow — but the demo hit it on the first try, and the
+fix is two listeners.
+
+`keepalive` itself is now shown, not argued: run C's fetch was issued
+during `pagehide` of a page that was gone before the response.
+
 ### What shipped (SDK)
 
 - `flush()` — `leave()`'s and the hidden tab's — retries a 429 with
@@ -229,12 +266,13 @@ the GET has one. A follow-on if it ever bites.
   suspect), not a regression — but if it recurs, capture the name.
 - Landed in commit `824431d` (filled in by the wrap-up commit).
 - Mechanism 5 landed 4 Sep 2026 (the commit after this line was written);
-  SDK version → 0.2.1, **unreleased**.
+  SDK version → 0.2.1, **unreleased**. The `pagehide` hook and the browser
+  demonstration landed the same afternoon, one commit later.
 
 ### Remaining
 
-- Browser demonstration of mechanism 2 (above) — then the acceptance
-  criterion's "under context close" half is shown, not argued.
+- ~~Browser demonstration of mechanism 2~~ — done (runs A–C above); the
+  acceptance criterion's "under context close" half is shown.
 - Sign-off on the surface (state field vs. a `leave()` value).
 - Tell syrup and manyhands (owner) — and pass on the ring point:
   verify-and-retry cannot beat `POCKET_K`.

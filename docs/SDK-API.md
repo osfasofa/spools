@@ -240,8 +240,9 @@ interface PocketState {
   the loss; it never goes quiet. A scheduled deposit that meets a 429 re-arms
   itself after the min-gap instead of waiting for the next change. Deposits
   that seal to ≤ 64 KiB go out with `keepalive: true`, so a flush started by
-  `visibilitychange` outlives the tab that started it (bigger ones cannot
-  carry the option — browsers refuse it).
+  `visibilitychange` or `pagehide` outlives the tab that started it (bigger
+  ones cannot carry the option — browsers refuse it). Both hooks, because a
+  tab that was never visible gets no `visibilitychange` at all.
 - **Leaving before the check settles** (T-178, mechanism 5): a wind made
   while the pocket is still `checking` is remembered, and a `leave()` that
   comes before the check settles waits for it — up to ~3 s — so the final

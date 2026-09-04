@@ -272,6 +272,38 @@ it('when the check never settles, leave() waits only the bound and deposits what
   expect(a.pocket?.phase).toBe('checking') // honest: the check never came back before we left
 })
 
+it('pagehide flushes too — a tab that was never visible gets no visibilitychange (T-178)', async () => {
+  // stand in a document (hidden from the start: the automation-window case)
+  // and a window that can dispatch pagehide
+  const win = new EventTarget()
+  const g = globalThis as unknown as Record<string, unknown>
+  const saved = { document: g.document, add: g.addEventListener, remove: g.removeEventListener, dispatch: g.dispatchEvent }
+  g.document = Object.assign(new EventTarget(), { visibilityState: 'hidden' })
+  g.addEventListener = win.addEventListener.bind(win)
+  g.removeEventListener = win.removeEventListener.bind(win)
+  g.dispatchEvent = win.dispatchEvent.bind(win)
+  try {
+    const stub = await startStubRelay([200])
+    const code = generateCode()
+    const key = generateKey()
+    const engine = new SpoolEngine({ code, relay: stub.ws, key, persist: false })
+    const a = track(
+      new Spool(engine, stub.ws, key, 'a', { debounceMs: 10, minGapMs: 10 }, { debounceMs: 60_000, minGapMs: 0 })
+    )
+    await settled(a)
+    a.wind({ kind: 'track', body: 'about to navigate away' })
+    expect(stub.puts).toEqual([])
+    win.dispatchEvent(new Event('pagehide'))
+    expect(await until(() => stub.puts.length === 1)).toBe(true)
+    expect(stub.puts).toEqual([200])
+  } finally {
+    g.document = saved.document
+    g.addEventListener = saved.add
+    g.removeEventListener = saved.remove
+    g.dispatchEvent = saved.dispatch
+  }
+})
+
 it('a deposit the relay refuses as too big degrades loudly to live-only', async () => {
   const relay = await startRealRelay({ POCKET_MAX_BYTES: '60' })
   const code = generateCode()
