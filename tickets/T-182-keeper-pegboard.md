@@ -181,5 +181,27 @@ name. Owner decides yes / not yet.
   three real spools (one keyless, one keyed, so the pocket path is exercised
   too) on a machine that stays on; in the morning, paste the log's shape
   (not its links) and the `ls` of the directory here.
+- **The run started, 4 Sep 2026, 03:57 local, on the owner's laptop.**
+  `~/pegboard` holds two freshly minted spools on the canonical relay, one
+  keyless (`jade-echo-236`) and one keyed (`hidden-echo-280`); the keeper
+  runs detached under `caffeinate -i`, logging to `~/pegboard.log`, exports
+  beside the list. Two findings before the night even began:
+  - *The minted entries were lost, both of them.* The minting script wound
+    one entry per spool and `leave()`d before the keeper existed. Keyless:
+    expected — no peer, no pocket, that's the gap the keeper closes. Keyed:
+    the pocket should have caught it and the keeper's open should have
+    applied it, and neither the keeper nor a laptop client opened cold saw
+    anything (`before=0`). T-178's shape — `persist: false`, wind, leave
+    within seconds. Not chased tonight; filed here as the first real-run
+    evidence for T-178.
+  - *The keeper doesn't say what the pocket did.* `spool.pocket` reports
+    `applied` / `empty` / `unavailable` on open and the keeper logs none of
+    it. One log line, counts-only, would have answered the question above
+    in the morning. Cheap follow-on; not added mid-run.
+  - The keyed spool's socket dropped and reconnected once inside the first
+    minute (`offline → connecting → connected`), then held. Watch whether
+    that recurs overnight.
+  Both spools then took one entry wound from a laptop client, logged
+  `1 entries held`, and exported (~790 bytes each) within the debounce.
 - Open for the owner: whether M17 is the right home or this should sit
   under M15's "before it goes wider" rail instead.
