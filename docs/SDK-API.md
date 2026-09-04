@@ -299,5 +299,12 @@ Per-spool instance bundles: `Y.Doc` + `IndexeddbPersistence` (db name = spool co
   dual-key human), syrup's shipped `/branch` convention and its `/splice`
   + `/rejoin` ask, lore's brief, and the owner's reel riff (forgetting as
   cutting a new reel). T-180 is the review; it waits on the riff.
+- **Undo / redo** — no client wants it yet; parked with the verdict
+  already attached (`docs/riffs/tape-deck.md` §5, measured): a raw
+  `Y.UndoManager` over the entries map undoes a wind as a *hard* removal
+  (the entry leaves `entries` and `deleted` both; its body text is
+  orphaned), which the soft-delete decision forbids. Any surface builds on
+  `delete()`/`restore()` plus per-body text undo, scoped to the local
+  origin — your winds, never your friend's.
 - *(Not parked, a bug: pocket deposits lost at `leave()` under 429 or
   unload — T-178.)*

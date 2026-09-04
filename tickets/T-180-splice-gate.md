@@ -33,6 +33,17 @@ independently want it. There are now four sources:
    forgetting is cutting a new reel from what you keep, under a new key.
    That is a retelling with rotation — and it is also the room's only
    honest answer to "start over without them" (T-164).
+5. **The tape-deck riff** (`docs/riffs/tape-deck.md`, Sep 2026): a second
+   independent wanter for identity across a retelling (idempotent
+   operators need a stable dedup key; `wind()` can't set `id`). Measured
+   in `scratch/riff-tape-deck/spike.mjs`: branch-from-a-moment works
+   through the escape hatch (`Y.createDocFromSnapshot` off a rewind
+   moment), carries no record of the moment it was cut from, and reunion
+   with the origin resurrects the origin's whole present, soft-deletes
+   included — the retelling is the only subset that stays a subset. Also
+   on the record for whoever designs undo: a raw `Y.UndoManager` over the
+   entries map undoes a wind as a hard removal (gone from both getters,
+   body orphaned), so a spool-flavored undo builds on soft delete.
 
 ## What the gate has to decide
 
