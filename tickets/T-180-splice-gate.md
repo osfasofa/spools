@@ -62,11 +62,24 @@ independently want it. There are now four sources:
 
 ## Tasks
 
-- [ ] Owner answers the forgetting questions (who "hosts" a spool; the reel
-      reading) → `docs/riffs`-style riff in the loom.
+- [x] Owner answers the forgetting questions (who "hosts" a spool; the reel
+      reading) → `docs/riffs`-style riff in the loom. *(Answered 4–5 Sep;
+      the riff is [docs/riffs/the-reel.md](../docs/riffs/the-reel.md).)*
 - [ ] Brief: `docs/M16-splice-brief.md` from the riff + the spike.
 - [ ] **Sign-off**; DESIGN_DOC §5 row; tickets for the chosen operators.
 
 ## Acceptance criteria
 
 - A decision recorded with its trade-offs, whichever way it goes.
+
+6. **The reel riff** (`docs/riffs/the-reel.md`, Sep 2026): the owner's
+   forgetting answers, and the cut measured for the first time
+   (`scratch/riff-reel/spike.mjs`, 5 000 messages): a retelling of the
+   live half is 741 KiB with fresh ids and no provenance, 965 KiB with a
+   `from` stamp (91 B an entry), 760 KiB with ids preserved through the
+   escape hatch — identity is the cheaper provenance. Three operator
+   decisions surfaced: what happens to a reply whose parent didn't make the
+   cut (the spike flattens it), preserved or fresh ids, and cutting by
+   entry rather than by time (createdAt ties make a time cut fuzzy). The
+   new reel carries no rewind moments from before the cut — the point, and
+   the sentence for the button.

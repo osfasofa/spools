@@ -81,6 +81,8 @@ Petnames deserve one more sentence, because they're load-bearing: there is no gl
 
 ## 4. Splice, measured (the reserved verb meets the physics)
 
+*(Rotation as eviction is now the cut's mechanism too — the [reel riff](riffs/the-reel.md) §3 measures a retelling under a new key.)*
+
 `splice` has been reserved since §2 of the design doc with no design. The spike put the physics on the table, using only the shipped surface (`spool.doc` escape hatch + `Y.applyUpdate`):
 
 ```

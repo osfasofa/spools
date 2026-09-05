@@ -313,5 +313,9 @@ Per-spool instance bundles: `Y.Doc` + `IndexeddbPersistence` (db name = spool co
   orphaned), which the soft-delete decision forbids. Any surface builds on
   `delete()`/`restore()` plus per-body text undo, scoped to the local
   origin — your winds, never your friend's.
+- **The cut (a retelling operator) and the reel counter** — the reel riff
+  (`docs/riffs/the-reel.md`) measured the cut and named its three
+  decisions (threads, identity, the seam); the counter needs only
+  `spool.doc` and the relay's advertised `maxBytes`. Both queue at T-180.
 - *(Not parked, a bug: pocket deposits lost at `leave()` under 429 or
   unload — T-178.)*
