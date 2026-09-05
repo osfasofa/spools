@@ -6,7 +6,9 @@
   Open with #relay=ws://127.0.0.1:15900/yjs (a LOCAL relay, never the
   canonical one). Add &auto=1&link=<urlencoded link> for the deterministic
   variant: open that link, wind, navigate away in the same tick.
-  Serve scratch/ with python3 -m http.server so ../smoke-t011 resolves.
+  Rebuild the bundle first (it isn't committed): cd packages/spools &&
+  npx tsup --config tsup.smoke.config.ts. Then serve scratch/ with
+  python3 -m http.server so ../smoke-t011 resolves.
   (Plain mode: a LOCAL relay, never the
   canonical one). The page mints a keyed, persist:false spool, waits for
   the pocket check to settle (so mechanism 5 is out of the picture), winds
