@@ -118,7 +118,7 @@ The migration lesson, restated as a rule: **a packet is reversible only if it ca
 ## 7. Open questions parked here (with what would decide each)
 
 - **The recipe spool** — a co-edited, rewindable view spec: keepsake, or a config file wearing a trenchcoat? Decider: the owner's debate, then a vessel that winds one.
-- **Which packet shape the toy carries first** — deltas, checkpoints, or both on one screen so one breaks and one holds. Lean: both. Decider: `scratch/riff-tape-deck/` grows a two-tab page (transport buttons, a counter, two fields) and whoever runs it in two tabs.
+- **The toy** — built: `scratch/riff-tape-deck/index.html` is the rig (two tabs, a plug, both packet shapes on one screen so one breaks and one holds; the README has the five-minute script and `drive.mjs` replays it headless). What it teaches once two real hands are on it is the open part. Decider: whoever runs it in two tabs.
 - **Does the toy want undo?** If it does, that is the evidence for a passthrough — shaped by §5.4, never the raw manager. Decider: the toy.
 - **Should a fork from a moment carry the moment's own record?** Trivially fixable by appending the snapshot after the cut; whether it *should* is the splice brief's call. Decider: T-180.
 
