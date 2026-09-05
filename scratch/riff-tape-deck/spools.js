@@ -3933,6 +3933,14 @@ var TOKEN_DOMAIN = "spool-pocket-v1";
 var POCKET_TX_ORIGIN = "spool-pocket";
 var KEEPALIVE_MAX_BYTES = 64 * 1024;
 var sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+var bounded = (ms) => new Promise((r) => {
+  const t = setTimeout(r, ms);
+  t.unref?.();
+});
+var pageTarget = () => {
+  const g = globalThis;
+  return typeof g.addEventListener === "function" ? globalThis : null;
+};
 var withoutError = ({ depositError: _cleared, ...rest }) => rest;
 var deriveToken = (key) => {
   const domain = new TextEncoder().encode(TOKEN_DOMAIN);
@@ -3968,7 +3976,7 @@ var pocketOrigin = (relay) => {
 };
 var isPocketEnvelope = (json) => typeof json === "object" && json !== null && json.format === "spool-pocket" && typeof json.version === "number";
 var unavailableOrigins = /* @__PURE__ */ new Set();
-var _origin, _code, _key2, _doc2, _whenReady, _state, _listeners2, _abort, _destroyed3, _fetched, _tag, _debounceMs2, _minGapMs2, _flushRetries, _flushBackoffMs, _armed3, _dirty, _rateLimited, _timer2, _lastDepositAt, _inflight, _flushing, _onVisibility, _PocketClient_instances, set_fn, isAheadOf_fn, docHasState_fn, _onTransaction3, schedule_fn2, stopped_fn, deposit_fn, put_fn, flushNow_fn;
+var _origin, _code, _key2, _doc2, _whenReady, _state, _listeners2, _abort, _destroyed3, _fetched, _tag, _debounceMs2, _minGapMs2, _flushRetries, _flushBackoffMs, _settleWaitMs, _started, _armed3, _dirty, _rateLimited, _timer2, _lastDepositAt, _inflight, _flushing, _onVisibility, _onPageHide, _PocketClient_instances, set_fn, start_fn, isAheadOf_fn, docHasState_fn, _onTransaction3, schedule_fn2, stopped_fn, deposit_fn, put_fn, flushNow_fn;
 var PocketClient = class {
   constructor(opts) {
     __privateAdd(this, _PocketClient_instances);
@@ -3991,6 +3999,8 @@ var PocketClient = class {
     __privateAdd(this, _minGapMs2);
     __privateAdd(this, _flushRetries);
     __privateAdd(this, _flushBackoffMs);
+    __privateAdd(this, _settleWaitMs);
+    __privateAdd(this, _started, null);
     __privateAdd(this, _armed3, false);
     __privateAdd(this, _dirty, false);
     /** the last PUT was answered 429 — what flush()'s bounded retry reads */
@@ -4000,10 +4010,11 @@ var PocketClient = class {
     __privateAdd(this, _inflight, null);
     __privateAdd(this, _flushing, null);
     __privateAdd(this, _onVisibility, null);
+    __privateAdd(this, _onPageHide, null);
     __privateAdd(this, _onTransaction3, (tr) => {
-      if (!__privateGet(this, _armed3) || __privateGet(this, _destroyed3) || !tr.local) return;
+      if (__privateGet(this, _destroyed3) || !tr.local) return;
       __privateSet(this, _dirty, true);
-      __privateMethod(this, _PocketClient_instances, schedule_fn2).call(this);
+      if (__privateGet(this, _armed3)) __privateMethod(this, _PocketClient_instances, schedule_fn2).call(this);
     });
     __privateSet(this, _origin, pocketOrigin(opts.relay));
     __privateSet(this, _code, opts.code);
@@ -4015,12 +4026,17 @@ var PocketClient = class {
     __privateSet(this, _minGapMs2, opts.tuning?.minGapMs ?? 6e4);
     __privateSet(this, _flushRetries, opts.tuning?.flushRetries ?? 2);
     __privateSet(this, _flushBackoffMs, opts.tuning?.flushBackoffMs ?? 1e3);
+    __privateSet(this, _settleWaitMs, opts.tuning?.settleWaitMs ?? 3e3);
     __privateGet(this, _doc2).on("afterTransaction", __privateGet(this, _onTransaction3));
     if (typeof document !== "undefined") {
       __privateSet(this, _onVisibility, () => {
         if (document.visibilityState === "hidden" && __privateGet(this, _dirty)) void this.flush();
       });
       document.addEventListener("visibilitychange", __privateGet(this, _onVisibility));
+      __privateSet(this, _onPageHide, () => {
+        if (__privateGet(this, _dirty)) void this.flush();
+      });
+      pageTarget()?.addEventListener("pagehide", __privateGet(this, _onPageHide));
     }
   }
   get state() {
@@ -4034,69 +4050,9 @@ var PocketClient = class {
     __privateGet(this, _listeners2).add(cb);
     return () => __privateGet(this, _listeners2).delete(cb);
   }
-  /** fetch → verify envelope → decrypt → merge after local persistence loads */
-  async start() {
-    if (!__privateGet(this, _origin) || unavailableOrigins.has(__privateGet(this, _origin))) {
-      __privateMethod(this, _PocketClient_instances, set_fn).call(this, { phase: "unavailable" });
-      return;
-    }
-    __privateMethod(this, _PocketClient_instances, set_fn).call(this, { phase: "checking" });
-    let json;
-    try {
-      const res = await fetch(`${__privateGet(this, _origin)}/pocket/${__privateGet(this, _code)}/${this.token}`, {
-        signal: __privateGet(this, _abort).signal
-      });
-      json = await res.json();
-    } catch {
-      __privateMethod(this, _PocketClient_instances, set_fn).call(this, { phase: "unavailable" });
-      return;
-    }
-    if (!isPocketEnvelope(json)) {
-      unavailableOrigins.add(__privateGet(this, _origin));
-      __privateMethod(this, _PocketClient_instances, set_fn).call(this, { phase: "unavailable" });
-      return;
-    }
-    if (json.version > POCKET_VERSION) {
-      __privateMethod(this, _PocketClient_instances, set_fn).call(this, { phase: "unavailable" });
-      return;
-    }
-    const raw = Array.isArray(json.deposits) ? json.deposits : [];
-    await __privateGet(this, _whenReady);
-    if (__privateGet(this, _destroyed3)) return;
-    let applied = 0;
-    let dropped = 0;
-    const appliedUpdates = [];
-    for (const d of raw) {
-      let update = null;
-      if (typeof d.blob === "string") {
-        try {
-          update = openDeposit(b64decode(d.blob), __privateGet(this, _key2));
-        } catch {
-          update = null;
-        }
-      }
-      if (!update) {
-        dropped++;
-        continue;
-      }
-      applyUpdate(__privateGet(this, _doc2), update, POCKET_TX_ORIGIN);
-      appliedUpdates.push(update);
-      applied++;
-    }
-    __privateSet(this, _fetched, {
-      newestAt: typeof raw[0]?.at === "number" ? raw[0].at : 0,
-      ttlDays: typeof json.ttlDays === "number" ? json.ttlDays : 60,
-      count: raw.length
-    });
-    __privateMethod(this, _PocketClient_instances, set_fn).call(this, applied > 0 ? { phase: "applied", applied, dropped } : { phase: "empty", applied, dropped });
-    __privateSet(this, _armed3, true);
-    const ahead = __privateMethod(this, _PocketClient_instances, isAheadOf_fn).call(this, appliedUpdates);
-    const halfTtl = __privateGet(this, _fetched).ttlDays * 864e5 / 2;
-    const stale = __privateGet(this, _fetched).newestAt > 0 && Date.now() - __privateGet(this, _fetched).newestAt > halfTtl;
-    if (ahead || stale && __privateMethod(this, _PocketClient_instances, docHasState_fn).call(this)) {
-      __privateSet(this, _dirty, true);
-      void __privateMethod(this, _PocketClient_instances, deposit_fn).call(this);
-    }
+  /** fetch → verify envelope → decrypt → merge after local persistence loads; once */
+  start() {
+    return __privateGet(this, _started) ?? __privateSet(this, _started, __privateMethod(this, _PocketClient_instances, start_fn).call(this));
   }
   /**
    * Capture pending changes right now instead of waiting out the debounce —
@@ -4120,6 +4076,7 @@ var PocketClient = class {
     __privateSet(this, _timer2, null);
     __privateGet(this, _doc2).off("afterTransaction", __privateGet(this, _onTransaction3));
     if (__privateGet(this, _onVisibility)) document.removeEventListener("visibilitychange", __privateGet(this, _onVisibility));
+    if (__privateGet(this, _onPageHide)) pageTarget()?.removeEventListener("pagehide", __privateGet(this, _onPageHide));
     __privateGet(this, _abort).abort();
     __privateGet(this, _listeners2).clear();
   }
@@ -4139,6 +4096,8 @@ _debounceMs2 = new WeakMap();
 _minGapMs2 = new WeakMap();
 _flushRetries = new WeakMap();
 _flushBackoffMs = new WeakMap();
+_settleWaitMs = new WeakMap();
+_started = new WeakMap();
 _armed3 = new WeakMap();
 _dirty = new WeakMap();
 _rateLimited = new WeakMap();
@@ -4147,10 +4106,73 @@ _lastDepositAt = new WeakMap();
 _inflight = new WeakMap();
 _flushing = new WeakMap();
 _onVisibility = new WeakMap();
+_onPageHide = new WeakMap();
 _PocketClient_instances = new WeakSet();
 set_fn = function(state) {
   __privateSet(this, _state, state);
   for (const cb of __privateGet(this, _listeners2)) cb(state);
+};
+start_fn = async function() {
+  if (!__privateGet(this, _origin) || unavailableOrigins.has(__privateGet(this, _origin))) {
+    __privateMethod(this, _PocketClient_instances, set_fn).call(this, { phase: "unavailable" });
+    return;
+  }
+  __privateMethod(this, _PocketClient_instances, set_fn).call(this, { phase: "checking" });
+  let json;
+  try {
+    const res = await fetch(`${__privateGet(this, _origin)}/pocket/${__privateGet(this, _code)}/${this.token}`, {
+      signal: __privateGet(this, _abort).signal
+    });
+    json = await res.json();
+  } catch {
+    if (__privateGet(this, _destroyed3)) return;
+    __privateMethod(this, _PocketClient_instances, set_fn).call(this, { phase: "unavailable" });
+    return;
+  }
+  if (!isPocketEnvelope(json)) {
+    unavailableOrigins.add(__privateGet(this, _origin));
+    __privateMethod(this, _PocketClient_instances, set_fn).call(this, { phase: "unavailable" });
+    return;
+  }
+  if (json.version > POCKET_VERSION) {
+    __privateMethod(this, _PocketClient_instances, set_fn).call(this, { phase: "unavailable" });
+    return;
+  }
+  const raw = Array.isArray(json.deposits) ? json.deposits : [];
+  await __privateGet(this, _whenReady);
+  if (__privateGet(this, _destroyed3)) return;
+  let applied = 0;
+  let dropped = 0;
+  const appliedUpdates = [];
+  for (const d of raw) {
+    let update = null;
+    if (typeof d.blob === "string") {
+      try {
+        update = openDeposit(b64decode(d.blob), __privateGet(this, _key2));
+      } catch {
+        update = null;
+      }
+    }
+    if (!update) {
+      dropped++;
+      continue;
+    }
+    applyUpdate(__privateGet(this, _doc2), update, POCKET_TX_ORIGIN);
+    appliedUpdates.push(update);
+    applied++;
+  }
+  __privateSet(this, _fetched, {
+    newestAt: typeof raw[0]?.at === "number" ? raw[0].at : 0,
+    ttlDays: typeof json.ttlDays === "number" ? json.ttlDays : 60,
+    count: raw.length
+  });
+  __privateMethod(this, _PocketClient_instances, set_fn).call(this, applied > 0 ? { phase: "applied", applied, dropped } : { phase: "empty", applied, dropped });
+  __privateSet(this, _armed3, true);
+  const ahead = __privateMethod(this, _PocketClient_instances, isAheadOf_fn).call(this, appliedUpdates);
+  const halfTtl = __privateGet(this, _fetched).ttlDays * 864e5 / 2;
+  const stale = __privateGet(this, _fetched).newestAt > 0 && Date.now() - __privateGet(this, _fetched).newestAt > halfTtl;
+  __privateSet(this, _dirty, ahead || stale && __privateMethod(this, _PocketClient_instances, docHasState_fn).call(this));
+  if (__privateGet(this, _dirty)) void __privateMethod(this, _PocketClient_instances, deposit_fn).call(this);
 };
 /** does the local doc hold anything beyond what the given updates carry? */
 isAheadOf_fn = function(updates) {
@@ -4224,8 +4246,12 @@ flushNow_fn = async function() {
     clearTimeout(__privateGet(this, _timer2));
     __privateSet(this, _timer2, null);
   }
+  if (!__privateGet(this, _armed3) && __privateGet(this, _dirty) && __privateGet(this, _started)) {
+    await Promise.race([__privateGet(this, _started), bounded(__privateGet(this, _settleWaitMs))]);
+    if (__privateGet(this, _state).phase === "unavailable") return;
+  }
   if (__privateGet(this, _inflight)) await __privateGet(this, _inflight);
-  if (!__privateGet(this, _dirty) || !__privateGet(this, _armed3)) return;
+  if (!__privateGet(this, _dirty)) return;
   await __privateMethod(this, _PocketClient_instances, deposit_fn).call(this);
   for (let i = 0; i < __privateGet(this, _flushRetries) && __privateGet(this, _rateLimited) && !__privateGet(this, _destroyed3); i++) {
     await sleep(__privateGet(this, _flushBackoffMs) * 2 ** i);

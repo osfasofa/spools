@@ -5,20 +5,25 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>the tape deck</title>
 <style>
-  :root { --bg:#14120f; --panel:#1e1b16; --ink:#efe6d6; --dim:#8f8677; --line:#3a352c; --amber:#e8a33d; --ok:#7fd1a1; --bad:#ef6f6c; --ana:#7fb2f0; --ben:#f0a87f; --cy:#c7a3f0; --dee:#9fe0c9; }
+  :root { --bg:#14120f; --panel:#1e1b16; --ink:#efe6d6; --dim:#8f8677; --line:#3a352c; --amber:#e8a33d; --ok:#7fd1a1; --bad:#ef6f6c; --ana:#7fb2f0; --ben:#f0a87f; color-scheme:dark }
   body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
-  main { max-width:980px; margin:0 auto; padding:20px 16px 60px; }
+  main { max-width:1080px; margin:0 auto; padding:20px 16px 60px; }
   h1 { font-size:18px; font-weight:600; margin:0 0 4px; letter-spacing:.02em }
   .sub { color:var(--dim); margin:0 0 16px }
   section { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:14px 16px; margin:12px 0; transition:border-color .2s }
   section.unplugged { border-color:var(--amber) }
-  section h2 { font-size:12px; text-transform:uppercase; letter-spacing:.12em; color:var(--dim); margin:0 0 10px; font-weight:600 }
+  h2 { font-size:12px; text-transform:uppercase; letter-spacing:.12em; color:var(--dim); margin:0 0 10px; font-weight:600; display:flex; gap:8px; align-items:center }
+  h3 { margin:0 0 6px; font-size:12px; color:var(--dim); font-weight:600 }
   button { font:inherit; color:var(--ink); background:#2a261f; border:1px solid var(--line); border-radius:8px; padding:6px 10px; cursor:pointer }
   button:hover { border-color:var(--amber) }
   button:disabled { opacity:.4; cursor:default }
   button.on { background:var(--amber); color:#1a1408; border-color:var(--amber) }
   button.sw-btn { padding:6px 8px }
   .row { display:flex; flex-wrap:wrap; gap:8px; align-items:center }
+  .hands { display:grid; grid-template-columns:1fr 1fr; gap:12px }
+  @media (max-width:760px) { .hands { grid-template-columns:1fr } }
+  .hand { margin:0 }
+  .hand h2 { text-transform:none; letter-spacing:0; font-size:15px; color:var(--ink) }
   .tape { display:flex; gap:6px; overflow-x:auto; padding:8px 4px; min-height:56px; align-items:center }
   .pk { flex:none; border:1px solid var(--line); border-radius:8px; padding:6px 8px; background:#25211a; display:flex; gap:6px; align-items:center }
   .pk.unread { opacity:.35 }
@@ -28,17 +33,15 @@
   .sw { display:inline-block; width:14px; height:14px; border-radius:3px; vertical-align:-2px; border:1px solid #0006 }
   .head { flex:none; width:3px; height:44px; background:var(--amber); border-radius:2px; box-shadow:0 0 8px var(--amber) }
   .empty { color:var(--dim) }
-  .readouts { display:grid; grid-template-columns:1fr 1fr; gap:12px }
-  @media (max-width:640px) { .readouts { grid-template-columns:1fr } }
-  .readout { border:1px solid var(--line); border-radius:8px; padding:10px 12px }
-  .readout h3 { margin:0 0 6px; font-size:12px; color:var(--dim); font-weight:600 }
-  .big { font-size:20px; display:flex; gap:10px; align-items:center; flex-wrap:wrap }
-  .big .sw { width:20px; height:20px }
+  .readout { border:1px solid var(--line); border-radius:8px; padding:8px 12px; margin-top:8px }
+  .big { font-size:18px; display:flex; gap:10px; align-items:center; flex-wrap:wrap }
+  .big .sw { width:18px; height:18px }
   .ok { color:var(--ok) } .bad { color:var(--bad) }
   .status { color:var(--dim); font-size:12px }
-  .note { color:var(--dim); font-size:12px; margin:8px 0 0 }
+  .note { color:var(--dim); font-size:12px; margin:8px 0 0; max-width:78ch }
+  .sub { max-width:78ch }
+  .rewind { border-top:1px solid var(--line); margin-top:12px; padding-top:10px }
   input[type=range] { width:100%; accent-color:var(--amber) }
-  a { color:var(--amber) }
   code { color:var(--amber) }
   .spacer { margin-left:auto }
 </style>
@@ -46,67 +49,23 @@
 <body>
 <main>
   <h1>the tape deck</h1>
-  <p class="sub">a bench rig for <code>docs/riffs/tape-deck.md</code>. one spool, two hands, two packet shapes. the tape never runs backward; the head does.</p>
+  <p class="sub">a bench rig for <code>docs/riffs/tape-deck.md</code>. two hands, one tape, two packet shapes. the tape never runs backward; the head does.</p>
 
   <section id="deck-section">
-    <h2>this deck</h2>
+    <h2>the tape between them</h2>
     <div class="row">
-      <span>you are <b id="me"></b> <span class="who" id="me-dot"></span></span>
       <button id="plug" class="on">plugged in</button>
-      <span class="status" id="stats"></span>
+      <span class="status" id="deck-stats"></span>
     </div>
-    <p class="note">second hand: <a id="other" href="#">open this same tape in another tab</a>. memory-only; tabs on this machine only (a BroadcastChannel is the rig's whole transport) — nothing here touches a relay, and a reload is a blank tape.</p>
+    <p class="note">each hand is its own copy of the spool; the plug is the rig's whole transport. plugged, every packet crosses at once. unplugged, each hand keeps its own worldview until you plug them back in. the first two packets are the rig's, so the tape isn't blank. memory-only — a reload starts over, and nothing here touches a relay.</p>
   </section>
 
-  <section>
-    <h2>wind a packet</h2>
-    <div class="row">
-      <span>color, a set-packet (carries <code>from</code> and <code>to</code>):</span>
-      <span class="row" id="swatches"></span>
-    </div>
-    <div class="row" style="margin-top:8px">
-      <span>count, a commuting delta:</span>
-      <button id="plus">+1</button>
-      <button id="minus">−1</button>
-      <span class="spacer"></span>
-      <button id="undo">undo mine (soft)</button>
-    </div>
-  </section>
+  <div class="hands">
+    <section class="hand" id="hand-ana"></section>
+    <section class="hand" id="hand-ben"></section>
+  </div>
 
-  <section id="tape-section">
-    <h2>the tape <span class="status" id="tape-stats"></span></h2>
-    <div class="tape" id="tape"></div>
-    <div class="row">
-      <button id="to-start" title="to the start">⏮</button>
-      <button id="back" title="one packet back (←)">◀</button>
-      <button id="fwd" title="one packet forward (→)">▶</button>
-      <button id="to-end" title="to the end">⏭</button>
-      <span class="status" id="head-stats"></span>
-      <label class="spacer status"><input type="checkbox" id="ghosts"> show ghosts</label>
-    </div>
-  </section>
-
-  <section>
-    <h2>two readings of the same tape</h2>
-    <div class="readouts">
-      <div class="readout"><h3>replayed forward, up to the head</h3><div class="big" id="fwd-read"></div></div>
-      <div class="readout"><h3>walked back from the end, down to the head</h3><div class="big" id="back-read"></div></div>
-    </div>
-    <p class="note" id="verdict"></p>
-  </section>
-
-  <section>
-    <h2>rewind <span class="status" id="moments-stats"></span></h2>
-    <input type="range" id="scrub" min="0" max="0" value="0" disabled>
-    <div class="row">
-      <span class="status" id="scrub-label"></span>
-      <span class="spacer"></span>
-      <button id="put-back" disabled>put it back to here</button>
-      <button id="now" disabled>back to now</button>
-    </div>
-    <div class="tape" id="then"></div>
-    <p class="note">moments land a beat after you stop winding. "put it back" is compensating winds — newer packets get soft-deleted, older ones restored — so scrub again afterwards: the walk left footprints.</p>
-  </section>
+  <p class="note">the script: wind a color on one hand and watch it land on the other. unplug. on each hand, wind +1 and then a color. plug back in — same packets, same order, both sides. step a head back once: color disagrees, count agrees. undo mine, show ghosts, then rewind and put it back — the walk leaves footprints.</p>
 </main>
 <script type="module" src="./deck.js"></script>
 </body>
