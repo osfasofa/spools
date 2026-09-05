@@ -242,6 +242,18 @@ name. Owner decides yes / not yet.
   ticket. The keeper is still running as this note is written.
 - Open for the owner: whether M17 is the right home or this should sit
   under M15's "before it goes wider" rail instead.
+- **Follow-on 1 landed — 5 Sep 2026.** T-183 (commit `6d2befd`) gave the
+  keeper the pocket line: once per keyed spool, on open, under the spool's
+  prefix — `pocket: applied (N deposits)` / `pocket: empty` /
+  `pocket: unavailable`, with `, N dropped` when a deposit couldn't be
+  applied. Counts only; keyless spools say nothing. Then the test's links
+  file gained a keyed spool, so the suite now asserts that line from a
+  list (before and after a kill -9 restart) and checks the real link and
+  key strings — not just `spool=` / `k=` — never reach the log, in all
+  three scenarios. The morning question from the run's first note (did the
+  pocket return nothing, or did the keeper fail to apply something?) is
+  answerable from the log. `keeper.js` unchanged by this; 0.2.0 still
+  unreleased.
 
 ### Follow-ons (the owner picks; none filed)
 
@@ -249,7 +261,8 @@ name. Owner decides yes / not yet.
    saying what the pocket did (`pocket: applied` / `empty` /
    `unavailable`); a periodic one-liner per spool with entries held and
    reconnects so far. Counts-only, still. Would have answered every
-   question this run raised.
+   question this run raised. *Landed: T-183, and the test extension in the
+   note above.*
 2. **The fifty reconnects.** With timestamps in hand, read the cadence
    against the canonical relay's proxy idle timeout, the relay's ping/pong,
    and the SDK's resync interval. Zero entries were lost, so this is

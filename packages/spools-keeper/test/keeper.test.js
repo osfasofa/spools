@@ -10,6 +10,11 @@
 // T-183: narration — every line stamped, a keyed spool says what the pocket
 // did on open, a relay outage is narrated as a numbered, timed reconnect,
 // and a heartbeat line says the wall is up.
+//
+// T-182 follow-on (the pocket line): the links file carries a keyed spool
+// too, so the pocket's verdict is asserted under a spool's prefix from a
+// list, and log hygiene is checked against the real link and key strings
+// (not just their syntax) in every scenario.
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
@@ -51,6 +56,24 @@ const entriesIn = async (file) => {
 
 const STAMPED = /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z \[keeper/
 const everyLineStamped = (out) => out.split('\n').filter(Boolean).every((l) => STAMPED.test(l))
+const linesOf = (out, code) => out.split('\n').filter((l) => l.includes(`[keeper ${code}]`))
+const pocketLine = (out, code) => new RegExp(`\\[keeper ${code}\\] pocket: (empty|applied)`).test(out)
+
+// the standing rule, checked with the real strings: never a link (nor its
+// syntax), never a key — the 8-char fingerprint is allowed, the full k= value
+// is not — and, with --links, never a line of the list
+const hygienic = (out, { links = [], list = '' } = {}) => {
+  assert.doesNotMatch(out, /spool=|relay=|k=/, 'log carries link syntax')
+  for (const link of links) {
+    assert.ok(!out.includes(link), 'log carries a link')
+    const key = new URLSearchParams(link.slice(1)).get('k')
+    if (key) assert.ok(!out.includes(key), 'log carries a key')
+  }
+  list.split('\n').forEach((raw, i) => {
+    const line = raw.trim()
+    if (line) assert.ok(!out.includes(line), `log carries line ${i + 1} of the list`)
+  })
+}
 
 // spawn a keeper with the given args; stdout is collected for assertions
 const spawnKeeper = (args, env = {}) => {
@@ -139,62 +162,88 @@ test('midnight with only a keeper: keyless spool, no pocket, kill -9 restart', a
   // 25 s: covers one client resync interval in case the first ask raced
   assert.ok(await converges(link, 'c', 3, 25_000), 'C converged from the restarted keeper')
   assert.ok(everyLineStamped(keeper.out) && everyLineStamped(again.out), 'every line stamped')
+  hygienic(keeper.out + again.out, { links: [link] })
 
   children.forEach((c) => c !== children[0] && c.kill('SIGKILL'))
   await until(async () => (await health()).relay.connections === 0, 5_000)
 })
 
-test('a links file: two spools on one keeper, garbage and duplicate lines, kill -9, clean SIGTERM', async () => {
-  // two households' worth of keyless spools
+test('a links file: two keyless spools and a keyed one on one keeper, garbage and duplicate lines, kill -9, clean SIGTERM', async () => {
+  // two households' worth of keyless spools, and a keyed one — so the list
+  // carries a key (the key ring sentence) and the pocket path runs under a
+  // spool's prefix, the shape of the owner's real wall
   const { spool: a1, link: link1 } = await wind('a1', 2)
   const { spool: a2, link: link2 } = await wind('a2', 3)
+  const { spool: a3, link: link3 } = await wind('a3', 1, { encrypted: true })
 
-  // the list: a comment, a link, a garbage line, another link, a duplicate
+  // the list: a comment, a link, a garbage line, another link, a duplicate, the keyed link
   const dir = await mkdtemp(join(tmpdir(), 'pegboard-'))
   const list = join(dir, 'pegboard')
-  await writeFile(list, ['# the wall', link1, '', 'this is not a link', link2, link1, ''].join('\n'))
+  const listText = ['# the wall', link1, '', 'this is not a link', link2, link1, link3, ''].join('\n')
+  await writeFile(list, listText)
   const file1 = join(dir, `${a1.code}.spool.json`)
   const file2 = join(dir, `${a2.code}.spool.json`)
+  const file3 = join(dir, `${a3.code}.spool.json`)
+  const links = [link1, link2, link3]
 
   const keeper = spawnKeeper(['--links', list])
   assert.ok(
-    await until(async () => (await entriesIn(file1)) === 2 && (await entriesIn(file2)) === 3, 15_000),
-    'keeper synced both spools and exported a file for each, beside the list'
+    await until(
+      async () => (await entriesIn(file1)) === 2 && (await entriesIn(file2)) === 3 && (await entriesIn(file3)) === 1,
+      15_000
+    ),
+    'keeper synced all three spools and exported a file for each, beside the list'
   )
   assert.match(keeper.out, /\[keeper line 4\] skipped — that's not a spool link/)
   assert.match(keeper.out, new RegExp(`\\[keeper line 6\\] skipped — ${a1.code} is already on the list`))
-  assert.match(keeper.out, /\[keeper\] keeping 2 spools from .*pegboard \(1 failed\)/)
-  // logs never carry a link, nor the list's contents
-  assert.doesNotMatch(keeper.out, /spool=/)
-  assert.doesNotMatch(keeper.out, /this is not a link/)
+  assert.match(keeper.out, /\[keeper\] keeping 3 spools from .*pegboard \(1 failed\)/)
+  // the keyed spool says what the pocket did, under its own prefix; the keyless ones say nothing about it
+  assert.ok(await until(() => pocketLine(keeper.out, a3.code)), 'the keyed spool named the pocket on open')
+  assert.ok(
+    ![...linesOf(keeper.out, a1.code), ...linesOf(keeper.out, a2.code)].some((l) => l.includes('pocket:')),
+    'keyless spools say nothing about the pocket'
+  )
+  // logs never carry a link, a key, nor a line of the list
+  hygienic(keeper.out, { links, list: listText })
 
-  // both writers close their laptops
+  // every writer closes their laptop
   await leave(a1)
   await leave(a2)
+  await leave(a3)
 
-  // midnight, twice: cold readers converge on each from the keeper alone
+  // midnight, thrice: cold readers converge on each. The keyless two prove
+  // the keeper alone (no pocket exists for them); the keyed one is entangled
+  // with the pocket a3's leave() deposited into, and proves the peg
   assert.ok(await converges(link1, 'b1', 2), 'B1 converged on spool 1 from the keeper alone')
   assert.ok(await converges(link2, 'b2', 3), 'B2 converged on spool 2 from the keeper alone')
+  assert.ok(await converges(link3, 'b3', 1), 'B3 converged on the keyed spool')
 
-  // power cut, then restart from the same list — both files restore
+  // power cut, then restart from the same list — every file restores
   keeper.kill('SIGKILL')
   await sleep(300)
   const again = spawnKeeper(['--links', list])
-  assert.ok(await reconnected(2), 'restarted keeper reconnected both spools')
-  assert.ok(await until(() => /restored 2 entries/.test(again.out) && /restored 3 entries/.test(again.out)), 'both restored from file')
+  assert.ok(await reconnected(3), 'restarted keeper reconnected all three spools')
+  assert.ok(
+    await until(() => /restored 2 entries/.test(again.out) && /restored 3 entries/.test(again.out) && /restored 1 entries/.test(again.out)),
+    'all three restored from file'
+  )
+  assert.ok(await until(() => pocketLine(again.out, a3.code)), 'the keyed spool named the pocket again after the restart')
   assert.ok(await converges(link1, 'c1', 2, 25_000), 'C1 converged from the restarted keeper')
   assert.ok(await converges(link2, 'c2', 3, 25_000), 'C2 converged from the restarted keeper')
+  assert.ok(await converges(link3, 'c3', 1, 25_000), 'C3 converged on the keyed spool from the restarted keeper')
 
   // clean shutdown: every spool saves and leaves, exit 0
   const exited = new Promise((r) => again.on('exit', r))
   again.kill('SIGTERM')
   assert.equal(await exited, 0, 'SIGTERM exits 0')
-  assert.match(again.out, new RegExp(`\\[keeper ${a1.code}\\] SIGTERM — saving and leaving`))
-  assert.match(again.out, new RegExp(`\\[keeper ${a2.code}\\] SIGTERM — saving and leaving`))
+  for (const code of [a1.code, a2.code, a3.code]) {
+    assert.match(again.out, new RegExp(`\\[keeper ${code}\\] SIGTERM — saving and leaving`))
+  }
   assert.equal(await entriesIn(file1), 2)
   assert.equal(await entriesIn(file2), 3)
+  assert.equal(await entriesIn(file3), 1)
   assert.ok(everyLineStamped(keeper.out) && everyLineStamped(again.out), 'every line stamped')
-  assert.doesNotMatch(keeper.out, /pocket:/, 'keyless spools say nothing about the pocket')
+  hygienic(again.out, { links, list: listText })
 })
 
 test('narration: a keyed spool names the pocket, an outage is a numbered reconnect, the heartbeat beats', async () => {
@@ -219,8 +268,8 @@ test('narration: a keyed spool names the pocket, an outage is a numbered reconne
   )
   assert.ok(await until(() => /up 0h00m · .+ 1 held, 1 reconnects/.test(keeper.out), 3_000), 'heartbeat counts the reconnect')
 
-  // still counts-only, still stamped
-  assert.doesNotMatch(keeper.out, /spool=|k=/)
+  // still counts-only (the real link and key never appear), still stamped
+  hygienic(keeper.out, { links: [link] })
   assert.ok(everyLineStamped(keeper.out), 'every line stamped')
 
   const exited = new Promise((r) => keeper.on('exit', r))

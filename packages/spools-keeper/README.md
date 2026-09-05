@@ -79,7 +79,9 @@ pocket check settles and re-deposits what the file holds.
 Every line carries an ISO UTC timestamp. Then, per spool: connection state,
 entry counts, the spool code, and the key's short fingerprint; for a keyed
 spool, what the pocket did on open (`pocket: applied (2 deposits)`,
-`pocket: empty`, `pocket: unavailable`) and any deposit the relay refuses;
+`pocket: empty`, `pocket: unavailable`; a deposit that couldn't be applied
+is counted too: `pocket: empty, 1 dropped`) and any deposit the relay
+refuses;
 for a socket that drops and comes back, which reconnect it was and how long
 it was down (`relay: connected — reconnect #7 after 3.2 s offline`). Every
 ten minutes, one line for the whole wall says it's still up:
