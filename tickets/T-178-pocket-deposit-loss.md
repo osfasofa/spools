@@ -273,7 +273,11 @@ during `pagehide` of a page that was gone before the response.
 
 - ~~Browser demonstration of mechanism 2~~ — done (runs A–C above); the
   acceptance criterion's "under context close" half is shown.
-- Sign-off on the surface (state field vs. a `leave()` value).
+- ~~Sign-off on the surface~~ — **decided 5 Sep 2026: the state field
+  alone.** `leave()` stays `Promise<void>`; read `spool.pocket.depositError`
+  after `await leave()`. A `leave()` value would only ever describe the
+  leave-time flush and would layer on top, not replace — it waits for a
+  vessel to ask.
 - Tell syrup and manyhands (owner) — and pass on the ring point:
   verify-and-retry cannot beat `POCKET_K`.
 
@@ -308,4 +312,4 @@ during `pagehide` of a page that was gone before the response.
 > you're on 0.2.1; if anything still vanishes, the ticket is T-178 in
 > `osfasofa/spools` and I want the repro.
 
-The ticket stays `doing` until the sign-off lands and the note is sent.
+The ticket stays `doing` until the note is sent (after 0.2.1 is on the registry).
