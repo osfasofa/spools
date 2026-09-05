@@ -201,7 +201,7 @@ Opened 4 Sep 2026 from the brand repo's second riff (`../brand/riffs/pegboard.md
 | Ticket | Title | Depends | Status |
 |---|---|---|---|
 | [T-182](T-182-keeper-pegboard.md) | `spools-keeper --links`: hold many spools from a file — **sign-off** on the hippo line, **owner at keyboard** for the first real run | T-181 | done |
-| [T-183](T-183-keeper-narration.md) | `spools-keeper` narration: timestamps, the pocket's verdict, a heartbeat — **owner at keyboard** for the second night | T-182 | doing |
+| [T-183](T-183-keeper-narration.md) | `spools-keeper` narration: timestamps, the pocket's verdict, a heartbeat — **owner at keyboard** for the second night | T-182 | done |
 
 ## Parked (no ticket until evidence demands one)
 

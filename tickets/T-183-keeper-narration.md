@@ -1,7 +1,7 @@
 ---
 id: T-183
 title: "spools-keeper narration: timestamps, the pocket's verdict, a heartbeat"
-status: doing
+status: done
 milestone: M17
 depends: [T-182]
 ---
@@ -122,7 +122,7 @@ is relay-side it becomes evidence for a relay ticket, not a fix here.
       counts, the heartbeat — and the standing rule, unchanged: never
       content, never the key, never the full link, never a line of the list.
 - [x] `CHANGELOG.md`: fold into the **unreleased 0.2.0** entry. No bump.
-- [ ] **Owner at keyboard:** stop the running wall
+- [x] **Owner at keyboard:** stop the running wall
       (`pkill -TERM -f "keeper.js --links"` — shutdown saves and leaves),
       restart on the new build under `caffeinate -i`, read the next ~12 h.
       Record in Notes: the per-spool inter-drop intervals (min / median /
@@ -184,6 +184,75 @@ is relay-side it becomes evidence for a relay ticket, not a fix here.
   ~120 ms, the keyed one's first stamped line from the pocket:
   `pocket: applied (8 deposits)`. The old keeper's SIGTERM save and leave
   went cleanly (the files it left were the ones restored). Read from here.
+- **The second night, read 5 Sep 2026 16:20 PDT — verdict: y-websocket's
+  `messageReconnectTimeout`, and the keeper was alone.** 24.6 h on the new
+  build, both spools restored, 147 heartbeats (one every 10 min, none
+  missed), the keyed spool's open line `pocket: applied (8 deposits)`.
+  And then this:
+
+  | | keyless `jade-echo-236` | keyed `hidden-echo-280` |
+  |---|---|---|
+  | reconnects | 2,664 | 2,662 |
+  | gap between reconnects | median **33.0 s**, p90 33.1 s, max 35.6 s | median **33.0 s**, p90 33.1 s, max 33.9 s |
+  | offline per reconnect | median 2.6 s (0.3–2.9) | median 2.6 s (0.3–2.9) |
+  | per hour, every hour | 109 | 109 |
+  | first reconnect | 22:53:53Z, 14.5 min after start | 22:53:59Z |
+  | entries lost | 0 | 0 |
+
+  A metronome. Not the network (both spools, independently, to the tenth of
+  a second), not the relay's ping (30 s interval, terminate on a *missed*
+  pong — a silent peer would churn at 60 s, not 33), not a proxy.
+
+  **The experiment (23:18–23:20Z):** a second Node client sat in the keyless
+  spool's room for 120 s. That spool: **0 reconnects**. The keyed spool,
+  still alone: 4, on the beat. Cause found:
+  `y-websocket/src/y-websocket.js:99` — `const messageReconnectTimeout = 30000`,
+  a module constant, not an option — closes the socket when no *message* has
+  arrived in 30 s (`:444`). A dumb relay never answers a lone peer's
+  SyncStep1 (peers are each other's server, DESIGN_DOC §5), and the relay's
+  ping frames are control frames the provider never sees. So a keeper alone
+  in a room reconnects every 30 s + backoff (`maxBackoffTime` 2 500 ms → the
+  2.6 s), forever. 33.0 s exactly.
+
+  **Why the first night showed 50, not 2,600:** the owner had the room open
+  in a browser most of that night — a peer answering the 20 s resync keeps
+  `wsLastMessageReceived` fresh. The 13–20 min gaps were that tab's screen
+  going dark or the phone sleeping. And the 14.5 quiet minutes at the start
+  of night two were the owner's room still open after the restart; the
+  storm began the moment it closed. T-182's "fifty reconnects" and T-183's
+  five thousand are one mechanism seen with and without company.
+
+  **What it costs:** a TCP+TLS handshake and a fresh room join every 33 s
+  per spool, ~2,600 a day per peg, against the canonical relay, for as long
+  as nobody else is in the room — which is exactly the keeper's job
+  description. Zero entries lost; the export files stayed right. Wasteful
+  and noisy, not broken. A wall of ten spools would be 26,000 connections
+  a day from one household IP, which is a number the relay's per-address
+  caps (T-169) and Railway's edge may eventually have opinions about.
+
+  **Options, for the owner (SDK-shaping, not protocol; sign-off wanted):**
+  1. *Feed the provider.* The SDK bumps `provider.wsLastMessageReceived`
+     on its own resync tick (the field is public). Neuters y-websocket's
+     client-side dead-socket detection — but our relay already terminates a
+     peer that misses a pong (server.js `keepAlive`, 30–60 s), and the
+     client sees that close and reconnects, so liveness is still covered
+     from the other end. Cheapest; a few lines in `engine.ts`; every client
+     benefits, not just the keeper. Bakes in: trusting the relay's ping for
+     liveness. A half-open socket where the server's terminate never
+     arrives would linger until the client's next write errors.
+  2. *The relay answers.* Any application message from the relay would do,
+     but the relay is opaque bytes by design and a keyed client would count
+     an unencrypted frame as `undecryptable`. Rejected on the spot: it
+     un-dumbs the relay.
+  3. *Fork the constant.* Patch or vendor y-websocket to make the timeout an
+     option. A dependency fork for one constant; no.
+  4. *Accept and document.* "A keeper alone reconnects every 33 s." Honest,
+     free, and the relay pays for it.
+  Lean: option 1, as its own ticket, with a test that a lone peer on the
+  workspace relay holds one socket for > 60 s.
+- **Unrelated but seen in the same log:** the keeper's SIGTERM at the
+  night-one handover saved and left cleanly; the night-two export files
+  never changed size (no writes all day), which is also correct.
 - Drafted 4 Sep 2026 from T-182's follow-ons #1 and #2, with the SDK and
   relay facts above verified in source the same afternoon. The keeper from
   T-182's run was still up (PID 2668, eleven hours and counting) when this
