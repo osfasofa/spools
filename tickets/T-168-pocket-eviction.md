@@ -103,3 +103,11 @@ T-124's precedent: sign-off, README honesty section updated.
   but "never-read first" must not be read as "junk first": the order protects
   collected spools; the creation cap (off until `TRUST_PROXY`) is what
   protects the uncollected one.
+- **5 Sep 2026 (sync-up):** the "off until `TRUST_PROXY`" caveat above is
+  stale — T-161 turned `TRUST_PROXY` on in production on 3 Sep (`9ed7fdc`),
+  so the creation cap has a real address to count. Nothing code-shaped
+  remains here; the ticket is exactly two canonical-relay defaults away
+  from done: `POCKET_FIRST_MAX_BYTES` (1 MiB, or leave it at the full cap)
+  and `POCKET_NEW_NAMESPACES_PER_HOUR` (60 proposed, or leave it off). A
+  "keep the shipped defaults" answer closes it with no keyboard step; either
+  knob turned on is one `railway variables --set` and a restart.

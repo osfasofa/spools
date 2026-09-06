@@ -164,7 +164,7 @@ Drafted 3 Sep 2026 from the ship review — design record: [docs/M15-ship-review
 
 | Ticket | Title | Depends | Status |
 |---|---|---|---|
-| [T-160](T-160-relay-hostname.md) | Own the relay hostname (`relay.spools.lol`) — **owner at keyboard** | — | doing |
+| [T-160](T-160-relay-hostname.md) | Own the relay hostname (`relay.spools.lol`) — **owner at keyboard** | — | done |
 | [T-161](T-161-proxy-aware-rate-limit.md) | Proxy-aware rate limit: the per-IP bucket is global behind Railway | — | done |
 | [T-162](T-162-hide-not-remove.md) | Hide, not remove — the delete affordance says what it does | — | done |
 | [T-163](T-163-room-export-forget.md) | Export and forget in the room | — | done |
@@ -186,11 +186,11 @@ Drafted 3 Sep 2026 from the ship review — design record: [docs/M15-ship-review
 
 ## M16 — the gate (evidence from the vessels)
 
-Opened 3 Sep 2026. Seven repos now consume `spools` from the registry, and two of them had filed SDK evidence in their own notes instead of here — syrup's HANDOFF and familiar/manyhands' evidence #8. ECOSYSTEM's rule 7 says friction flows back as evidence; this rail is that filing. One bug, two gate reviews; the reviews are **sign-off** and the splice one waits on the owner's forgetting riff.
+Opened 3 Sep 2026. Seven repos now consume `spools` from the registry, and two of them had filed SDK evidence in their own notes instead of here — syrup's HANDOFF and familiar/manyhands' evidence #8. ECOSYSTEM's rule 7 says friction flows back as evidence; this rail is that filing. One bug, two gate reviews; the reviews are **sign-off**. The forgetting riff the splice review waited on landed 5 Sep as [docs/riffs/the-reel.md](../docs/riffs/the-reel.md) (with [docs/riffs/tape-deck.md](../docs/riffs/tape-deck.md) as a second independent wanter), so T-180's brief (`docs/M16-splice-brief.md`) is writable now, no owner needed; the sign-off after it is the owner's. T-178 closed 5 Sep on its own acceptance criterion — the note to syrup and manyhands rides with T-185.
 
 | Ticket | Title | Depends | Status |
 |---|---|---|---|
-| [T-178](T-178-pocket-deposit-loss.md) | Pocket deposits can be lost at leave — syrup + manyhands evidence | T-161 | doing |
+| [T-178](T-178-pocket-deposit-loss.md) | Pocket deposits can be lost at leave — syrup + manyhands evidence | T-161 | done |
 | [T-179](T-179-stash-remember.md) | `stash.remember` — a vessel mirrors the stash's private format — **sign-off** | — | todo |
 | [T-180](T-180-splice-gate.md) | `splice()` — the gate review — **sign-off** | — | todo |
 
@@ -198,11 +198,22 @@ Opened 3 Sep 2026. Seven repos now consume `spools` from the registry, and two o
 
 Opened 4 Sep 2026 from the brand repo's second riff (`../brand/riffs/pegboard.md`, downstream of `hippo.md`). The keeper has shipped twice and never been run for real; the riff split the owner's "walls full of spools" image into move A (the keeper holds many — a links file, one export per spool, still 100-odd boring lines) and move B (the wall you look at — a client, which lives beside the keeper, never inside it). This rail is move A only. It carries one **sign-off** (whether the keeper's README gets the hippo now) and one **owner at keyboard** step that is the whole point: leave it running overnight holding real spools.
 
+**Two nights run, 4–5 Sep 2026.** Night one: eleven hours, two spools, fifty reconnects, zero losses. Night two, read with the new narration: 5,326 reconnects on a 33 s metronome, zero losses — and the cause is y-websocket's client-side `messageReconnectTimeout` (a module constant), which a dumb relay can never satisfy for a peer alone in a room. That fix is SDK-shaped, benefits every client, and is filed as T-184 (**sign-off**). The keeper's 0.2.0 ships with T-185. Move B (the wall you look at) stays unassigned until the owner says where it lives — `apps/` or a vessel repo beside `lore`.
+
 | Ticket | Title | Depends | Status |
 |---|---|---|---|
 | [T-182](T-182-keeper-pegboard.md) | `spools-keeper --links`: hold many spools from a file — **sign-off** on the hippo line, **owner at keyboard** for the first real run | T-181 | done |
 | [T-183](T-183-keeper-narration.md) | `spools-keeper` narration: timestamps, the pocket's verdict, a heartbeat — **owner at keyboard** for the second night | T-182 | done |
 | [T-182 follow-on](T-182-keeper-pegboard.md#notes--open-questions) | the pocket line, proven from a links file — a keyed spool on the test's list, log hygiene checked against the real link and key (no ticket of its own; the landing is in T-182's Notes) | T-183 | done |
+| [T-184](T-184-lone-peer-reconnect.md) | A lone peer holds its socket — feed y-websocket's dead-socket timer from the resync tick — **sign-off** | T-183 | todo |
+
+## M18 — Release 3
+
+Drafted 5 Sep 2026 at the sync-up. Pure execution, like M12: `spools` 0.2.1 (T-178's last three fixes) and `spools-keeper` 0.2.0 (`--links`, narration) are on `main` with dated-`unreleased` changelogs, and the keeper's registry README describes a CLI that no longer exists — RELEASING.md's "npm would otherwise lie" trigger is met. **Owner at keyboard for the publish itself.** If T-184 is signed off and lands first, it rides along.
+
+| Ticket | Title | Depends | Status |
+|---|---|---|---|
+| [T-185](T-185-npm-release-3.md) | npm release: SDK 0.2.1, keeper 0.2.0 — **owner at keyboard**; then the note to syrup and manyhands | T-178, T-182, T-183 | todo |
 
 ## Parked (no ticket until evidence demands one)
 
@@ -210,3 +221,6 @@ Opened 4 Sep 2026 from the brand repo's second riff (`../brand/riffs/pegboard.md
 - Permissions / signed authorship — DESIGN_DOC §6 has the banked sentence.
 - `splice`, more renderers (board, blog).
 - Pocket follow-ons deliberately out of M10: deposit DELETE (needs standing → identity ladder), plaintext deposits, in-session pocket polling, compression/delta deposits, multi-relay.
+- From the reel riff ([docs/riffs/the-reel.md](../docs/riffs/the-reel.md) §7, Sep 2026), waiting on the owner: a reserved reel-length kind (advisory convention) and the word *reel* in DESIGN_DOC §2 — **sign-off**; the tape counter and "full is a cut, not a wall" — a room ticket once signed off, client work only. The retelling operator itself is T-180.
+- From the tape-deck riff ([docs/riffs/tape-deck.md](../docs/riffs/tape-deck.md) §7): the two-tab toy in `scratch/riff-tape-deck/` that would decide which packet shape and whether undo is wanted — nobody's until someone wants the answer. `undo()`/`redo()` sit at SDK-API's parked-with-evidence gate.
+- Move B, the wall (`../brand/riffs/pegboard.md` §3): a client that reads the keeper's links file. Not a keeper feature; where it lives is the owner's call.

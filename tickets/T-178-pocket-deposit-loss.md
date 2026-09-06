@@ -1,7 +1,7 @@
 ---
 id: T-178
 title: "Pocket deposits can be lost at leave — evidence from syrup and manyhands"
-status: doing
+status: done
 milestone: M16
 depends: [T-161]
 ---
@@ -69,7 +69,7 @@ should tell them apart:
       + `read.mjs`) — and the `pagehide` hook it turned out to need.
 - [x] Docs: SDK-API pocket section and the keeper README name the
       persist:false gap plainly.
-- [ ] Tell syrup and manyhands to drop their workarounds once shipped.
+- [x] ~~Tell syrup and manyhands to drop their workarounds once shipped.~~ → moved to T-185 (the release that carries 0.2.1); the note is drafted below.
 
 ## Acceptance criteria
 
@@ -312,4 +312,11 @@ during `pagehide` of a page that was gone before the response.
 > you're on 0.2.1; if anything still vanishes, the ticket is T-178 in
 > `osfasofa/spools` and I want the repro.
 
-The ticket stays `doing` until the note is sent (after 0.2.1 is on the registry).
+~~The ticket stays `doing` until the note is sent (after 0.2.1 is on the registry).~~
+
+**Closed 5 Sep 2026 (sync-up).** The acceptance criterion is met on both
+halves (zero loss under 429 and under context close, a named error where
+loss is physics), the surface sign-off landed the same day (`f73d1ac`), and
+nothing a session can pick up remained — only the note, which is gated on
+a publish that had no ticket. That publish is now T-185, and the note goes
+with it. Done on its own terms.

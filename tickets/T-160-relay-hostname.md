@@ -1,7 +1,7 @@
 ---
 id: T-160
 title: "Own the relay hostname — owner at keyboard"
-status: doing
+status: done
 milestone: M15
 depends: []
 ---
@@ -36,13 +36,16 @@ DNS change; before it, changing providers strands every link.
 - [x] SDK: `DEFAULT_RELAY` → `wss://relay.spools.lol/yjs`; update the tests that
       pin the old value (`spool.test.ts`); CHANGELOG entry; publish (version:
       see Notes).
-- [ ] Clients: rebuild room + mixtape, regenerate the vendor bundle
-      (`pnpm client:vendor`), redeploy (`scratch/deploy-room.sh`).
+- [x] Clients: rebuild room + mixtape, regenerate the vendor bundle
+      (`pnpm client:vendor`), redeploy (`scratch/deploy-room.sh`). *(Room and
+      vendor bundle 3 Sep; the mixtape at the gh-pages root 5 Sep — see Notes.)*
 - [x] Keep the `*.up.railway.app` hostname enabled on the service indefinitely
       and write that promise into the relay README's "What the canonical relay
       promises" block: old links must keep working.
-- [ ] Docs: relay README "Point your links at it" example, WHITEPAPER §1's
-      example link, T-002's name log gets a row.
+- [x] Docs: relay README "Point your links at it" example, WHITEPAPER §1's
+      example link, T-002's name log gets a row. *(The two examples were
+      already host-agnostic — `your-relay.example` and an elided host — so
+      nothing to change; the T-002 row landed 5 Sep.)*
 
 ## Acceptance criteria
 
@@ -77,3 +80,18 @@ DNS change; before it, changing providers strands every link.
   minted at chat.spools.lol carry the new name — until then the deployed
   room still mints Railway-hostname links, which keep working; (3) never
   remove the Railway hostname from the service.
+- **Closed 5 Sep 2026 (sync-up).** Every acceptance criterion had been met
+  by other tickets without this one noticing: (1) the publish was T-181 —
+  `spools@0.2.0` on the registry, its tarball read back to confirm the
+  default (so `npm view spools` shows the release); (2) T-161's production
+  check hit health 200 and a websocket upgrade on *both* hostnames against
+  the same process, so old and new links share a room; (3) the room was
+  rebuilt and redeployed on 3 Sep (gh-pages `f86c7d6`, and chat.spools.lol
+  through the same script), so the "deployed room still mints
+  Railway-hostname links" sentence above stopped being true that day. The
+  one client still pinning Railway was the **mixtape** at the gh-pages
+  root — its bundle dated from T-105's midnight test (15 Aug). Rebuilt
+  today from `main` (SDK 0.2.1 workspace build: `relay.spools.lol`, and
+  T-176's clipboard fallback rides along) and pushed to the gh-pages root;
+  verified by fetching the live bundle. T-002's name log has its
+  `relay.spools.lol` row. (3) stands as a promise in the relay README.

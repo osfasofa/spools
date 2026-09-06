@@ -112,3 +112,5 @@ http, as the brief already plans. Review finding F18.
 The ticket stays `doing` until those report.
 
 *(Merged 3 Sep 2026: both halves landed — the SDK's `uuid()` in `03bf0ec`, the clipboard fallback in `fa7a02d`, and `apps/client/vendor/spools.js` regenerated in the SDK lane's PR. Still open: the LAN row in `apps/client/TESTING.md`, the off-grid brief's asterisk, and the two-device no-internet acceptance — owner at keyboard.)*
+
+*(5 Sep 2026: the deployed mixtape at the gh-pages root now carries the clipboard fallback — it was rebuilt from `main` to close T-160 and had been on a 15 Aug bundle until then. The three items above are unchanged.)*

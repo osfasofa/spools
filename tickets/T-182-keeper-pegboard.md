@@ -273,3 +273,13 @@ name. Owner decides yes / not yet.
 4. **Move B, the wall.** `../brand/riffs/pegboard.md` §3 — a separate
    vessel or reference app that reads the same links file. Not a keeper
    feature.
+
+*Where they went (5 Sep 2026, sync-up):* 1 → T-183, done. 2 → answered in
+T-183's second night (it was y-websocket's lone-peer timeout, not a proxy
+or the relay's ping); the fix is filed as **T-184**, sign-off wanted.
+3 → **T-185**, owner at keyboard, together with the SDK's 0.2.1. 4 → still
+nobody's: the open question is where the wall lives (`apps/` as a
+reference client, or a vessel repo beside `lore`), and that is the owner's
+call before a ticket can be drafted. Also recorded: decision 3's SIGHUP
+re-read is **dropped** — two nights on the wall never once wanted it;
+restart stays the way to change the list.
