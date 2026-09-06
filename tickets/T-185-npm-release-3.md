@@ -149,3 +149,13 @@ One tag per `git tag` call — three names in one call creates nothing
   dated section for the end of FINDINGS.md. Owner pastes them in, or a
   session run inside those repos does. This ticket stays `doing` on that
   one line; the publish half is complete.
+- **syrup told, 5 Sep 2026 (owner, in syrup's own session):** commit
+  `af134dd` there bumps syrup to `spools@0.2.1`, names the "solar moons
+  vanished twice" landmine as the SDK's (T-178) in HANDOFF §5 and
+  CLAUDE.md, drops it from the unfiled-upstream list, and keeps the
+  fresh-context-per-room rule as fixture hygiene rather than a workaround.
+  That is the note's content delivered by the better route — the
+  upgrade itself. **manyhands is still untold** (FINDINGS.md unchanged at
+  `3783316`); the drafted section is the `manyhands-note.md` in the
+  session scratchpad, or the T-178 draft above. The ticket stays `doing`
+  on that one line.
