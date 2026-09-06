@@ -1,7 +1,7 @@
 ---
 id: T-185
 title: "npm release: SDK 0.2.1, keeper 0.2.0 — owner at keyboard"
-status: todo
+status: done
 milestone: M18
 depends: [T-178, T-182, T-183]
 ---
@@ -70,10 +70,10 @@ One tag per `git tag` call — three names in one call creates nothing
       `"spools": "^0.2.1"`), fresh-dir tarball smoke — `npx spools-keeper
       --links <file>` from the tarball holds two spools and logs
       timestamped lines under Node 24.
-- [ ] **Publish ×2, owner at keyboard.**
-- [ ] `npm view` sanity ×2; tags pushed one per call; this ticket and
+- [x] **Publish ×2, owner at keyboard.** *(5 Sep 2026, 02:22 and 02:23 UTC on the 6th.)*
+- [x] `npm view` sanity ×2; tags pushed one per call; this ticket and
       INDEX record the shipped versions.
-- [ ] **Tell syrup and manyhands** to drop their workarounds — the note is
+- [x] **Tell syrup and manyhands** to drop their workarounds — the note is
       drafted verbatim in `tickets/T-178-pocket-deposit-loss.md` ("Note for
       syrup and manyhands"); send it once `spools@0.2.1` is on the
       registry. (Moved here from T-178 at the 5 Sep sync-up so that ticket
@@ -123,3 +123,25 @@ One tag per `git tag` call — three names in one call creates nothing
 - If T-184 (the lone-peer socket) is signed off and lands before the owner
   gets to the keyboard, it rides along as `spools@0.2.2`-or-`0.2.1` at the
   owner's call — fold its CHANGELOG line under whichever heading ships.
+- **Shipped, 5 Sep 2026 (evening, US; 02:22–02:23 UTC on the 6th), owner at
+  keyboard:** `spools@0.2.1` then `spools-keeper@0.2.0`, in that order.
+  The one wall was T-130's again — `npm whoami` returned 401 before the
+  run, so `npm login` went first. The keeper's publish took about half a
+  minute longer than the SDK's to show on `npm view` (its `prepublishOnly`
+  runs the three relay-spawning tests, ~15 s), so the first check after
+  the second command still read `0.1.1`; the next read `0.2.0` with
+  `dependencies = { spools: '^0.2.1' }` — the publish order held.
+  Verified from a fresh empty project under Node 24.19: `npm i spools@0.2.1`
+  (dist carries `pagehide` and the `relay.spools.lol/yjs` default), then
+  `npm i spools-keeper` resolving `spools@0.2.1` and the prep smoke rerun
+  against the registry install — two spools held, timestamped lines,
+  cold-open converged with only the keeper in the room. Tags
+  `spools@0.2.1` and `spools-keeper@0.2.0` pushed one per call at `f7c57f6`
+  (the handoff commit; the same tree as the prep commit plus docs), checked
+  with `git ls-remote --tags`.
+- **The note sent, 5 Sep 2026:** into `../syrup/HANDOFF.md` (top of §1
+  Open Threads, and the §5 Durability landmine marked closed upstream) and
+  `../manyhands/FINDINGS.md` (a dated section after the counterfeit
+  experiment), each committed in its own repo — the T-178 draft, with the
+  paragraphs each repo doesn't need trimmed. Neither is pushed; that's the
+  owner's, as with every push in those repos.
