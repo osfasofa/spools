@@ -1,7 +1,7 @@
 ---
 id: T-184
 title: "A lone peer holds its socket — feed y-websocket's dead-socket timer from the resync tick — sign-off"
-status: todo
+status: done
 milestone: M17
 depends: [T-183]
 ---
@@ -77,18 +77,18 @@ wants the owner's sign-off, not a §5 row unless the owner wants one.
 
 ## Tasks
 
-- [ ] **Sign-off:** option 1, or 4 — owner.
-- [ ] `engine.ts`: on each resync tick, refresh the provider's
-      last-message timestamp (only while the socket is open; never touch
-      it while `roomFull` stand-back is in effect, so T-169's backoff is
-      unchanged).
-- [ ] Test: a lone peer on the workspace relay holds **one** socket for
-      > 60 s — count `status` transitions / `ws` closes, expect zero. And
-      the reverse: kill the relay under a lone peer, the client still
-      notices (goes `offline`) within the relay's keepAlive window +
-      backoff, so liveness from the other end is proven, not assumed.
-- [ ] CHANGELOG (SDK, patch lane per RELEASING.md — no default or
-      behavior a caller can see changes; the socket just stops churning).
+- [x] **Sign-off:** option 1 — owner, 5 Sep 2026.
+- [x] `engine.ts`: refresh the provider's last-message timestamp while the
+      socket is open (a 10 s timer of the SDK's own — see Notes on why not
+      the resync tick itself); untouched during `roomFull` stand-back, where
+      the socket is closed anyway.
+- [x] Test: a lone peer on the workspace relay holds **one** socket for
+      65 s (the relay counts every upgrade; one `connected` transition), then
+      the relay is closed under it and the client says offline within 5 s.
+      Plus the control: with the heartbeat off, the relay sees a second
+      upgrade inside 40 s — the T-183 metronome, reproduced in the suite.
+- [x] CHANGELOG (SDK, under the unreleased 0.2.1 — patch lane; ships with
+      T-185).
 - [ ] Keeper: nothing to change. Night three on the wall with the new
       build reads no 33 s metronome (owner at keyboard, optional — the test
       is the proof; the night is the confirmation).
@@ -114,3 +114,34 @@ wants the owner's sign-off, not a §5 row unless the owner wants one.
   workspace relay holds one socket for > 60 s." Filed at the sync-up so it
   stops living only inside another ticket's Notes. Not implemented — the
   sign-off comes first.
+- **Signed off and landed, 5 Sep 2026 — option 1.** One deviation from
+  the ticket's own wording: "on the resync tick" isn't reachable. The
+  resync is y-websocket's private `_resyncInterval`, and the SyncStep1 it
+  sends goes out through `ws.send` — which the SDK only wraps for *keyed*
+  spools (the sealed-transport subclass), so hooking the send would have
+  fixed keyed rooms and left keyless ones on the metronome. The engine
+  runs its own `setInterval` instead: every 10 s (a third of the 30 s
+  constant, so a missed tick still lands inside the window), if
+  `provider.wsconnected`, set `provider.wsLastMessageReceived = Date.now()`
+  — the same clock the provider uses (`lib0/time.getUnixTime` *is*
+  `Date.now`). Both fields are public on the provider's type. The timer is
+  `unref()`'d so it never keeps the keeper's process alive, and `leave()`
+  clears it. New engine option `socketHeartbeatMs` (default 10 000, 0 =
+  the provider's own behaviour) exists so the control test can reproduce
+  the bug; it is `@internal` like the engine and not on the SDK surface.
+- Measured in the suite (`engine.test.ts`): with the heartbeat, one
+  upgrade in 65 s and one `connected` transition; without it, the second
+  upgrade arrives at ~33–36 s, exactly T-183's beat. The dead-relay half:
+  closing the relay under the lone peer flips `status` off `connected`
+  within the 5 s bound (the close event still reaches the provider; the
+  heartbeat only feeds the *message* clock, never the close path). The two
+  tests add ~100 s to the SDK suite — the ticket asked for > 60 s of real
+  time and there is no honest way to fake y-websocket's constant.
+- What this bakes in, restated for the record: a half-open socket that the
+  relay never terminates (its ping/pong is the detector now) lingers until
+  the client's next write errors, where the provider's own timer would have
+  caught it inside 30 s. The canonical relay pings every `PING_TIMEOUT_MS`
+  and terminates on a missed pong, so the window is that interval, not
+  forever.
+- The keeper needs no change; it picks the default up from the SDK. Night
+  three is the owner's confirmation, not the proof.

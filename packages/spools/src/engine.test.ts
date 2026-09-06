@@ -7,16 +7,18 @@ import { generateKey } from './link'
 // the T-003 dumb relay, inlined: fan out frames to the room, exclude sender,
 // never parse
 const startRelay = () =>
-  new Promise<{ port: number; close: () => void }>((resolve) => {
+  new Promise<{ port: number; connections: () => number; close: () => void }>((resolve) => {
     const rooms = new Map<string, Set<import('ws').WebSocket>>()
+    let connections = 0 // every upgrade ever accepted — a reconnect counts again
     const close = () => {
       for (const conn of wss.clients) conn.terminate()
       wss.close()
     }
     const wss = new WebSocketServer({ port: 0 }, () =>
-      resolve({ port: (wss.address() as { port: number }).port, close })
+      resolve({ port: (wss.address() as { port: number }).port, connections: () => connections, close })
     )
     wss.on('connection', (conn, req) => {
+      connections++
       const room = req.url ?? '/'
       if (!rooms.has(room)) rooms.set(room, new Set())
       const members = rooms.get(room)!
@@ -108,6 +110,44 @@ it('leave() is clean and idempotent', async () => {
 it('persist defaults to off-limits outside browsers', () => {
   expect(() => new SpoolEngine({ code: 'test-persist-1', persist: true })).toThrow(/IndexedDB/)
 })
+
+// ---- T-184: a lone peer holds its socket ----
+
+// y-websocket closes a socket that has received no message in 30 s (a module
+// constant, y-websocket.js:99). A dumb relay never answers a lone peer, so
+// without the SDK's heartbeat a solo client reconnects every ~33 s — T-183
+// counted 5,326 in one night. The relay above counts every upgrade it accepts.
+
+it('a lone peer holds one socket for over a minute, and still notices a dead relay (T-184)', async () => {
+  const relay = await startRelay()
+  const url = `ws://127.0.0.1:${relay.port}`
+  const seen: string[] = []
+  const e = mkEngine({ code: 'test-lone-1', relay: url })
+  e.onStatus((s) => seen.push(s))
+  expect(await waitUntil(() => e.status === 'connected')).toBe(true)
+  expect(relay.connections()).toBe(1)
+
+  // twice the provider's 30 s timeout, plus its 3 s check granularity
+  await new Promise((r) => setTimeout(r, 65_000))
+  expect(relay.connections()).toBe(1)
+  expect(e.status).toBe('connected')
+  expect(seen.filter((s) => s === 'connected')).toHaveLength(1)
+
+  // liveness from the other end: the relay goes away, the client sees the
+  // close and says offline within the provider's backoff (≤ 2.5 s)
+  relay.close()
+  expect(await waitUntil(() => e.status !== 'connected', 5_000)).toBe(true)
+}, 80_000)
+
+it('without the heartbeat the 30 s timer tears the lone socket down — the T-183 metronome, reproduced', async () => {
+  const relay = await startRelay()
+  cleanups.push(relay.close)
+  const e = mkEngine({ code: 'test-lone-2', relay: `ws://127.0.0.1:${relay.port}`, socketHeartbeatMs: 0 })
+  expect(await waitUntil(() => e.status === 'connected')).toBe(true)
+  expect(relay.connections()).toBe(1)
+  // 30 s timeout + ≤ 3 s check tick + ≤ 2.5 s backoff → a second upgrade by ~36 s
+  expect(await waitUntil(() => relay.connections() >= 2, 40_000)).toBe(true)
+}, 45_000)
 
 // ---- T-169: a full room says so ----
 

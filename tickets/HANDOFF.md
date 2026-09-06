@@ -4,9 +4,10 @@ Written 5 Sep 2026 at the sync-up; `main` at 3b61dea. Paste the block below
 as the opening prompt. Delete or rewrite this file when it's been used.
 
 ```
-Sync-up context: main is at 3b61dea (5 Sep 2026). T-184 and T-185 were
-filed today and both wait on the owner — do not implement T-184 or
-publish anything. Two things are unblocked and need nobody:
+Sync-up context: 5 Sep 2026. T-184 (the lone-peer socket) was signed off
+and landed the same day; T-185 (the release that carries it, plus keeper
+0.2.0) waits on the owner — do not publish anything. Two things are
+unblocked and need nobody:
 
 1. T-169, the room-full notice (room lane). The relay and SDK halves are
    done; the room has zero references to spool.roomFull or on('full').
@@ -37,8 +38,8 @@ something protocol-shaping, stop and surface it with evidence.
 
 ## The owner's queue (not for a session)
 
-1. T-184 sign-off: option 1 (feed the provider) or 4 (accept and document).
-2. T-185: publish `spools@0.2.1` and `spools-keeper@0.2.0` at the keyboard, then send the syrup/manyhands note drafted in T-178.
+1. ~~T-184 sign-off~~ — done, option 1, 5 Sep.
+2. T-185: publish `spools@0.2.1` (now carrying T-184 too) and `spools-keeper@0.2.0` at the keyboard, then send the syrup/manyhands note drafted in T-178. Optional after: a night on the wall with the new build to see the metronome gone.
 3. T-168: the two canonical-relay defaults. "Keep the shipped defaults" closes it.
 4. T-165: the address-bar A/B/C decision.
 5. Move B, the wall: `apps/` reference client or a vessel repo beside `lore`.

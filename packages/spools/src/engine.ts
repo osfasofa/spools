@@ -41,6 +41,15 @@ export interface SpoolEngineOptions {
    * (T-169). Default 30 s; tests shrink it.
    */
   roomFullBackoffMs?: number
+  /**
+   * How often, while the websocket is open, to refresh y-websocket's
+   * last-message clock so its 30 s dead-socket timer never fires on a peer
+   * that is simply alone in the room (T-184). A dumb relay never answers a
+   * lone peer, so without this a solo client reconnects every ~33 s forever.
+   * Liveness is still detected from the relay's side (ping/pong, terminate).
+   * Default 10 s; 0 restores the provider's own behaviour (tests).
+   */
+  socketHeartbeatMs?: number
 }
 
 /** RFC 6455 "try again later" — what spools-relay sends past MAX_CONNS_PER_ROOM */
@@ -75,6 +84,7 @@ export class SpoolEngine {
   #fullListeners = new Set<(reason: string) => void>()
   #fullTimer: ReturnType<typeof setTimeout> | null = null
   #roomFullBackoffMs: number
+  #heartbeat: ReturnType<typeof setInterval> | null = null
   #left = false
 
   constructor(opts: SpoolEngineOptions) {
@@ -135,6 +145,23 @@ export class SpoolEngine {
           if (!this.#left) this.#websocket?.connect()
         }, this.#roomFullBackoffMs)
       })
+      // T-184: y-websocket closes any socket that has received no *message*
+      // in 30 s (a module constant). Peers are each other's server here —
+      // the relay never answers a SyncStep1 — so a peer alone in a room got
+      // no messages at all and reconnected every ~33 s, all night (T-183
+      // measured 5,326 of them). Feed the clock ourselves while the socket is
+      // open; a dead relay is still caught from the other end (its ping/pong
+      // terminate → close event → reconnect as before). Not while standing
+      // back from a full room: the socket is closed then, so nothing to feed.
+      const heartbeat = opts.socketHeartbeatMs ?? 10_000
+      if (heartbeat > 0) {
+        const provider = this.#websocket
+        this.#heartbeat = setInterval(() => {
+          if (provider.wsconnected) provider.wsLastMessageReceived = Date.now()
+        }, heartbeat)
+        // never the reason a Node process (the keeper) stays up
+        ;(this.#heartbeat as { unref?: () => void }).unref?.()
+      }
     }
 
     const webrtc = opts.webrtc ?? hasWebRTC
@@ -225,6 +252,8 @@ export class SpoolEngine {
     this.#left = true
     if (this.#fullTimer) clearTimeout(this.#fullTimer)
     this.#fullTimer = null
+    if (this.#heartbeat) clearInterval(this.#heartbeat)
+    this.#heartbeat = null
     await this.#webrtcPending
     this.#webrtc?.destroy()
     this.#websocket?.destroy()

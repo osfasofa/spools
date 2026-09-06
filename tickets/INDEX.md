@@ -205,7 +205,7 @@ Opened 4 Sep 2026 from the brand repo's second riff (`../brand/riffs/pegboard.md
 | [T-182](T-182-keeper-pegboard.md) | `spools-keeper --links`: hold many spools from a file — **sign-off** on the hippo line, **owner at keyboard** for the first real run | T-181 | done |
 | [T-183](T-183-keeper-narration.md) | `spools-keeper` narration: timestamps, the pocket's verdict, a heartbeat — **owner at keyboard** for the second night | T-182 | done |
 | [T-182 follow-on](T-182-keeper-pegboard.md#notes--open-questions) | the pocket line, proven from a links file — a keyed spool on the test's list, log hygiene checked against the real link and key (no ticket of its own; the landing is in T-182's Notes) | T-183 | done |
-| [T-184](T-184-lone-peer-reconnect.md) | A lone peer holds its socket — feed y-websocket's dead-socket timer from the resync tick — **sign-off** | T-183 | todo |
+| [T-184](T-184-lone-peer-reconnect.md) | A lone peer holds its socket — feed y-websocket's dead-socket timer from the resync tick — **sign-off** | T-183 | done |
 
 ## M18 — Release 3
 
