@@ -193,7 +193,7 @@ Opened 3 Sep 2026. Seven repos now consume `spools` from the registry, and two o
 | [T-178](T-178-pocket-deposit-loss.md) | Pocket deposits can be lost at leave — syrup + manyhands evidence | T-161 | done |
 | [T-179](T-179-stash-remember.md) | `stash.remember` — a vessel mirrors the stash's private format — **sign-off** | — | todo |
 | [T-180](T-180-splice-gate.md) | `splice()` — the gate review — **sign-off** | — | done |
-| [T-186](T-186-splice-primitive.md) | SDK: `splice(records)`, `Entry.snapshot()`, `SpoolSpliceError`; the reel-spike fixture as tests; the cut, fork, and rejoin recipes in SDK-API | T-180 | doing |
+| [T-186](T-186-splice-primitive.md) | SDK: `splice(records)`, `Entry.snapshot()`, `SpoolSpliceError`; the reel-spike fixture as tests; the cut, fork, and rejoin recipes in SDK-API | T-180 | done |
 | [T-187](T-187-room-cut.md) | Room: the cut ("start a new reel from here"), the tape counter, "full is a cut, not a wall", the reel-length kind, sealed `home`/`next` | T-186 | todo |
 | [T-188](T-188-splice-docs.md) | DESIGN_DOC/SPEC: the one non-normative sentence if wanted, the §2/§5 rows checked against working code — **last** | T-186, T-187 | todo |
 

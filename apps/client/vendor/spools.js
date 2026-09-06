@@ -14858,6 +14858,7 @@ ${err.toString()}`);
     SpoolHistoryError: () => SpoolHistoryError,
     SpoolKeyError: () => SpoolKeyError,
     SpoolLinkError: () => SpoolLinkError,
+    SpoolSpliceError: () => SpoolSpliceError,
     TRANSPORT_MAGIC: () => TRANSPORT_MAGIC,
     buildSpoolLink: () => buildSpoolLink,
     createEncryptedWebSocketClass: () => createEncryptedWebSocketClass,
@@ -15892,7 +15893,7 @@ ${reason}`);
   var ROOM_FULL_CLOSE_CODE = 1013;
   var inBrowser = typeof indexedDB !== "undefined";
   var hasWebRTC = typeof RTCPeerConnection !== "undefined";
-  var _idb, _websocket, _webrtc, _webrtcPending, _wsStatus, _rtcConnected, _status, _statusListeners, _undecryptable, _undecryptableListeners, _roomFull, _fullListeners, _fullTimer, _roomFullBackoffMs, _left, _SpoolEngine_instances, countUndecryptable_fn, deriveStatus_fn;
+  var _idb, _websocket, _webrtc, _webrtcPending, _wsStatus, _rtcConnected, _status, _statusListeners, _undecryptable, _undecryptableListeners, _roomFull, _fullListeners, _fullTimer, _roomFullBackoffMs, _heartbeat, _left, _SpoolEngine_instances, countUndecryptable_fn, deriveStatus_fn;
   var SpoolEngine = class {
     constructor(opts) {
       __privateAdd(this, _SpoolEngine_instances);
@@ -15913,6 +15914,7 @@ ${reason}`);
       __privateAdd(this, _fullListeners, /* @__PURE__ */ new Set());
       __privateAdd(this, _fullTimer, null);
       __privateAdd(this, _roomFullBackoffMs);
+      __privateAdd(this, _heartbeat, null);
       __privateAdd(this, _left, false);
       this.code = opts.code;
       __privateSet(this, _roomFullBackoffMs, opts.roomFullBackoffMs ?? 3e4);
@@ -15952,6 +15954,14 @@ ${reason}`);
             if (!__privateGet(this, _left)) __privateGet(this, _websocket)?.connect();
           }, __privateGet(this, _roomFullBackoffMs)));
         });
+        const heartbeat = opts.socketHeartbeatMs ?? 1e4;
+        if (heartbeat > 0) {
+          const provider = __privateGet(this, _websocket);
+          __privateSet(this, _heartbeat, setInterval(() => {
+            if (provider.wsconnected) provider.wsLastMessageReceived = Date.now();
+          }, heartbeat));
+          __privateGet(this, _heartbeat).unref?.();
+        }
       }
       const webrtc = opts.webrtc ?? hasWebRTC;
       if (webrtc && opts.signaling?.length) {
@@ -16013,6 +16023,8 @@ ${reason}`);
       __privateSet(this, _left, true);
       if (__privateGet(this, _fullTimer)) clearTimeout(__privateGet(this, _fullTimer));
       __privateSet(this, _fullTimer, null);
+      if (__privateGet(this, _heartbeat)) clearInterval(__privateGet(this, _heartbeat));
+      __privateSet(this, _heartbeat, null);
       await __privateGet(this, _webrtcPending);
       __privateGet(this, _webrtc)?.destroy();
       __privateGet(this, _websocket)?.destroy();
@@ -16040,6 +16052,7 @@ ${reason}`);
   _fullListeners = new WeakMap();
   _fullTimer = new WeakMap();
   _roomFullBackoffMs = new WeakMap();
+  _heartbeat = new WeakMap();
   _left = new WeakMap();
   _SpoolEngine_instances = new WeakSet();
   countUndecryptable_fn = function() {
@@ -16058,6 +16071,16 @@ ${reason}`);
   init_yjs();
   var ENTRIES = "entries";
   var bodyKey = (id2) => `entry:${id2}`;
+  var SpoolSpliceError = class extends Error {
+    constructor(id2, rule, message) {
+      super(message);
+      __publicField(this, "id");
+      __publicField(this, "rule");
+      this.name = "SpoolSpliceError";
+      this.id = id2;
+      this.rule = rule;
+    }
+  };
   var uuid = () => {
     if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
     const b = crypto.getRandomValues(new Uint8Array(16));
@@ -16095,6 +16118,26 @@ ${reason}`);
     /** plain-JSON machine fields set at wind time; read-only by convention (mutations don't sync) */
     get data() {
       return __privateMethod(this, _Entry_instances, meta_fn).call(this).get("data");
+    }
+    /**
+     * The entry as a plain frozen record — the same shape rewind() hands out
+     * and splice() takes in. `keep.map((e) => e.snapshot())` is the whole
+     * selection step of a cut (T-186).
+     */
+    snapshot() {
+      const parent = this.parent;
+      const deletedAt = this.deletedAt;
+      const data = this.data;
+      return Object.freeze({
+        id: this.id,
+        author: this.author,
+        kind: this.kind,
+        ...parent !== void 0 ? { parent } : {},
+        createdAt: this.createdAt,
+        ...deletedAt != null ? { deletedAt } : {},
+        ...data !== void 0 ? { data } : {},
+        body: this.body
+      });
     }
     /**
      * Raw Y.Text for editor bindings; null until a body exists. Existence =
@@ -16217,6 +16260,55 @@ ${reason}`);
         if (input.body !== void 0) this.doc.getText(bodyKey(id2)).insert(0, input.body);
       });
       return this.handle(id2);
+    }
+    /**
+     * Write complete records with their identity intact (T-186). Validates the
+     * whole batch first and throws SpoolSpliceError before any write; ids
+     * already present are skipped entirely (idempotent — a re-run changes no
+     * byte); everything else lands in one transaction, so a peer never sees a
+     * half-built reel. Returns live handles in input order.
+     */
+    splice(records) {
+      const fail = (id2, rule, why) => {
+        throw new SpoolSpliceError(id2, rule, `splice() refused record ${JSON.stringify(id2)}: ${why}`);
+      };
+      const incoming = /* @__PURE__ */ new Set();
+      for (const rec of records) {
+        const id2 = rec?.id;
+        if (typeof id2 !== "string" || id2 === "") fail(String(id2), "id", "id must be a non-empty string");
+        if (incoming.has(id2)) fail(id2, "duplicate", "the same id twice in one batch");
+        incoming.add(id2);
+        if (typeof rec.kind !== "string" || rec.kind === "") fail(id2, "kind", "kind must be a non-empty string");
+        if (typeof rec.author !== "string") fail(id2, "author", "author must be a string");
+        if (typeof rec.createdAt !== "number" || !Number.isFinite(rec.createdAt)) {
+          fail(id2, "createdAt", "createdAt must be a finite number");
+        }
+        if (rec.deletedAt !== void 0 && (typeof rec.deletedAt !== "number" || !Number.isFinite(rec.deletedAt))) {
+          fail(id2, "deletedAt", "deletedAt must be a finite number when present");
+        }
+        if (rec.body !== void 0 && typeof rec.body !== "string") fail(id2, "body", "body must be a string");
+      }
+      for (const rec of records) {
+        if (rec.parent !== void 0 && !incoming.has(rec.parent) && !this.entriesMap.has(rec.parent)) {
+          fail(rec.id, "parent", `parent ${JSON.stringify(rec.parent)} is neither in this batch nor in the spool`);
+        }
+      }
+      this.doc.transact(() => {
+        for (const rec of records) {
+          if (this.entriesMap.has(rec.id)) continue;
+          const meta = new YMap();
+          meta.set("id", rec.id);
+          meta.set("author", rec.author);
+          meta.set("kind", rec.kind);
+          meta.set("createdAt", rec.createdAt);
+          if (rec.parent !== void 0) meta.set("parent", rec.parent);
+          if (rec.deletedAt !== void 0) meta.set("deletedAt", rec.deletedAt);
+          if (rec.data !== void 0) meta.set("data", structuredClone(rec.data));
+          this.entriesMap.set(rec.id, meta);
+          if (rec.body) this.doc.getText(bodyKey(rec.id)).insert(0, rec.body);
+        }
+      });
+      return records.map((rec) => this.handle(rec.id));
     }
     onEntry(cb) {
       __privateGet(this, _listeners).add(cb);
@@ -16557,6 +16649,14 @@ ${reason}`);
   var POCKET_TX_ORIGIN = "spool-pocket";
   var KEEPALIVE_MAX_BYTES = 64 * 1024;
   var sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  var bounded = (ms) => new Promise((r) => {
+    const t = setTimeout(r, ms);
+    t.unref?.();
+  });
+  var pageTarget = () => {
+    const g = globalThis;
+    return typeof g.addEventListener === "function" ? globalThis : null;
+  };
   var withoutError = ({ depositError: _cleared, ...rest }) => rest;
   var deriveToken = (key) => {
     const domain = new TextEncoder().encode(TOKEN_DOMAIN);
@@ -16592,7 +16692,7 @@ ${reason}`);
   };
   var isPocketEnvelope = (json) => typeof json === "object" && json !== null && json.format === "spool-pocket" && typeof json.version === "number";
   var unavailableOrigins = /* @__PURE__ */ new Set();
-  var _origin, _code, _key2, _doc2, _whenReady, _state, _listeners2, _abort, _destroyed3, _fetched, _tag, _debounceMs2, _minGapMs2, _flushRetries, _flushBackoffMs, _armed3, _dirty, _rateLimited, _timer2, _lastDepositAt, _inflight, _flushing, _onVisibility, _PocketClient_instances, set_fn, isAheadOf_fn, docHasState_fn, _onTransaction3, schedule_fn2, stopped_fn, deposit_fn, put_fn, flushNow_fn;
+  var _origin, _code, _key2, _doc2, _whenReady, _state, _listeners2, _abort, _destroyed3, _fetched, _tag, _debounceMs2, _minGapMs2, _flushRetries, _flushBackoffMs, _settleWaitMs, _started, _armed3, _dirty, _rateLimited, _timer2, _lastDepositAt, _inflight, _flushing, _onVisibility, _onPageHide, _PocketClient_instances, set_fn, start_fn, isAheadOf_fn, docHasState_fn, _onTransaction3, schedule_fn2, stopped_fn, deposit_fn, put_fn, flushNow_fn;
   var PocketClient = class {
     constructor(opts) {
       __privateAdd(this, _PocketClient_instances);
@@ -16615,6 +16715,8 @@ ${reason}`);
       __privateAdd(this, _minGapMs2);
       __privateAdd(this, _flushRetries);
       __privateAdd(this, _flushBackoffMs);
+      __privateAdd(this, _settleWaitMs);
+      __privateAdd(this, _started, null);
       __privateAdd(this, _armed3, false);
       __privateAdd(this, _dirty, false);
       /** the last PUT was answered 429 — what flush()'s bounded retry reads */
@@ -16624,10 +16726,11 @@ ${reason}`);
       __privateAdd(this, _inflight, null);
       __privateAdd(this, _flushing, null);
       __privateAdd(this, _onVisibility, null);
+      __privateAdd(this, _onPageHide, null);
       __privateAdd(this, _onTransaction3, (tr) => {
-        if (!__privateGet(this, _armed3) || __privateGet(this, _destroyed3) || !tr.local) return;
+        if (__privateGet(this, _destroyed3) || !tr.local) return;
         __privateSet(this, _dirty, true);
-        __privateMethod(this, _PocketClient_instances, schedule_fn2).call(this);
+        if (__privateGet(this, _armed3)) __privateMethod(this, _PocketClient_instances, schedule_fn2).call(this);
       });
       __privateSet(this, _origin, pocketOrigin(opts.relay));
       __privateSet(this, _code, opts.code);
@@ -16639,12 +16742,17 @@ ${reason}`);
       __privateSet(this, _minGapMs2, opts.tuning?.minGapMs ?? 6e4);
       __privateSet(this, _flushRetries, opts.tuning?.flushRetries ?? 2);
       __privateSet(this, _flushBackoffMs, opts.tuning?.flushBackoffMs ?? 1e3);
+      __privateSet(this, _settleWaitMs, opts.tuning?.settleWaitMs ?? 3e3);
       __privateGet(this, _doc2).on("afterTransaction", __privateGet(this, _onTransaction3));
       if (typeof document !== "undefined") {
         __privateSet(this, _onVisibility, () => {
           if (document.visibilityState === "hidden" && __privateGet(this, _dirty)) void this.flush();
         });
         document.addEventListener("visibilitychange", __privateGet(this, _onVisibility));
+        __privateSet(this, _onPageHide, () => {
+          if (__privateGet(this, _dirty)) void this.flush();
+        });
+        pageTarget()?.addEventListener("pagehide", __privateGet(this, _onPageHide));
       }
     }
     get state() {
@@ -16658,69 +16766,9 @@ ${reason}`);
       __privateGet(this, _listeners2).add(cb);
       return () => __privateGet(this, _listeners2).delete(cb);
     }
-    /** fetch → verify envelope → decrypt → merge after local persistence loads */
-    async start() {
-      if (!__privateGet(this, _origin) || unavailableOrigins.has(__privateGet(this, _origin))) {
-        __privateMethod(this, _PocketClient_instances, set_fn).call(this, { phase: "unavailable" });
-        return;
-      }
-      __privateMethod(this, _PocketClient_instances, set_fn).call(this, { phase: "checking" });
-      let json;
-      try {
-        const res = await fetch(`${__privateGet(this, _origin)}/pocket/${__privateGet(this, _code)}/${this.token}`, {
-          signal: __privateGet(this, _abort).signal
-        });
-        json = await res.json();
-      } catch {
-        __privateMethod(this, _PocketClient_instances, set_fn).call(this, { phase: "unavailable" });
-        return;
-      }
-      if (!isPocketEnvelope(json)) {
-        unavailableOrigins.add(__privateGet(this, _origin));
-        __privateMethod(this, _PocketClient_instances, set_fn).call(this, { phase: "unavailable" });
-        return;
-      }
-      if (json.version > POCKET_VERSION) {
-        __privateMethod(this, _PocketClient_instances, set_fn).call(this, { phase: "unavailable" });
-        return;
-      }
-      const raw = Array.isArray(json.deposits) ? json.deposits : [];
-      await __privateGet(this, _whenReady);
-      if (__privateGet(this, _destroyed3)) return;
-      let applied = 0;
-      let dropped = 0;
-      const appliedUpdates = [];
-      for (const d of raw) {
-        let update = null;
-        if (typeof d.blob === "string") {
-          try {
-            update = openDeposit(b64decode(d.blob), __privateGet(this, _key2));
-          } catch {
-            update = null;
-          }
-        }
-        if (!update) {
-          dropped++;
-          continue;
-        }
-        applyUpdate(__privateGet(this, _doc2), update, POCKET_TX_ORIGIN);
-        appliedUpdates.push(update);
-        applied++;
-      }
-      __privateSet(this, _fetched, {
-        newestAt: typeof raw[0]?.at === "number" ? raw[0].at : 0,
-        ttlDays: typeof json.ttlDays === "number" ? json.ttlDays : 60,
-        count: raw.length
-      });
-      __privateMethod(this, _PocketClient_instances, set_fn).call(this, applied > 0 ? { phase: "applied", applied, dropped } : { phase: "empty", applied, dropped });
-      __privateSet(this, _armed3, true);
-      const ahead = __privateMethod(this, _PocketClient_instances, isAheadOf_fn).call(this, appliedUpdates);
-      const halfTtl = __privateGet(this, _fetched).ttlDays * 864e5 / 2;
-      const stale = __privateGet(this, _fetched).newestAt > 0 && Date.now() - __privateGet(this, _fetched).newestAt > halfTtl;
-      if (ahead || stale && __privateMethod(this, _PocketClient_instances, docHasState_fn).call(this)) {
-        __privateSet(this, _dirty, true);
-        void __privateMethod(this, _PocketClient_instances, deposit_fn).call(this);
-      }
+    /** fetch → verify envelope → decrypt → merge after local persistence loads; once */
+    start() {
+      return __privateGet(this, _started) ?? __privateSet(this, _started, __privateMethod(this, _PocketClient_instances, start_fn).call(this));
     }
     /**
      * Capture pending changes right now instead of waiting out the debounce —
@@ -16744,6 +16792,7 @@ ${reason}`);
       __privateSet(this, _timer2, null);
       __privateGet(this, _doc2).off("afterTransaction", __privateGet(this, _onTransaction3));
       if (__privateGet(this, _onVisibility)) document.removeEventListener("visibilitychange", __privateGet(this, _onVisibility));
+      if (__privateGet(this, _onPageHide)) pageTarget()?.removeEventListener("pagehide", __privateGet(this, _onPageHide));
       __privateGet(this, _abort).abort();
       __privateGet(this, _listeners2).clear();
     }
@@ -16763,6 +16812,8 @@ ${reason}`);
   _minGapMs2 = new WeakMap();
   _flushRetries = new WeakMap();
   _flushBackoffMs = new WeakMap();
+  _settleWaitMs = new WeakMap();
+  _started = new WeakMap();
   _armed3 = new WeakMap();
   _dirty = new WeakMap();
   _rateLimited = new WeakMap();
@@ -16771,10 +16822,73 @@ ${reason}`);
   _inflight = new WeakMap();
   _flushing = new WeakMap();
   _onVisibility = new WeakMap();
+  _onPageHide = new WeakMap();
   _PocketClient_instances = new WeakSet();
   set_fn = function(state) {
     __privateSet(this, _state, state);
     for (const cb of __privateGet(this, _listeners2)) cb(state);
+  };
+  start_fn = async function() {
+    if (!__privateGet(this, _origin) || unavailableOrigins.has(__privateGet(this, _origin))) {
+      __privateMethod(this, _PocketClient_instances, set_fn).call(this, { phase: "unavailable" });
+      return;
+    }
+    __privateMethod(this, _PocketClient_instances, set_fn).call(this, { phase: "checking" });
+    let json;
+    try {
+      const res = await fetch(`${__privateGet(this, _origin)}/pocket/${__privateGet(this, _code)}/${this.token}`, {
+        signal: __privateGet(this, _abort).signal
+      });
+      json = await res.json();
+    } catch {
+      if (__privateGet(this, _destroyed3)) return;
+      __privateMethod(this, _PocketClient_instances, set_fn).call(this, { phase: "unavailable" });
+      return;
+    }
+    if (!isPocketEnvelope(json)) {
+      unavailableOrigins.add(__privateGet(this, _origin));
+      __privateMethod(this, _PocketClient_instances, set_fn).call(this, { phase: "unavailable" });
+      return;
+    }
+    if (json.version > POCKET_VERSION) {
+      __privateMethod(this, _PocketClient_instances, set_fn).call(this, { phase: "unavailable" });
+      return;
+    }
+    const raw = Array.isArray(json.deposits) ? json.deposits : [];
+    await __privateGet(this, _whenReady);
+    if (__privateGet(this, _destroyed3)) return;
+    let applied = 0;
+    let dropped = 0;
+    const appliedUpdates = [];
+    for (const d of raw) {
+      let update = null;
+      if (typeof d.blob === "string") {
+        try {
+          update = openDeposit(b64decode(d.blob), __privateGet(this, _key2));
+        } catch {
+          update = null;
+        }
+      }
+      if (!update) {
+        dropped++;
+        continue;
+      }
+      applyUpdate(__privateGet(this, _doc2), update, POCKET_TX_ORIGIN);
+      appliedUpdates.push(update);
+      applied++;
+    }
+    __privateSet(this, _fetched, {
+      newestAt: typeof raw[0]?.at === "number" ? raw[0].at : 0,
+      ttlDays: typeof json.ttlDays === "number" ? json.ttlDays : 60,
+      count: raw.length
+    });
+    __privateMethod(this, _PocketClient_instances, set_fn).call(this, applied > 0 ? { phase: "applied", applied, dropped } : { phase: "empty", applied, dropped });
+    __privateSet(this, _armed3, true);
+    const ahead = __privateMethod(this, _PocketClient_instances, isAheadOf_fn).call(this, appliedUpdates);
+    const halfTtl = __privateGet(this, _fetched).ttlDays * 864e5 / 2;
+    const stale = __privateGet(this, _fetched).newestAt > 0 && Date.now() - __privateGet(this, _fetched).newestAt > halfTtl;
+    __privateSet(this, _dirty, ahead || stale && __privateMethod(this, _PocketClient_instances, docHasState_fn).call(this));
+    if (__privateGet(this, _dirty)) void __privateMethod(this, _PocketClient_instances, deposit_fn).call(this);
   };
   /** does the local doc hold anything beyond what the given updates carry? */
   isAheadOf_fn = function(updates) {
@@ -16848,8 +16962,12 @@ ${reason}`);
       clearTimeout(__privateGet(this, _timer2));
       __privateSet(this, _timer2, null);
     }
+    if (!__privateGet(this, _armed3) && __privateGet(this, _dirty) && __privateGet(this, _started)) {
+      await Promise.race([__privateGet(this, _started), bounded(__privateGet(this, _settleWaitMs))]);
+      if (__privateGet(this, _state).phase === "unavailable") return;
+    }
     if (__privateGet(this, _inflight)) await __privateGet(this, _inflight);
-    if (!__privateGet(this, _dirty) || !__privateGet(this, _armed3)) return;
+    if (!__privateGet(this, _dirty)) return;
     await __privateMethod(this, _PocketClient_instances, deposit_fn).call(this);
     for (let i = 0; i < __privateGet(this, _flushRetries) && __privateGet(this, _rateLimited) && !__privateGet(this, _destroyed3); i++) {
       await sleep(__privateGet(this, _flushBackoffMs) * 2 ** i);
@@ -16964,6 +17082,17 @@ ${reason}`);
     wind(input) {
       return __privateGet(this, _store2).wind(input);
     }
+    /**
+     * Write complete entry records — identity, time, author, parent, data,
+     * body — into this spool exactly as given, in one transaction (T-186).
+     * Idempotent: an id already here is skipped. Refuses the batch, before
+     * any write, if a record's parent is neither in the batch nor in this
+     * spool (SpoolSpliceError). The primitive under the cut; policy-free —
+     * what crosses, what's flattened, and the new key are the caller's.
+     */
+    splice(records) {
+      return __privateGet(this, _store2).splice(records);
+    }
     on(event, cb) {
       if (event === "entry") return __privateGet(this, _store2).onEntry(cb);
       if (event === "status") return __privateGet(this, _engine).onStatus(cb);
@@ -16998,17 +17127,7 @@ ${reason}`);
      * file. Synchronous — it's all local.
      */
     export() {
-      const snapshot2 = (e) => Object.freeze({
-        id: e.id,
-        author: e.author,
-        kind: e.kind,
-        ...e.parent !== void 0 ? { parent: e.parent } : {},
-        createdAt: e.createdAt,
-        ...e.deletedAt != null ? { deletedAt: e.deletedAt } : {},
-        ...e.data !== void 0 ? { data: e.data } : {},
-        body: e.body
-      });
-      const all2 = [...this.entries, ...this.deleted].sort((a, b) => a.createdAt - b.createdAt || (a.id < b.id ? -1 : 1)).map(snapshot2);
+      const all2 = [...this.entries, ...this.deleted].sort((a, b) => a.createdAt - b.createdAt || (a.id < b.id ? -1 : 1)).map((e) => e.snapshot());
       return buildExport(this.code, all2, this.doc);
     }
     /** the shareable link — hand it to someone */

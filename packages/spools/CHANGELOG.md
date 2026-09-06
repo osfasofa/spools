@@ -1,5 +1,10 @@
 # spools changelog
 
+## 0.3.0 — unreleased
+
+- `spool.splice(records)`: write complete entry records — `id`, `author`, `kind`, `createdAt`, `parent?`, `data?`, `deletedAt?`, `body` (the `EntrySnapshot` shape `rewind()` hands out) — into a spool exactly as given, in one transaction. Idempotent: an id already present is skipped, so a re-run changes no byte. Refuses the whole batch before any write when a record's `parent` is neither in the batch nor in the spool (`SpoolSpliceError`, with `.id` and `.rule`) — a dangling parent in a fresh spool would render as "not synced yet", a lie. Policy-free: what crosses, what's flattened, and the new key are the caller's. The one primitive under the cut (a new reel from here on), the fork, and the rejoin, which are recipes in SDK-API. `wind()` is untouched (T-186; the gate review is T-180, the brief `docs/M16-splice-brief.md`).
+- `entry.snapshot()`: the entry as a plain frozen `EntrySnapshot` — `keep.map((e) => e.snapshot())` is the whole selection step of a cut. `export()` is built on it now; its output is unchanged.
+
 ## 0.2.1 — 2026-09-05
 
 - A wind made before the pocket's open-time check settles is no longer lost when `leave()` comes first: the flush waits for the check (up to ~3 s, `settleWaitMs` for tests) so the deposit carries the pocket's state too, and past the bound deposits what it has. Found by the keeper's first real run; the fifth T-178 mechanism.

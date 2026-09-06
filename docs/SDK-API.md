@@ -59,6 +59,7 @@ interface Spool {
   readonly history: number[]         // recorded moment timestamps (ms), ascending — what rewind() can target; the scrubber's tick marks
 
   wind(input: WindInput): Entry
+  splice(records: EntrySnapshot[]): Entry[]  // write complete records, identity intact, one transaction; idempotent; refuses a dangling parent. See "splice()" below (M16, T-186)
   on(event: 'entry', cb: (change: EntryChange) => void): () => void   // returns unsubscribe
   on(event: 'status', cb: (status: Spool['status']) => void): () => void
   on(event: 'undecryptable', cb: (total: number) => void): () => void // fires per dropped frame with the running total — "someone here isn't on your key" UX
@@ -122,6 +123,7 @@ interface Entry {
 
   delete(): void               // soft: sets deletedAt (DESIGN_DOC §5)
   restore(): void              // clears deletedAt — archiving falls out free
+  snapshot(): EntrySnapshot    // the entry as a plain frozen record — what rewind() hands out and splice() takes in (T-186)
 }
 ```
 
@@ -272,13 +274,68 @@ interface PocketState {
   hidden` narrows it with a best-effort flush that, for spools sealing to
   ≤ 64 KiB, rides `keepalive` and so outlives the tab (T-178).
 
+## splice() — the identity-preserving write (M16, T-186)
+
+`wind()` stamps identity: a fresh `id` and `createdAt`, this spool's `author`. That is right for the naive client and wrong for exactly one job — copying entries from one spool into another *as themselves*. A retelling built from `wind()` loses identity and **order** (a thousand entries wound in one loop share a millisecond and sort by random id), which is why three clients reached under the SDK and wrote the `entries` map by hand. `splice()` is those twelve lines with a contract (the gate review: T-180, `docs/M16-splice-brief.md`).
+
+```ts
+splice(records: EntrySnapshot[]): Entry[]
+```
+
+Writes **complete** records — `id`, `author`, `kind`, `createdAt`, `parent?`, `data?`, `deletedAt?`, `body` — into this spool exactly as given. The input shape is `EntrySnapshot`, the same plain record `rewind()` returns and `entry.snapshot()` produces: the cut is literally rewind-shaped data going the other way. Returns the live handles in input order.
+
+The rules, all of them boring:
+
+- **One transaction.** The whole batch lands at once, so a peer never sees a half-built reel.
+- **Idempotent.** An `id` already in this spool is skipped entirely — no meta write, no body write, no event; its existing handle is returned. A second `splice()` of the same input changes no byte. That is what makes a cut re-runnable after a crash and a derived spool safe under `gc:false`.
+- **It refuses to write a lie.** Every `parent` must resolve inside the batch or already in this spool (soft-deleted parents count — a reply to a hidden entry is a real shape). One bad record rejects the batch **before any write** with `SpoolSpliceError` (`.id` names the record, `.rule` the field: `'parent'`, or `'id' | 'kind' | 'author' | 'createdAt' | 'deletedAt' | 'body' | 'duplicate'`). A dangling parent in a fresh spool is indistinguishable from "not synced yet", and the room would render it as exactly that lie. Flattening is the caller's explicit act — `{ ...rec, parent: undefined }` — never something the SDK does behind your back.
+- **Policy-free.** It does not decide which entries cross, whether soft-deleted ones do (a record with `deletedAt` lands soft-deleted), whether to stamp provenance (stamp `data` yourself before the call; the SDK never adds fields), or what the new spool's key is. Those are the recipe's decisions.
+- **`author` is whatever the record says.** Author was always self-declared trust, not proof; the splicing seat is not recorded per entry. If you want provenance, the reel's sealed `home` link is the cheap one.
+- **`wind()` is untouched.** It keeps stamping identity; it stays the one verb a naive client ever needs.
+
+What it bakes in, said plainly: an entry `id` can now be *the same entry* in two spools. That is the feature (idempotence, order, cheap provenance) and it costs nothing in the document — but anything that assumed ids were spool-local (a cross-spool index, a deep link) has to know. Zero protocol change: the document shape, the `entries` map, the body key, write-once-per-document, and the display order are what they were.
+
+### The recipes (prose to copy, per ECOSYSTEM's rule; `splice.test.ts` runs each of them)
+
+**The cut** — a new reel from here on. A *reel* is a spool seen as a length of tape; a *cut* is the gesture: point at an entry and start a new reel with everything from there on (DESIGN_DOC §2). The three decisions the reel riff measured, taken: the seam is **by entry**, never by time (`createdAt` ties make a time cut fuzzy); identity is **preserved** (760 KiB vs 965 KiB with a `from` stamp — identity is the cheaper provenance); a reply whose parent didn't make the cut is **flattened**, and the button says so.
+
+```js
+const all = old.entries                                         // the SDK's own order: (createdAt, id)
+const keep = all.slice(all.findIndex((e) => e.id === fromId)).map((e) => e.snapshot())
+const kept = new Set(keep.map((r) => r.id))
+const records = keep.map((r) => (r.parent && !kept.has(r.parent) ? { ...r, parent: undefined } : r))  // flatten, explicitly
+const reel = await newSpool({ relay: parseSpoolLink(old.share()).relay })   // new code, new key, new pocket — on the old link's relay
+reel.splice(records)                                            // identity, order, bodies, data cross; history doesn't
+reel.wind({ kind: 'spool', data: { link: sealed(old.share()), role: 'home' } })  // optional: where this reel came from — sealed with the client's own scheme (syrup's `home` convention); a link in plain `data` is a key on the tape
+```
+
+The sentence for the button: **the new reel has no past.** Entries keep their original `createdAt`, but no moment before the cut exists to rebuild — `rewind()` in the new reel reaches the first moment after the cut and no earlier (`SpoolHistoryError`, loud). The old reel is untouched on every device that keeps it. Soft-deleted entries cross only if you put them in `keep`; the cut above leaves them behind, which is the point.
+
+**The fork** — the whole document, lineage intact. Two lines:
+
+```js
+const fork = await newSpool({ relay })
+Y.applyUpdate(fork.doc, Y.encodeStateAsUpdate(orig.doc))   // every entry, every moment, every soft-delete — same ids, same items
+```
+
+A fork remembers who it was before it was born: `fork.rewind(t)` reaches moments from before the fork existed. **Branch-from-a-moment** is the same recipe fed a rewind moment instead of the present — `Y.createDocFromSnapshot(orig.doc, snap)` for a `{ ts, snap }` from the `history` array, then `encodeStateAsUpdate` of that — with two physics notes: the branch carries no record of the moment it was cut from (that moment's own history entry lands after its snapshot), and the fork's physics still apply below.
+
+**The rejoin** — reunion, inside one client holding both keys, never through a relay:
+
+```js
+Y.applyUpdate(fork.doc, Y.encodeStateAsUpdate(orig.doc, Y.encodeStateVector(fork.doc)))
+Y.applyUpdate(orig.doc, Y.encodeStateAsUpdate(fork.doc, Y.encodeStateVector(orig.doc)))
+```
+
+The honesty sentence, asserted in `splice.test.ts` so it stays true: **reunion resurrects everything the origin did since** — every entry, and every soft-delete, because a fork shares the origin's items. A branch-from-a-moment cannot un-know what the origin later did, once they meet. The retelling (the cut) is the only subset that *stays* a subset, because it is a new document; rejoining a reel with its old spool would bring the forgotten half back as new entries, which is why the cut is a cut. Fork and rejoin stay recipes until a vessel ships reunion for real (T-180 decision 2; lore's campfire is the named next shipper); `retell`, `fork`, and `rejoin` are unreserved names.
+
 ## Under the hood (M1 shape)
 
 Per-spool instance bundles: `Y.Doc` + `IndexeddbPersistence` (db name = spool code) + `WebsocketProvider` (room = spool code) + `WebrtcProvider` (same room, **sharing the websocket provider's awareness**, per fosho `sync.ts:1032`). Websocket is the reliable path; WebRTC the low-latency bonus — redundant, not competing. Extraction source: the distilled `connectToNote` / `disconnectFromNote` (fosho `sync.ts:950–1143`) minus identity, permissions, subdocs, addressing, singletons.
 
 ## Deferred surface (designed later, listed so names stay reserved)
 
-- `splice` — reserved verb, no design.
+- ~~`splice` — reserved verb, no design.~~ Shipped as the primitive in M16 (T-186); see "splice()" above. `retell`/`fork`/`rejoin` are unreserved recipe names.
 
 ### Parked with evidence (M11 — the room shipped these as app conventions; promotion waits for a second client to want them)
 
@@ -301,11 +358,10 @@ Per-spool instance bundles: `Y.Doc` + `IndexeddbPersistence` (db name = spool co
   write by hand (same key, same row shape) because its satchel opens with
   `persist: false`. A vessel coupled to a private format is the evidence;
   T-179 is the review.
-- **The `splice` family — fork / retelling / rejoin** — evidence from four
-  sources: the spools-of-spools spike (fork keeps lineage; reunion by a
-  dual-key human), syrup's shipped `/branch` convention and its `/splice`
-  + `/rejoin` ask, lore's brief, and the owner's reel riff (forgetting as
-  cutting a new reel). T-180 is the review; it waits on the riff.
+- ~~**The `splice` family — fork / retelling / rejoin**~~ — reviewed
+  (T-180, `docs/M16-splice-brief.md`, signed off 5 Sep 2026): the
+  retelling's primitive shipped as `splice()` (T-186); fork and rejoin
+  stay recipes above until a vessel ships reunion.
 - **Undo / redo** — no client wants it yet; parked with the verdict
   already attached (`docs/riffs/tape-deck.md` §5, measured): a raw
   `Y.UndoManager` over the entries map undoes a wind as a *hard* removal
@@ -313,9 +369,9 @@ Per-spool instance bundles: `Y.Doc` + `IndexeddbPersistence` (db name = spool co
   orphaned), which the soft-delete decision forbids. Any surface builds on
   `delete()`/`restore()` plus per-body text undo, scoped to the local
   origin — your winds, never your friend's.
-- **The cut (a retelling operator) and the reel counter** — the reel riff
-  (`docs/riffs/the-reel.md`) measured the cut and named its three
-  decisions (threads, identity, the seam); the counter needs only
-  `spool.doc` and the relay's advertised `maxBytes`. Both queue at T-180.
+- **The cut and the reel counter** — the cut is a recipe over `splice()`
+  now (above); the room's gesture, the tape counter (reading the link's
+  relay's advertised `maxBytes`, never a constant), and the reserved
+  reel-length kind are T-187, client work only.
 - *(Not parked, a bug: pocket deposits lost at `leave()` under 429 or
   unload — T-178.)*

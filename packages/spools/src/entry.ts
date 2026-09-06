@@ -1,4 +1,5 @@
 import * as Y from 'yjs'
+import type { EntrySnapshot } from './history'
 
 export interface WindInput {
   /** app-level flavor; the protocol doesn't care */
@@ -23,6 +24,25 @@ export interface EntryChange {
 
 const ENTRIES = 'entries'
 const bodyKey = (id: string) => `entry:${id}`
+
+/** which of splice()'s rules a record broke */
+export type SpliceRule = 'id' | 'kind' | 'author' | 'createdAt' | 'deletedAt' | 'body' | 'parent' | 'duplicate'
+
+/**
+ * splice() refused the batch — before a single write. `id` names the record,
+ * `rule` the field. A dangling `parent` is the one that matters most: in a
+ * fresh spool it would render as "not synced yet", a lie (T-180).
+ */
+export class SpoolSpliceError extends Error {
+  readonly id: string
+  readonly rule: SpliceRule
+  constructor(id: string, rule: SpliceRule, message: string) {
+    super(message)
+    this.name = 'SpoolSpliceError'
+    this.id = id
+    this.rule = rule
+  }
+}
 
 /**
  * @internal An RFC 4122 v4 id. Browsers expose `crypto.randomUUID` only in
@@ -86,6 +106,27 @@ export class Entry {
   /** plain-JSON machine fields set at wind time; read-only by convention (mutations don't sync) */
   get data(): Record<string, unknown> | undefined {
     return this.#meta().get('data') as Record<string, unknown> | undefined
+  }
+
+  /**
+   * The entry as a plain frozen record — the same shape rewind() hands out
+   * and splice() takes in. `keep.map((e) => e.snapshot())` is the whole
+   * selection step of a cut (T-186).
+   */
+  snapshot(): EntrySnapshot {
+    const parent = this.parent
+    const deletedAt = this.deletedAt
+    const data = this.data
+    return Object.freeze({
+      id: this.id,
+      author: this.author,
+      kind: this.kind,
+      ...(parent !== undefined ? { parent } : {}),
+      createdAt: this.createdAt,
+      ...(deletedAt != null ? { deletedAt } : {}),
+      ...(data !== undefined ? { data } : {}),
+      body: this.body,
+    })
   }
 
   /**
@@ -208,6 +249,58 @@ export class EntryStore {
       if (input.body !== undefined) this.doc.getText(bodyKey(id)).insert(0, input.body)
     })
     return this.handle(id)
+  }
+
+  /**
+   * Write complete records with their identity intact (T-186). Validates the
+   * whole batch first and throws SpoolSpliceError before any write; ids
+   * already present are skipped entirely (idempotent — a re-run changes no
+   * byte); everything else lands in one transaction, so a peer never sees a
+   * half-built reel. Returns live handles in input order.
+   */
+  splice(records: readonly EntrySnapshot[]): Entry[] {
+    const fail = (id: string, rule: SpliceRule, why: string): never => {
+      throw new SpoolSpliceError(id, rule, `splice() refused record ${JSON.stringify(id)}: ${why}`)
+    }
+    const incoming = new Set<string>()
+    for (const rec of records) {
+      const id = rec?.id
+      if (typeof id !== 'string' || id === '') fail(String(id), 'id', 'id must be a non-empty string')
+      if (incoming.has(id)) fail(id, 'duplicate', 'the same id twice in one batch')
+      incoming.add(id)
+      if (typeof rec.kind !== 'string' || rec.kind === '') fail(id, 'kind', 'kind must be a non-empty string')
+      if (typeof rec.author !== 'string') fail(id, 'author', 'author must be a string')
+      if (typeof rec.createdAt !== 'number' || !Number.isFinite(rec.createdAt)) {
+        fail(id, 'createdAt', 'createdAt must be a finite number')
+      }
+      if (rec.deletedAt !== undefined && (typeof rec.deletedAt !== 'number' || !Number.isFinite(rec.deletedAt))) {
+        fail(id, 'deletedAt', 'deletedAt must be a finite number when present')
+      }
+      if (rec.body !== undefined && typeof rec.body !== 'string') fail(id, 'body', 'body must be a string')
+    }
+    // parents resolve in the batch or in the target — soft-deleted included:
+    // a reply to a hidden entry is a real shape; a reply to nothing is a lie
+    for (const rec of records) {
+      if (rec.parent !== undefined && !incoming.has(rec.parent) && !this.entriesMap.has(rec.parent)) {
+        fail(rec.id, 'parent', `parent ${JSON.stringify(rec.parent)} is neither in this batch nor in the spool`)
+      }
+    }
+    this.doc.transact(() => {
+      for (const rec of records) {
+        if (this.entriesMap.has(rec.id)) continue // already here: nothing to write, nothing to say
+        const meta = new Y.Map<unknown>()
+        meta.set('id', rec.id)
+        meta.set('author', rec.author)
+        meta.set('kind', rec.kind)
+        meta.set('createdAt', rec.createdAt)
+        if (rec.parent !== undefined) meta.set('parent', rec.parent)
+        if (rec.deletedAt !== undefined) meta.set('deletedAt', rec.deletedAt)
+        if (rec.data !== undefined) meta.set('data', structuredClone(rec.data))
+        this.entriesMap.set(rec.id, meta)
+        if (rec.body) this.doc.getText(bodyKey(rec.id)).insert(0, rec.body)
+      }
+    })
+    return records.map((rec) => this.handle(rec.id))
   }
 
   onEntry(cb: (change: EntryChange) => void): () => void {

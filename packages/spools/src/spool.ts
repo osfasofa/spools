@@ -178,6 +178,18 @@ export class Spool {
     return this.#store.wind(input)
   }
 
+  /**
+   * Write complete entry records — identity, time, author, parent, data,
+   * body — into this spool exactly as given, in one transaction (T-186).
+   * Idempotent: an id already here is skipped. Refuses the batch, before
+   * any write, if a record's parent is neither in the batch nor in this
+   * spool (SpoolSpliceError). The primitive under the cut; policy-free —
+   * what crosses, what's flattened, and the new key are the caller's.
+   */
+  splice(records: readonly EntrySnapshot[]): Entry[] {
+    return this.#store.splice(records)
+  }
+
   on(event: 'entry', cb: (change: EntryChange) => void): () => void
   on(event: 'status', cb: (status: SpoolStatus) => void): () => void
   on(event: 'undecryptable', cb: (total: number) => void): () => void
@@ -231,20 +243,9 @@ export class Spool {
    * file. Synchronous — it's all local.
    */
   export(): string {
-    const snapshot = (e: Entry): EntrySnapshot =>
-      Object.freeze({
-        id: e.id,
-        author: e.author,
-        kind: e.kind,
-        ...(e.parent !== undefined ? { parent: e.parent } : {}),
-        createdAt: e.createdAt,
-        ...(e.deletedAt != null ? { deletedAt: e.deletedAt } : {}),
-        ...(e.data !== undefined ? { data: e.data } : {}),
-        body: e.body,
-      })
     const all = [...this.entries, ...this.deleted]
       .sort((a, b) => a.createdAt - b.createdAt || (a.id < b.id ? -1 : 1))
-      .map(snapshot)
+      .map((e) => e.snapshot())
     return buildExport(this.code, all, this.doc)
   }
 
