@@ -1,6 +1,6 @@
 # spools-keeper changelog
 
-## 0.2.0 — unreleased
+## 0.2.0 — 2026-09-05
 
 - `--links <file>`: one keeper holds every spool on a list (one link per line, `# ` comments), one export file per spool beside the list (`--dir <path>` to choose). A bad line is skipped by number; the rest stay kept. Edit the list and restart to change it (T-182).
 - The single-link form is unchanged.

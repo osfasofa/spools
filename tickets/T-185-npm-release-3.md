@@ -65,7 +65,7 @@ One tag per `git tag` call — three names in one call creates nothing
 
 ## Tasks
 
-- [ ] Prep (any session): date the two CHANGELOG headings, `pnpm pack`
+- [x] Prep (any session): date the two CHANGELOG headings, `pnpm pack`
       dry-run ×2 eyeballed (the keeper tarball's dependency reads
       `"spools": "^0.2.1"`), fresh-dir tarball smoke — `npx spools-keeper
       --links <file>` from the tarball holds two spools and logs
@@ -87,6 +87,35 @@ One tag per `git tag` call — three names in one call creates nothing
 
 ## Notes / open questions
 
+- **Prep, 5 Sep 2026 (headless):** both CHANGELOG headings dated
+  2026-09-05 (T-184's line rides under `0.2.1`, per the owner's call).
+  `pnpm pack` ×2 eyeballed — the SDK tarball ships `dist/` (index.js +
+  d.ts) + LICENSE + README + package.json, 30 KiB; the keeper ships
+  `keeper.js` + LICENSE + README + package.json, 7 KiB, and its dependency
+  reads `"spools": "^0.2.1"` (pnpm rewrote `workspace:^`). `dist/` was
+  newer than the last `src/` change, and the tarball's `index.js` carries
+  `pagehide` and the 10 s clock refresh; `pnpm publish` rebuilds anyway.
+  Fresh-dir smoke under Node 24.19: `npm i` of both tarballs into an empty
+  project resolved the keeper's `^0.2.1` from the local SDK tarball; a
+  local relay, two spools minted from the installed SDK (one keyless, one
+  keyed, 3 and 5 entries), `npx spools-keeper --links pegboard` from
+  `node_modules` — every line ISO-stamped, `relay: connected`, `3 entries
+  held` / `5 entries held`, the keyed one's `pocket: applied (1 deposit)`,
+  no link or key in the log; the writers left, and a cold open of each
+  link converged with only the keeper in the room (the keyless spool has
+  no pocket, so that one is the keeper's doing, not the relay's). SIGTERM
+  saved both export files with the right counts. Script:
+  `scratch/`-style, kept out of the repo (session scratchpad).
+- Lab note from the smoke, not a T-185 item: my first two runs gave the
+  SDK `ws://127.0.0.1:4597` with no `/yjs` path. The relay refuses the
+  upgrade, and the SDK sits in `connecting` for good — no error, no
+  event, while the pocket (plain HTTP on the same origin) works fine, so
+  the keyed spool *looked* alive (deposits applied) and the keyless one
+  never connected. Links carry their own `relay=` so a person never types
+  this, but a vessel author passing `relay:` to `newSpool` could, and the
+  only symptom is silence. Filed here for the owner to decide whether a
+  one-line check (relay URL must end in `/yjs`) or a doc sentence in
+  SDK-API earns a ticket.
 - Drafted 5 Sep 2026 at the sync-up. Three places said this needed its own
   ticket and none had filed it (T-182 Notes ×2, T-182 follow-on 3, T-178's
   last line), and T-178 was sitting in `doing` behind it with nothing left

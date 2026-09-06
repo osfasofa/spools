@@ -1,6 +1,6 @@
 # spools changelog
 
-## 0.2.1 — unreleased
+## 0.2.1 — 2026-09-05
 
 - A wind made before the pocket's open-time check settles is no longer lost when `leave()` comes first: the flush waits for the check (up to ~3 s, `settleWaitMs` for tests) so the deposit carries the pocket's state too, and past the bound deposits what it has. Found by the keeper's first real run; the fifth T-178 mechanism.
 - A pocket check aborted by `leave()` no longer reports `unavailable` after teardown; `checking` stays the last word.
