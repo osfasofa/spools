@@ -186,7 +186,7 @@ Drafted 3 Sep 2026 from the ship review — design record: [docs/M15-ship-review
 
 ## M16 — the gate (evidence from the vessels)
 
-Opened 3 Sep 2026. Seven repos now consume `spools` from the registry, and two of them had filed SDK evidence in their own notes instead of here — syrup's HANDOFF and familiar/manyhands' evidence #8. ECOSYSTEM's rule 7 says friction flows back as evidence; this rail is that filing. One bug, two gate reviews; the reviews are **sign-off**. The forgetting riff the splice review waited on landed 5 Sep as [docs/riffs/the-reel.md](../docs/riffs/the-reel.md) (with [docs/riffs/tape-deck.md](../docs/riffs/tape-deck.md) as a second independent wanter), and T-180's brief landed the same day — [docs/M16-splice-brief.md](../docs/M16-splice-brief.md): one primitive (`splice(records)`, identity-preserving, idempotent, refusing a dangling parent) recommended; fork and rejoin stay recipes; its five decisions were **signed off 5 Sep 2026 as recommended** (DESIGN_DOC §5 "The splice family"; *reel* and *cut* in §2) and became T-186 (SDK), T-187 (room), T-188 (docs, last — the only ticket allowed near SPEC.md). T-178 closed 5 Sep on its own acceptance criterion — the note to syrup and manyhands rides with T-185.
+Opened 3 Sep 2026. Seven repos now consume `spools` from the registry, and two of them had filed SDK evidence in their own notes instead of here — syrup's HANDOFF and familiar/manyhands' evidence #8. ECOSYSTEM's rule 7 says friction flows back as evidence; this rail is that filing. One bug, two gate reviews; the reviews are **sign-off**. The forgetting riff the splice review waited on landed 5 Sep as [docs/riffs/the-reel.md](../docs/riffs/the-reel.md) (with [docs/riffs/tape-deck.md](../docs/riffs/tape-deck.md) as a second independent wanter), and T-180's brief landed the same day — [docs/M16-splice-brief.md](../docs/M16-splice-brief.md): one primitive (`splice(records)`, identity-preserving, idempotent, refusing a dangling parent) recommended; fork and rejoin stay recipes; its five decisions were **signed off 5 Sep 2026 as recommended** (DESIGN_DOC §5 "The splice family"; *reel* and *cut* in §2) and became T-186 (SDK), T-187 (room), T-188 (docs, last — the only ticket allowed near SPEC.md). **M16 complete, 6 Sep 2026:** `splice()` in the SDK, the cut in the room, one non-normative sentence in SPEC; `spools@0.3.0` unreleased until a client needs it from the registry. T-178 closed 5 Sep on its own acceptance criterion — the note to syrup and manyhands rides with T-185.
 
 | Ticket | Title | Depends | Status |
 |---|---|---|---|
@@ -195,7 +195,7 @@ Opened 3 Sep 2026. Seven repos now consume `spools` from the registry, and two o
 | [T-180](T-180-splice-gate.md) | `splice()` — the gate review — **sign-off** | — | done |
 | [T-186](T-186-splice-primitive.md) | SDK: `splice(records)`, `Entry.snapshot()`, `SpoolSpliceError`; the reel-spike fixture as tests; the cut, fork, and rejoin recipes in SDK-API | T-180 | done |
 | [T-187](T-187-room-cut.md) | Room: the cut ("start a new reel from here"), the tape counter, "full is a cut, not a wall", the reel-length kind, sealed `home`/`next` | T-186 | done |
-| [T-188](T-188-splice-docs.md) | DESIGN_DOC/SPEC: the one non-normative sentence if wanted, the §2/§5 rows checked against working code — **last** | T-186, T-187 | todo |
+| [T-188](T-188-splice-docs.md) | DESIGN_DOC/SPEC: the one non-normative sentence if wanted, the §2/§5 rows checked against working code — **last** | T-186, T-187 | done |
 
 ## M17 — the pegboard (the keeper's first real run)
 

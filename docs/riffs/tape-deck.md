@@ -2,6 +2,8 @@
 
 *Research riff, September 2026. The founding prompt is the owner's, in two beats: (1) Spool beside a reactive language like RxJS — streams, pipelines, chains of spools, a spool "run through something" that interprets it however it likes, a network of interpreters that can interpret their interpreter; (2) direction — winding forward, then running the same spool backward through the same interpreter for a different effect, packets that carry an in and an out, rollback without cleanup. This document explores both to their edges and prices what it finds. **It decides nothing.** Nothing here amends SPEC, touches §5, or promises surface; every thread that wants to become real queues at the usual gates (owner sign-off for anything protocol-shaping, parked-with-evidence for SDK surface). It sits beside [spools-of-spools.md](../spools-of-spools.md) and cites it rather than repeating it. Numbers below are measured, not guessed: `scratch/riff-tape-deck/spike.mjs`, run offline and memory-only on the workspace build of `spools` 0.2.0 with the test history tuning, through the exported `Spool`/`SpoolEngine` escape hatches.*
 
+*What shipped (September 2026): identity across a retelling — `splice()` (T-186), the second wanter answered; branch-from-a-moment is a recipe in [docs/SDK-API.md](../SDK-API.md) with §6's two physics notes; undo stays parked with §5's verdict.*
+
 ---
 
 ## 0. The noticing

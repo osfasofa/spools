@@ -18,6 +18,7 @@ same.on('entry', () => render(same.entries))
 
 spool.rewind(ts)    // the spool as it was — read-only time travel
 spool.export()      // a portable JSON file, readable in 2040, yours forever
+spool.splice(recs)  // carry entries into a new spool as themselves — the cut
 ```
 
 - **Encrypted end-to-end.** The key rides in the link's URL fragment (never sent to servers); the relay forwards ciphertext it cannot read — and that's tested, not asserted.

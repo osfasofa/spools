@@ -2,6 +2,8 @@
 
 *Research riff, August 2026. The founding prompt is the owner's: collections of spools, lists of links of spools, spools that refer to each other and form a network — splices, meshes, routing, relays, "spools of spools of spools." This document explores that space to its edges and prices what it finds. **It decides nothing.** Nothing here amends SPEC, touches §5, or promises surface; every thread that wants to become real queues at the usual gates (owner sign-off for anything protocol-shaping, parked-with-evidence for SDK surface). Numbers below are measured, not guessed: `scratch/riff-spools-of-spools/spike.mjs`, run on the shipped `spools@0.1.0` build.*
 
+*What shipped from here (September 2026): the retelling's primitive, `splice()` (T-186), with the fork and the rejoin as recipes in [docs/SDK-API.md](SDK-API.md); everything else stays parked at its gate. The decision is DESIGN_DOC §5 "The splice family".*
+
 ---
 
 ## 0. The noticing

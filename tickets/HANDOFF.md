@@ -1,32 +1,27 @@
 # Handoff — next session
 
-Written 5 Sep 2026 at the sync-up; rewritten as things landed through the night. The block below is the opening prompt. Delete or rewrite this file when it's been used.
+Written 5 Sep 2026 at the sync-up; rewritten as things landed through the night of the 5th–6th. The block below is the opening prompt. Delete or rewrite this file when it's been used.
 
 ```
-Sync-up context: 5–6 Sep 2026. Shipped: spools@0.2.1 and
-spools-keeper@0.2.0 (T-185); T-180 signed off as recommended; T-186 built
-(splice, snapshot, SpoolSpliceError, 13 tests, the recipes, CHANGELOG
-0.3.0 unreleased); T-187 built (the room's cut, the tape counter, the
-reel length, "full is a cut" — smoke 24/24). Nothing new is published or
-deployed: the SDK 0.3.0 publish and the room's gh-pages build are the
-owner's.
+Sync-up context: 6 Sep 2026. M16 is complete: T-180 signed off, T-186
+(splice in the SDK), T-187 (the cut in the room, the tape counter, the
+reel length, "full is a cut"), T-188 (docs; SPEC gained one non-normative
+sentence). T-185 shipped spools@0.2.1 and spools-keeper@0.2.0. Nothing
+newer is published or deployed: spools@0.3.0 (splice) waits for a client
+that needs it from the registry, and the room's gh-pages build is the
+owner's word.
 
-Next for a session: T-188 (tickets/T-188-splice-docs.md) — re-read
-DESIGN_DOC §2 (splice, reel, cut) and §5 "The splice family" against what
-T-186 and T-187 actually shipped and fix wording, never intent; SPEC.md
-gets at most one non-normative sentence about carried identity, only if
-the build found it wanted (T-186's notes say nothing did); a one-line
-pointer in docs/spools-of-spools.md and the two riffs; WHITEPAPER §7's
-"spools grow and don't slim down" gains the cut as the graceful ending.
-T-187's Notes list the decisions the docs should reflect: no `next` on
-the old reel, room:home carries code + relay and never the key, the reel
-length is in messages, bytes are the document's own update size.
+Nothing on the board is unblocked for a headless session. Every open row
+is the owner's: publish 0.3.0 when wanted; deploy the room; T-168's two
+defaults; T-165's address-bar call; T-175, T-177, T-179; T-167 and the
+homepage (T-143, T-174); the hardware rows (T-125, T-176, the room's H1–H6,
+the two-device run of the cut). One lab note waiting on the owner: a
+relay URL without /yjs leaves the SDK in `connecting` forever, silently
+(T-185 Notes) — a one-line check or a doc sentence, owner's call.
 
-Still the owner's: publish spools@0.3.0 when a client needs it (the room
-uses the workspace SDK); deploy the room; T-168's two defaults; T-165's
-address-bar call; T-175, T-177, T-179, T-167 and the homepage; the
-hardware rows. Lab note waiting on the owner: a relay URL without /yjs
-leaves the SDK in `connecting` forever, silently (T-185 Notes).
+If a vessel repo asks for the cut, the recipe is docs/SDK-API.md under
+"splice()"; the room's conventions (reel length in messages, room:home
+without the key, no `next`) are T-187's Notes, prose to copy.
 
 Rules as usual: Notes are the lab notebook, and the
 claude/spools-reactive-programming-092qjz branch is someone else's live

@@ -17,6 +17,14 @@ and [tape-deck.md](tape-deck.md) and cites them rather than repeating them.
 Numbers are measured, not guessed: `scratch/riff-reel/spike.mjs`, offline
 and memory-only on the workspace build of `spools` 0.2.0.*
 
+*What shipped (September 2026): §3's cut and §4's counter — `splice()` in the
+SDK (T-186), and in the room the cut from any message, the tape counter
+against the link's relay, the reel length as a newest-wins custom in
+messages, and "full is a cut, not a wall" (T-187). The decisions are
+DESIGN_DOC §5 "The splice family"; §8's open questions are answered in
+T-187's Notes (by entry; preserved ids; a fraction with the number beside it;
+no `next` on the old reel).*
+
 ---
 
 ## 0. The noticing

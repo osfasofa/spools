@@ -109,6 +109,13 @@ Fields not marked optional are required. An entry from a non-compliant
 writer missing `createdAt` breaks only its own display position (readers
 SHOULD sort it as if `createdAt` were 0); it cannot break sync.
 
+Non-normative: uniqueness is *within* a spool. A writer may carry an entry
+into another spool under the same `id` with its metadata intact (the
+reference SDK's `splice()`, September 2026 — how a new reel is cut from an
+old one), so an `id` names an entry, not one spool's entry; nothing in
+this document assumes ids are spool-local, and a reader that does will be
+surprised.
+
 Metadata fields are plain values (last-write-wins per field). That is
 acceptable because write-once is **normative**: after an entry is created,
 no metadata field may be modified except `deletedAt` (set and removed
