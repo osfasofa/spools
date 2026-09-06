@@ -121,6 +121,47 @@ touching the pocket on either side.
 6. When A returns later, live sync proceeds as always — the pocket only
    ever adds.
 
+### 8. LAN, plain http — two devices, one Wi-Fi, no internet (T-176)
+
+The secure-context landmines. `http://localhost` is a secure context, so
+every scenario above runs with `crypto.randomUUID` and the clipboard API
+present; a page served from `http://192.168.x.x` has neither. This is the
+only row that can't be faked on one machine.
+
+1. On the laptop, find its LAN address (`ipconfig getifaddr en0` on macOS,
+   `hostname -I` on Linux); call it `<ip>`. Turn the internet off (or don't
+   — the point is that nothing below reaches it).
+2. Relay on the laptop: `npx spools-relay` (binds `0.0.0.0:4444` by
+   default — no `HOST` needed). Client on the laptop, from the repo:
+   `cd apps/client && python3 -m http.server 8000` (also `0.0.0.0`). If the
+   SDK changed since the vendor bundle was built, `pnpm client:vendor` first
+   — the bundle must carry `entry.ts`'s `uuid()` fallback, not a bare
+   `crypto.randomUUID()`.
+3. Mint a **keyed** link that pins the LAN relay. The client's own "new
+   spool" pins the cloud default, so make it by hand, from the repo:
+   `node -e "import('./packages/spools/dist/index.js').then(async m=>{const s=await m.newSpool({relay:'ws://<ip>:4444/yjs',persist:false});console.log(s.share(''));await s.leave()})"`
+   — prints `#spool=…&relay=ws%3A%2F%2F<ip>%3A4444%2Fyjs&k=…`. Prepend
+   `http://<ip>:8000/`. (Keyless variant: skip the mint and open
+   `http://<ip>:8000/#spool=<anycode>&relay=ws%3A%2F%2F<ip>%3A4444%2Fyjs`.)
+4. Laptop browser opens that URL **by `<ip>`, not `localhost`** — otherwise
+   the laptop is the secure-context control and proves nothing. Wind one
+   entry. **Expect:** it lands (the `randomUUID` fallback — before T-176 the
+   first wind threw here), status `connected`, `share` shows the link.
+5. Phone on the same Wi-Fi opens the same URL (type it, or long-press the
+   link the laptop shows — this client renders the link as text, so copying
+   is the phone's own select-and-copy, no clipboard API involved). **Expect:**
+   the laptop's entry within seconds, `connected`; wind from the phone,
+   expect it on the laptop. `curl http://<ip>:4444/` → `relay.connections: 2`.
+6. Keyed only: close the laptop tab, wait ~15 s for the deposit debounce,
+   open the link on the phone in a fresh browser (or private window) —
+   **expect** the entries from the pocket, the laptop now being the relay
+   and nothing else.
+7. Reverse control: open `https://` anything (the deployed mixtape) with the
+   same `relay=ws://<ip>…` link. **Expect** it never connects — mixed
+   content, the browser blocks `ws://` from an `https://` page silently.
+   That's why the off-grid client is served over http, and why a cloud
+   client can't join a LAN room.
+
 ## Results — 2026-08-15, pocket variant (M10, T-104), automated: 3/3
 
 | # | Scenario | Result | Measured |

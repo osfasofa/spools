@@ -30,10 +30,10 @@ http, as the brief already plans. Review finding F18.
 - [x] Clients: clipboard fallback (select-the-text + `execCommand('copy')`,
       or show the link with a long-press hint when the API is absent).
       — room + mixtape done (see Notes); `apps/client` is not this lane's.
-- [ ] LAN smoke row in `apps/client/TESTING.md`: `npx spools-relay` on one
+- [x] LAN smoke row in `apps/client/TESTING.md`: `npx spools-relay` on one
       laptop, `python3 -m http.server` for `apps/client` on the same laptop, a
       phone on the same Wi-Fi opens `http://<ip>:8000/#spool=…&relay=ws://<ip>:4444/yjs&k=…`.
-- [ ] Fold the findings into docs/vessels/off-grid.md §2/§3 (the "plain ws://
+- [x] Fold the findings into docs/vessels/off-grid.md §2/§3 (the "plain ws://
       is fine" sentence gets its asterisk).
 
 ## Acceptance criteria
@@ -114,3 +114,21 @@ The ticket stays `doing` until those report.
 *(Merged 3 Sep 2026: both halves landed — the SDK's `uuid()` in `03bf0ec`, the clipboard fallback in `fa7a02d`, and `apps/client/vendor/spools.js` regenerated in the SDK lane's PR. Still open: the LAN row in `apps/client/TESTING.md`, the off-grid brief's asterisk, and the two-device no-internet acceptance — owner at keyboard.)*
 
 *(5 Sep 2026: the deployed mixtape at the gh-pages root now carries the clipboard fallback — it was rebuilt from `main` to close T-160 and had been on a 15 Aug bundle until then. The three items above are unchanged.)*
+
+*(5 Sep 2026, headless — the two doc items.)* `apps/client/TESTING.md` has
+scenario 8: relay and `http.server` on the laptop (both bind `0.0.0.0` by
+default, so no `HOST`), a keyed link minted by hand with `node -e` against
+the built SDK because the reference client's "new spool" pins the cloud
+default, the laptop opening by `<ip>` and not `localhost` (the one way to
+make this row lie), the phone joining, a pocket cold-open, and the reverse
+control — an `https://` client against the LAN `ws://` never connects
+(mixed content). Checked while writing it: the vendored bundle carries the
+`uuid()` fallback (line ~16061), the reference client renders the link as
+text and never calls the clipboard API, so its only landmine was the id.
+`docs/vessels/off-grid.md` §2's "plain ws:// is fine" carries the asterisk
+(wire yes, page no: what http withholds, what the SDK and clients do about
+it, and the mixed-content wall that makes http mandatory for the kit's
+client), and §3's link-ceremony bullet notes that the kit's
+default-to-the-serving-host is the one real client change vs. the
+reference client. Still open: the two-device run itself — owner, hardware.
+Ticket stays `doing`.
