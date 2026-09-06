@@ -147,7 +147,10 @@ class Tab {
 // ---------- scenario plumbing ----------
 
 const results = []
+// ONLY=22,23 runs just those scenarios (the T-187 ones stand alone; most earlier ones chain)
+const only = process.env.ONLY ? new Set(process.env.ONLY.split(',')) : null
 const scenario = async (name, fn) => {
+  if (only && !only.has(name.split('.')[0])) return
   process.stdout.write(`\n▶ ${name}\n`)
   try {
     const detail = await fn()
@@ -1157,6 +1160,184 @@ await scenario('21. a full room says so: the 65th seat sees the line within seco
   await t.close()
   return `64 raw seats; the 65th showed the line ${shownMs} ms after the app was ready; status offline + roomFull true meanwhile; seats freed → connected and the line gone after ${inMs} ms`
 })
+
+// ---------- T-187: the reel — the cut, the tape counter, full is a cut ----------
+
+const reelCode = `reel-room-${String(Math.floor(Math.random() * 1000)).padStart(3, '0')}`
+const reelKey = randomBytes(32).toString('base64url')
+const reelLinkFor = (origin) =>
+  `http://localhost:${origin}/#spool=${reelCode}&relay=${encodeURIComponent(`ws://localhost:${RELAY_PORT}/yjs`)}&k=${reelKey}`
+// real keystrokes into a controlled input, then Enter (the room commits the
+// reel length on Enter → blur) — the composer's idiom, not synthetic events
+const typeInput = async (tab, sel, value) => {
+  await tab.eval(`(() => { const i = document.querySelector(${JSON.stringify(sel)}); i.focus(); i.select() })()`)
+  await tab.call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Backspace', code: 'Backspace', windowsVirtualKeyCode: 8, nativeVirtualKeyCode: 8 })
+  await tab.call('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Backspace', code: 'Backspace', windowsVirtualKeyCode: 8, nativeVirtualKeyCode: 8 })
+  if (value) await tab.call('Input.insertText', { text: value })
+  await tab.call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', text: '\r', windowsVirtualKeyCode: 13 })
+  await tab.call('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 })
+}
+const reelDiag = (tab) =>
+  tab.eval(`JSON.stringify({ reels: window.spool.entries.filter((e) => e.kind === 'room:reel').map((e) => e.body), line: document.querySelector('.tape .tapeLine')?.textContent, input: document.querySelector('#reelLength')?.value, active: document.activeElement?.id })`)
+let r1, r2
+
+await scenario('22. the cut: a new reel from a message on — identity kept, the orphan reply flattened, the orphan reaction dropped, names carried, the old room whole, a cold peer sees the reel', async () => {
+  r1 = await Tab.open(reelLinkFor(ORIGINS[0]))
+  await r1.ready()
+  r2 = await Tab.open(reelLinkFor(ORIGINS[1]))
+  await r2.ready()
+  // the world: four messages, a reply to the first wound after the third, a
+  // reaction on the first and one on the fourth, a hidden message, and a name
+  // a beat between winds: entries wound in one millisecond sort by id, and the
+  // cut is by the SDK's order — the fixture wants that order to be the story's
+  const world = await r1.eval(`(async () => {
+    const seat = localStorage.getItem('spool-seat')
+    const beat = () => new Promise((r) => setTimeout(r, 5))
+    const w = async (input) => { const id = window.spool.wind({ ...input, data: { ...(input.data ?? {}), seat } }).id; await beat(); return id }
+    window.spool.wind({ kind: 'room:profile', body: 'ren', data: { seat, by: seat } })
+    await beat()
+    const one = await w({ kind: 'message', body: 'one' })
+    const two = await w({ kind: 'message', body: 'two' })
+    const hidden = await w({ kind: 'message', body: 'never mind' })
+    const three = await w({ kind: 'message', body: 'three' })
+    const reOne = await w({ kind: 'message', body: 're one', parent: one })
+    const four = await w({ kind: 'message', body: 'four' })
+    const rOne = await w({ kind: 'reaction', body: '👍', parent: one })
+    const rFour = await w({ kind: 'reaction', body: '🔥', parent: four })
+    window.spool.entries.find((e) => e.id === hidden).delete()
+    return { seat, one, two, three, reOne, four, rOne, rFour, hidden }
+  })()`)
+  await r2.until(`document.querySelectorAll('.bubble').length >= 5`, 15_000, 'r2 sees the world')
+  await r1.eval(`navigator.clipboard.writeText = (t) => { localStorage.setItem('__copied', t); return Promise.resolve() }`)
+  // tap "three" → the sheet → the cut → the confirm line → cut
+  await r1.eval(`${bubbleSel('three')}.click()`)
+  await r1.until(`!!document.querySelector('.sheet')`, 5_000, 'sheet opens')
+  await r1.eval(`[...document.querySelectorAll('.sheetAction')].find(el => el.textContent.includes('start a new reel from here')).click()`)
+  await r1.until(`document.querySelector('.cutConfirm')?.textContent.includes('start a new reel from this message on.')`, 5_000, 'the confirm line')
+  const sentenceOk = await r1.eval(`(() => { const t = document.querySelector('.cutConfirm').textContent; return t.includes('replies to what you cut become plain entries') && t.includes('the new reel has no past') && t.includes('the old reel stays whole') && t.includes('your browser may sync this address') })()`)
+  if (!sentenceOk) throw new Error('the confirm line is missing part of the sentence')
+  const cutAt = Date.now()
+  await r1.eval(`[...document.querySelectorAll('.cutConfirm button')].find(el => el.textContent === 'cut').click()`)
+  await r1.until(`!!window.spool && window.spool.code !== '${reelCode}' && location.hash.includes('spool=')`, 30_000, 'the new reel opened')
+  await r1.until(`window.spool.entries.length >= 3`, 10_000, 'the reel has its entries')
+  const reel = await r1.eval(`({
+    code: window.spool.code,
+    link: window.spool.share(),
+    copied: localStorage.getItem('__copied'),
+    entries: window.spool.entries.map((e) => ({ id: e.id, kind: e.kind, parent: e.parent ?? null, body: e.body, data: e.data ?? null })),
+    deleted: window.spool.deleted.length,
+    history: window.spool.history,
+    bubbles: document.querySelectorAll('.bubble').length,
+    came: sessionStorage.getItem('room-came-from'),
+  })`)
+  await r1.eval(`localStorage.removeItem('__copied')`)
+  if (reel.copied !== reel.link) throw new Error(`copied "${reel.copied}" is not the reel's link "${reel.link}"`)
+  if (!decodeURIComponent(reel.link).includes(`relay=ws://localhost:${RELAY_PORT}/yjs`)) throw new Error('the reel left the local relay')
+  const byId = new Map(reel.entries.map((e) => [e.id, e]))
+  const want = { [world.three]: 'three', [world.reOne]: 're one', [world.four]: 'four' }
+  for (const [id, body] of Object.entries(want)) {
+    if (byId.get(id)?.body !== body) throw new Error(`"${body}" did not cross with its id`)
+  }
+  for (const id of [world.one, world.two, world.hidden, world.rOne]) {
+    if (byId.has(id)) throw new Error(`entry ${id} crossed and should not have (before the cut, hidden, or an orphan reaction)`)
+  }
+  if (byId.get(world.reOne).parent !== null) throw new Error('the orphan reply was not flattened')
+  if (byId.get(world.rFour)?.parent !== world.four) throw new Error('the reaction on "four" did not cross with its parent')
+  if (!reel.entries.some((e) => e.kind === 'room:profile' && e.body === 'ren')) throw new Error('the name did not carry')
+  if (!reel.entries.some((e) => e.kind === 'room:home' && e.data?.code === reelCode && !('k' in (e.data ?? {})))) throw new Error('room:home is missing or carries a key')
+  if (reel.deleted !== 0) throw new Error('a hidden message crossed')
+  if (reel.bubbles !== 3) throw new Error(`expected 3 bubbles in the reel, got ${reel.bubbles}`)
+  if (reel.history.some((t) => t < cutAt - 1000)) throw new Error('the reel carries a moment from before the cut')
+  if (reel.came !== null) throw new Error('the arrival flag was not consumed')
+  await r1.until(`!!document.querySelector('.cameFrom')`, 10_000, 'the arrival line')
+  const arrival = await r1.eval(`document.querySelector('.cameFrom').textContent`)
+  if (!arrival.includes('a new reel: 3 messages came along, 1 reply became plain entries; rewind starts here.')) throw new Error(`arrival line: ${arrival}`)
+  if (!arrival.includes('your old room is still on this device.') || !arrival.includes('the new link is copied')) throw new Error(`arrival line: ${arrival}`)
+  // settings says where it was cut from
+  await r1.eval(`document.querySelector('.headerTitle').click()`)
+  await r1.until(`document.querySelector('.tape')?.textContent.includes('cut from ${reelCode}')`, 5_000, 'settings names the home reel')
+  await r1.eval(`[...document.querySelectorAll('button')].find(el => el.getAttribute('aria-label') === 'Back').click()`)
+  // the old room is whole on r2, and reopens on r1's origin from its own database
+  const oldCount = await r2.eval(`window.spool.entries.filter((e) => e.kind === 'message').length`)
+  if (oldCount !== 5) throw new Error(`the old room changed: ${oldCount} live messages`)
+  const old = await Tab.open(reelLinkFor(ORIGINS[0]))
+  await old.until(`document.querySelectorAll('.bubble').length >= 5`, 15_000, 'the old room reopens from its link')
+  await old.close()
+  // a cold peer on a third origin opens the reel from the pocket
+  const cold = await Tab.open(`http://localhost:${ORIGINS[2]}/${reel.link.slice(reel.link.indexOf('#'))}`)
+  await cold.until(`document.querySelectorAll('.bubble').length === 3`, 20_000, 'a cold peer sees the reel')
+  const coldIds = await cold.eval(`window.spool.entries.filter((e) => e.kind === 'message').map((e) => e.id)`)
+  if (JSON.stringify(coldIds) !== JSON.stringify([world.three, world.reOne, world.four])) throw new Error(`cold peer's ids: ${coldIds}`)
+  if (cold.errors.length || r1.errors.length || r2.errors.length) throw new Error(`page errors: ${[...cold.errors, ...r1.errors, ...r2.errors].join(' | ')}`)
+  await cold.close()
+  return `reel ${reel.code}: three/re one/four crossed with their ids, the reply flattened, the orphan reaction dropped, the hidden one stayed, the name carried, room:home without a key, history from the cut, arrival line, old room whole (5 live), cold peer converged`
+})
+
+await scenario("23. the tape counter reads the relay's cap, and the reel length is a newest-wins custom", async () => {
+  // r2 is still in the old room; r1 is in the new reel — both on the local relay
+  await r2.eval(`document.querySelector('.headerTitle').click()`)
+  const n = await r2.eval(`window.spool.entries.filter((e) => e.kind === 'message').length`)
+  await r2.until(`document.querySelector('.tape .tapeLine')?.textContent.includes(' · ${n} messages')`, 10_000, `the counter measured ${n} messages (line: ' + document.querySelector('.tape .tapeLine')?.textContent + ')`)
+  const line = await r2.eval(`document.querySelector('.tape .tapeLine').textContent`)
+  if (!/^\d[\d.]* [KM]B of 8\.00 MB · \d+ messages$/.test(line)) throw new Error(`tape line: "${line}"`)
+  const health = await (await fetch(`http://127.0.0.1:${RELAY_PORT}/`)).json()
+  if (health.pocket.maxBytes !== 8 * 1024 * 1024) throw new Error(`the local relay advertises ${health.pocket.maxBytes}`)
+  const caption = await r2.eval(`document.querySelector('.tape').textContent`)
+  if (!caption.includes('full is a cut, not a wall')) throw new Error('the counter is missing its sentence')
+  if (!caption.includes('a custom, not a lock')) throw new Error('the reel length is missing its advisory')
+  // set the custom on r2 (named "rio" first); a third tab on the old room sees it, newest-wins, with the setter's name
+  await r2.eval(`(() => { const seat = localStorage.getItem('spool-seat'); window.spool.wind({ kind: 'room:profile', body: 'rio', data: { seat, by: seat } }) })()`)
+  await typeInput(r2, '#reelLength', '5')
+  try {
+    await r2.until(`document.querySelector('.tape .tapeLine').textContent.includes('messages of 5')`, 5_000, 'the custom shows on r2')
+  } catch (err) {
+    throw new Error(`${err.message} — ${await reelDiag(r2)}`)
+  }
+  const peer = await Tab.open(reelLinkFor(ORIGINS[2]))
+  await peer.ready()
+  await peer.eval(`document.querySelector('.headerTitle').click()`)
+  await peer.until(`document.querySelector('.tape')?.textContent.includes('messages of 5') && document.querySelector('.tape').textContent.includes('set by rio')`, 15_000, 'the custom arrives with its setter')
+  if (await peer.eval(`!!document.querySelector('.tapeFill.over')`)) throw new Error('5 messages of a 5-message reel reads over')
+  await peer.eval(`window.spool.wind({ kind: 'message', body: 'six', data: { seat: localStorage.getItem('spool-seat') } })`)
+  await peer.until(`!!document.querySelector('.tapeFill.over')`, 10_000, 'the sixth message tips the bar')
+  // clear the custom from the peer: an empty body is a clear, newest wins
+  await typeInput(peer, '#reelLength', '')
+  await r2.until(`!document.querySelector('.tape .tapeLine').textContent.includes(' of 5')`, 15_000, 'the clear arrives on r2')
+  if (peer.errors.length || r2.errors.length) throw new Error(`page errors: ${[...peer.errors, ...r2.errors].join(' | ')}`)
+  await peer.close()
+  return `"${line}" against the relay's advertised 8 MiB; custom 5 set by rio seen on a third tab, over at six, cleared newest-wins`
+})
+
+await scenario("24. full is a cut, not a wall: a room that outgrows its relay's pocket is offered the cut", async () => {
+  // a relay with a tiny pocket cap: the first deposit after the room passes it
+  // comes back 413, the SDK latches too-big, and the line offers the cut
+  const smallPort = RELAY_PORT + 1
+  const small = spawn(process.execPath, [new URL('../../packages/spools-relay/server.js', here).pathname], {
+    stdio: ['ignore', 'pipe', 'inherit'],
+    env: { ...process.env, PORT: String(smallPort), HOST: '127.0.0.1', POCKET_MAX_BYTES: '1500' },
+  })
+  await new Promise((resolve) => small.stdout.once('data', resolve))
+  try {
+    const link = `http://localhost:${ORIGINS[2]}/#spool=small-reel-${String(Math.floor(Math.random() * 1000)).padStart(3, '0')}&relay=${encodeURIComponent(`ws://localhost:${smallPort}/yjs`)}&k=${keyB64}`
+    const t = await Tab.open(link)
+    await t.ready()
+    await t.eval(`(() => { const seat = localStorage.getItem('spool-seat'); for (let i = 0; i < 12; i++) window.spool.wind({ kind: 'message', body: 'a message long enough to matter, number ' + i, data: { seat } }) })()`)
+    await t.eval(`document.querySelector('.headerTitle').click()`)
+    await t.until(`document.querySelector('.tape')?.textContent.includes('of 1.5 KB')`, 10_000, "the counter reads the small relay's cap")
+    await t.until(`!!document.querySelector('.tapeFill.over')`, 10_000, 'the bar reads over past the cap')
+    await t.eval(`[...document.querySelectorAll('button')].find(el => el.getAttribute('aria-label') === 'Back').click()`)
+    const ms = await t.until(`document.querySelector('.notice.warn')?.textContent.includes("outgrown the relay's pocket") && document.querySelector('.notice.warn').textContent.includes('full is a cut, not a wall')`, 40_000, 'the too-big line offers the cut')
+    if (t.errors.length) throw new Error(`page errors: ${t.errors.join(' | ')}`)
+    await t.close()
+    return `cap 1.5 KB read from the small relay, the bar over, the too-big line with the cut offered after ${ms} ms`
+  } finally {
+    small.kill('SIGKILL')
+  }
+})
+
+await r1?.close()
+await r2?.close()
+
 
 await a?.close()
 await b?.close()

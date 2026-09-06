@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { DEFAULT_RELAY, buildSpoolLink, generateCode, parseSpoolLink, stash, type Spool } from 'spools'
+import { DEFAULT_RELAY, buildSpoolLink, generateCode, openSpool, parseSpoolLink, stash, type Spool } from 'spools'
+import { encodeStateAsUpdate } from 'yjs'
 import { ActionSheet } from './ActionSheet'
 import { Arrival } from './Arrival'
 import { drawFavicon, pageTitle } from './badge'
@@ -12,6 +13,17 @@ import { nameFor, participants, profileTable, renamedByFor, type Profile } from 
 import { THEMES, applyTheme, currentTheme } from './theme'
 import { usePresence } from './usePresence'
 import { useRoom } from './useRoom'
+import {
+  CUT_SENTENCE,
+  FULL_IS_A_CUT,
+  HOME_KIND,
+  REEL_KIND,
+  REEL_LENGTH_ADVISORY,
+  fetchRelayCap,
+  formatBytes,
+  reelLength,
+  selectCut,
+} from './reel'
 
 /**
  * The shell: header → notices → feed (through the <MessageList> boundary,
@@ -109,6 +121,11 @@ const Settings = ({
   onToggleNotifText,
   onForget,
   onNewRoom,
+  tape,
+  relayCap,
+  reel,
+  onSetReelLength,
+  cutFrom,
   onBack,
 }: {
   spool: Spool
@@ -128,8 +145,34 @@ const Settings = ({
   onForget: () => void
   /** a fresh keyed room on the same relay, its link copied — the only remedy against a bad actor (T-164) */
   onNewRoom: () => void
+  /** the tape counter (T-187): the document's bytes and the conversation's message count, measured on a debounce */
+  tape: { bytes: number; messages: number } | null
+  /** the relay's advertised deposit cap — the reel length in practice; null: not advertised / not reached yet */
+  relayCap: number | null
+  /** the room's own soft length in messages, newest `room:reel` wins, and who set it */
+  reel: { messages: number; by: string } | null
+  onSetReelLength: (messages: number | null) => void
+  /** the code this reel was cut from, when it was */
+  cutFrom: string | null
   onBack: () => void
 }) => {
+  const [reelDraft, setReelDraft] = useState<string>(reel ? String(reel.messages) : '')
+  const commitReel = () => {
+    const n = Number(reelDraft.trim())
+    if (reelDraft.trim() === '') {
+      if (reel) onSetReelLength(null)
+      return
+    }
+    if (!Number.isFinite(n) || n <= 0) {
+      setReelDraft(reel ? String(reel.messages) : '')
+      return
+    }
+    if (!reel || Math.floor(n) !== reel.messages) onSetReelLength(Math.floor(n))
+  }
+  const overCap = tape !== null && relayCap !== null && tape.bytes > relayCap
+  const overReel = tape !== null && reel !== null && tape.messages > reel.messages
+  const fraction =
+    tape === null ? 0 : Math.max(relayCap ? tape.bytes / relayCap : 0, reel ? tape.messages / reel.messages : 0)
   const [copied, setCopied] = useState(false)
   // T-163 keepsake: export is a plain file download; forget is the one hard
   // delete in the system and owes confirm-twice ceremony (stash docstring) —
@@ -318,6 +361,40 @@ const Settings = ({
             forget it below.
           </div>
         </section>
+        <section className="settingsSection tape">
+          <div className="sectionLabel">the reel</div>
+          <div className="tapeLine">
+            {tape === null
+              ? 'measuring…'
+              : `${formatBytes(tape.bytes)}${relayCap !== null ? ` of ${formatBytes(relayCap)}` : ''} · ${tape.messages.toLocaleString()} message${tape.messages === 1 ? '' : 's'}${reel ? ` of ${reel.messages.toLocaleString()}` : ''}`}
+          </div>
+          <div className="tapeBar" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.min(100, Math.round(fraction * 100))}>
+            <div className={`tapeFill ${overCap || overReel ? 'over' : ''}`} style={{ width: `${Math.min(100, fraction * 100)}%` }} />
+          </div>
+          <div className="caption">
+            {relayCap !== null
+              ? `the relay this link names carries at most ${formatBytes(relayCap)} per copy — that is how long a reel can be here. `
+              : 'this relay advertises no cap, so only its people know how long a reel can be here. '}
+            {FULL_IS_A_CUT}
+          </div>
+          {cutFrom ? <div className="caption mono">cut from {cutFrom}</div> : null}
+          <label className="caption" htmlFor="reelLength">
+            reel length, in messages{reel ? ` — set by ${reel.by}` : ''}
+          </label>
+          <input
+            id="reelLength"
+            className="reelInput"
+            inputMode="numeric"
+            placeholder="no custom"
+            value={reelDraft}
+            onChange={(ev) => setReelDraft(ev.currentTarget.value)}
+            onBlur={commitReel}
+            onKeyDown={(ev) => {
+              if (ev.key === 'Enter') ev.currentTarget.blur()
+            }}
+          />
+          <div className="caption">{REEL_LENGTH_ADVISORY}</div>
+        </section>
         <section className="settingsSection">
           <div className="sectionLabel">keepsake</div>
           <button className="copyBtn" onClick={exportRoom}>
@@ -417,6 +494,81 @@ export const App = () => {
     setNamePromptDismissed(true)
   }
 
+  // T-187: the cut. A message's action sheet offers "start a new reel from
+  // here"; the confirm line carries the sentence; the tap on "cut" mints the
+  // link and copies it synchronously (T-164's Safari lesson), then the new
+  // reel is opened *in this page* long enough to splice the selection and
+  // leave — persistence writes it to this device and leave() deposits it to
+  // the pocket — and the fragment change opens it as any room. The one
+  // deviation from T-164's "no second Spool ever lives in this page": a
+  // second one lives for about a second, and is left before navigation.
+  const [cutFrom, setCutFrom] = useState<Rec | null>(null)
+  const [cutState, setCutState] = useState<{ phase: 'idle' } | { phase: 'working' } | { phase: 'failed'; message: string }>({
+    phase: 'idle',
+  })
+  const startNewReel = (from: Rec) => {
+    if (!spool) return
+    const relay = parseSpoolLink(spool.share()).relay ?? DEFAULT_RELAY
+    const link = buildSpoolLink({ code: generateCode(), relay, key: crypto.getRandomValues(new Uint8Array(32)) })
+    const copying = copyText(link) // synchronous first step, inside the tap (T-176)
+    setCutState({ phase: 'working' })
+    void (async () => {
+      const selection = selectCut(spool.entries, from.id)
+      if (!selection) throw new Error('that message is no longer in the room')
+      const reel = await openSpool(link, { author })
+      try {
+        reel.splice(selection.records)
+        // where this reel came from — code and relay, never the key (the
+        // pointer must not hand the key; the old reel's people already hold it)
+        reel.wind({ kind: HOME_KIND, data: { code: spool.code, relay, seat: SEAT } })
+      } finally {
+        await reel.leave() // closes this page's copy; deposits to the pocket; the database stays
+      }
+      const copied = await copying
+      try {
+        sessionStorage.setItem(
+          'room-came-from',
+          JSON.stringify({ code: spool.code, copied, cut: { kept: selection.kept, flattened: selection.flattened } })
+        )
+      } catch {
+        // no sessionStorage: the arrival notice is a courtesy, not a gate
+      }
+      location.href = link // a fragment change — main.tsx's hashchange reload opens it
+    })().catch((err: unknown) => {
+      setCutState({ phase: 'failed', message: err instanceof Error ? err.message : String(err) })
+    })
+  }
+
+  // the tape counter (T-187): bytes are the document's own update size, the
+  // physics every transport pays; measured on a debounce because encoding a
+  // 5 000-message room costs milliseconds, not microseconds
+  const [tape, setTape] = useState<{ bytes: number; messages: number } | null>(null)
+  useEffect(() => {
+    if (!spool) return
+    const measure = () =>
+      setTape({
+        bytes: encodeStateAsUpdate(spool.doc).byteLength,
+        messages: spool.entries.filter((e) => e.kind === 'message').length,
+      })
+    const t = setTimeout(measure, tape === null ? 0 : 2000)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [spool, entries])
+  // the cap comes from the relay the link names — never a constant
+  const [relayCap, setRelayCap] = useState<number | null>(null)
+  useEffect(() => {
+    if (!spool) return
+    const relay = parseSpoolLink(spool.share()).relay
+    if (!relay) return
+    let alive = true
+    void fetchRelayCap(relay).then((cap) => {
+      if (alive) setRelayCap(cap)
+    })
+    return () => {
+      alive = false
+    }
+  }, [spool])
+
   const [inviteCopied, setInviteCopied] = useState(false)
   /** the link shown in the feed when no copy path worked (T-176) */
   const [copyFallback, setCopyFallback] = useState<string | null>(null)
@@ -455,13 +607,21 @@ export const App = () => {
   }
   // …and the arrival on the other side: one notice, consumed on read so a
   // reload never repeats it
-  const [cameFrom, setCameFrom] = useState<{ code: string; copied: boolean } | null>(() => {
+  const [cameFrom, setCameFrom] = useState<{
+    code: string
+    copied: boolean
+    cut: { kept: number; flattened: number } | null
+  } | null>(() => {
     try {
       const raw = sessionStorage.getItem('room-came-from')
       if (!raw) return null
       sessionStorage.removeItem('room-came-from')
-      const parsed = JSON.parse(raw) as { code?: unknown; copied?: unknown }
-      return typeof parsed.code === 'string' ? { code: parsed.code, copied: parsed.copied === true } : null
+      const parsed = JSON.parse(raw) as { code?: unknown; copied?: unknown; cut?: { kept?: unknown; flattened?: unknown } }
+      const cut =
+        parsed.cut && typeof parsed.cut.kept === 'number' && typeof parsed.cut.flattened === 'number'
+          ? { kept: parsed.cut.kept, flattened: parsed.cut.flattened }
+          : null
+      return typeof parsed.code === 'string' ? { code: parsed.code, copied: parsed.copied === true, cut } : null
     } catch {
       return null
     }
@@ -548,6 +708,19 @@ export const App = () => {
   const profiles = useMemo(() => profileTable(entries), [entries])
   const seats = useMemo(() => participants(entries, SEAT), [entries])
   const resolveName = (seat: string) => nameFor(profiles, seat)
+
+  // the reel's own soft length (T-187): newest `room:reel` wins, like the
+  // room name; the setter's seat resolves through the profile table
+  const reelCustom = useMemo(() => {
+    const r = reelLength(entries)
+    return r ? { messages: r.messages, by: r.seat ? resolveName(r.seat) : 'someone' } : null
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entries])
+  const homeCode = useMemo(() => {
+    let code: string | null = null
+    for (const e of entries) if (e.kind === HOME_KIND && typeof e.data?.code === 'string') code = e.data.code
+    return code
+  }, [entries])
 
   // the shared room name (T-122): newest room:name entry wins; the entry's
   // seat is the free audit trail
@@ -779,6 +952,11 @@ export const App = () => {
         }}
         onForget={() => void forgetRoom()}
         onNewRoom={startNewRoom}
+        tape={tape}
+        relayCap={relayCap}
+        reel={reelCustom}
+        onSetReelLength={(n) => void spool.wind({ kind: REEL_KIND, body: n === null ? '' : String(n), data: { seat: SEAT } })}
+        cutFrom={homeCode}
         onBack={() => setView('room')}
       />
     )
@@ -847,7 +1025,7 @@ export const App = () => {
       {pocket?.depositError ? (
         <div className="notice warn">
           {pocket.depositError === 'too-big'
-            ? "this room has outgrown the relay's pocket — syncing live-only now."
+            ? `this room has outgrown the relay's pocket — syncing live-only now. ${FULL_IS_A_CUT}`
             : "the relay's pocket is full — syncing live-only now."}
         </div>
       ) : null}
@@ -895,9 +1073,39 @@ export const App = () => {
           </button>
         </div>
       ) : null}
+      {cutFrom ? (
+        <div className="noticeRow cutConfirm">
+          <div className="notice">
+            {cutState.phase === 'working'
+              ? 'cutting a new reel…'
+              : cutState.phase === 'failed'
+                ? `couldn't cut: ${cutState.message}. nothing changed.`
+                : `${CUT_SENTENCE} ${KEY_TRAVELS}`}
+            {cutState.phase !== 'working' ? (
+              <div className="noticeActions">
+                <button className="copyBtn" onClick={() => startNewReel(cutFrom)}>
+                  cut
+                </button>
+                <button
+                  className="copyBtn"
+                  onClick={() => {
+                    setCutFrom(null)
+                    setCutState({ phase: 'idle' })
+                  }}
+                >
+                  keep going
+                </button>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
       {cameFrom ? (
         <div className="noticeRow cameFrom">
           <div className="notice">
+            {cameFrom.cut
+              ? `a new reel: ${cameFrom.cut.kept.toLocaleString()} message${cameFrom.cut.kept === 1 ? '' : 's'} came along${cameFrom.cut.flattened ? `, ${cameFrom.cut.flattened} repl${cameFrom.cut.flattened === 1 ? 'y' : 'ies'} became plain entries` : ''}; rewind starts here. `
+              : ''}
             your old room is still on this device.{' '}
             {cameFrom.copied
               ? `the new link is copied — hand it only to the people you want. ${KEY_TRAVELS}`
@@ -981,6 +1189,15 @@ export const App = () => {
                         run: () => {
                           setEditTarget(null)
                           setReplyTo(sheetFor)
+                        },
+                      },
+                      {
+                        // the cut (T-187): a new reel from this message on;
+                        // the confirm line carries the sentence
+                        label: '✂ start a new reel from here',
+                        run: () => {
+                          setCutState({ phase: 'idle' })
+                          setCutFrom(sheetFor)
                         },
                       },
                       // affordance is own-only; the protocol can't enforce it
