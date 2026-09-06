@@ -473,7 +473,7 @@ const Settings = ({
 
 export const App = () => {
   const [author] = useState(() => localStorage.getItem('spool-author') || 'anonymous')
-  const { spool, entries, status, undecryptable, pocket, peers, openedEmpty, roomFull, fullReason, error } = useRoom(author)
+  const { spool, entries, status, undecryptable, pocket, peers, openedEmpty, roomFull, fullReason, bareOpen, error } = useRoom(author)
   const [view, setView] = useState<'room' | 'settings'>('room')
 
   // the arrival overlay runs exactly once, and only when the room opened
@@ -1009,7 +1009,15 @@ export const App = () => {
             : 'this room is full — the relay holds 64 connections per room and every one is taken. When someone leaves, this tab tries again on its own (about every half minute).'}
         </div>
       ) : null}
-      {undecryptable > 0 ? (
+      {bareOpen ? (
+        // a keyless open can't count sealed frames, so the line rides the
+        // fact it can know: the link had no key and this device never held
+        // the room (T-165)
+        <div className="notice warn bareOpen">
+          this link has no key, and this device never held this room. if the room is keyed, nothing here can be
+          read — open the full link someone handed you.
+        </div>
+      ) : undecryptable > 0 ? (
         <div className="notice warn">
           someone in this room isn't on your key — {undecryptable} frame
           {undecryptable === 1 ? '' : 's'} ignored.

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { newSpool, openSpool, type Entry, type PocketState, type Spool, type SpoolStatus } from 'spools'
+import { newSpool, openSpool, stash, type Entry, type PocketState, type Spool, type SpoolStatus } from 'spools'
 
 export interface RoomState {
   spool: Spool | null
@@ -16,7 +16,36 @@ export interface RoomState {
   roomFull: boolean
   /** the relay's close reason on the last refusal — "room full" or "too many connections from this address" */
   fullReason: string | null
+  /** the link had no key and the stash had never held this room — it opened keyless, and a keyed room's frames will be ignored (T-165) */
+  bareOpen: boolean
   error: string | null
+}
+
+/**
+ * Where the key goes (T-165, option C — DESIGN_DOC §5 "The address bar"):
+ * the browser syncs its address bar to its maker, so the bar drops `k=`
+ * once the stash confirms it holds the full link for this room, and a bare
+ * link (a bookmark, a reload, a synced tab) reopens through the stash. Only
+ * once the stash confirms: a device whose storage swallowed the write keeps
+ * the key in the bar, because that bar is then the only place it lives.
+ */
+const resolveHandedLink = async (): Promise<{ link: string; bare: boolean }> => {
+  const params = new URLSearchParams(location.hash.slice(1))
+  const code = params.get('spool')
+  if (code && !params.get('k')) {
+    const row = (await stash.list()).find((r) => r.code === code)
+    if (row?.link) return { link: row.link, bare: false } // the stash knows this room; its link carries the key
+    return { link: location.href, bare: true } // never held here: opens keyless, and the room says so
+  }
+  return { link: location.href, bare: false }
+}
+const hideKeyOnceStashed = async (code: string): Promise<void> => {
+  const params = new URLSearchParams(location.hash.slice(1))
+  if (!params.get('k')) return
+  const row = (await stash.list()).find((r) => r.code === code)
+  if (!row?.link || !/[#&]k=/.test(row.link)) return // not confirmed: the bar keeps the key
+  params.delete('k')
+  history.replaceState(null, '', `${location.pathname}${location.search}#${params.toString()}`)
 }
 
 /**
@@ -36,6 +65,7 @@ export const useRoom = (author: string): RoomState => {
     openedEmpty: false,
     roomFull: false,
     fullReason: null,
+    bareOpen: false,
     error: null,
   })
 
@@ -52,8 +82,9 @@ export const useRoom = (author: string): RoomState => {
         // self-hosted relay, and staying on it is what its people expect —
         // the canonical relay is only ever the default, never a redirect
         const relay = new URLSearchParams(location.hash.slice(1)).get('relay')
-        const spool = handed
-          ? await openSpool(location.href, { author })
+        const resolved = handed ? await resolveHandedLink() : null
+        const spool = resolved
+          ? await openSpool(resolved.link, { author })
           : await newSpool({ author, ...(relay && /^wss?:\/\//.test(relay) ? { relay } : {}) })
         if (!alive) {
           void spool.leave() // strict-mode double-mount or fast unmount
@@ -66,6 +97,8 @@ export const useRoom = (author: string): RoomState => {
         const openedEmpty = spool.entries.length === 0
         setState((s) => ({ ...s, openedEmpty }))
         if (!handed) history.replaceState(null, '', spool.share())
+        setState((s) => ({ ...s, bareOpen: resolved?.bare ?? false }))
+        void hideKeyOnceStashed(spool.code)
         // the torture harnesses drive the app through this (T-104 idiom)
         ;(window as unknown as { spool?: Spool }).spool = spool
         // roomFull rides every sync from the getter: the relay completes the

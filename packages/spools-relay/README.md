@@ -108,8 +108,8 @@ POCKET_DIR=/data/pocket npx spools-relay
 | `POCKET_MAX_BYTES` | `8388608` | per-deposit cap (413 above it) |
 | `POCKET_MAX_TOTAL_BYTES` | `1073741824` | relay-wide budget. Eviction order: namespaces nobody has ever collected go first (oldest among them), then the stalest-touched; 507 when even that can't fit it |
 | `POCKET_PUTS_PER_MIN` | `24` | per-IP deposit admission (clients self-pace to ~1/min each, so this is ~24 sustained same-NAT devices) |
-| `POCKET_NEW_NAMESPACES_PER_HOUR` | `0` *(off)* | per-IP cap on *new* namespaces (429 "too many new namespaces" past it; deposits into an existing namespace don't count, nor do refused ones). **Enable together with `TRUST_PROXY`** behind a proxy |
-| `POCKET_FIRST_MAX_BYTES` | `= POCKET_MAX_BYTES` | per-deposit cap for a namespace nobody has collected yet (413 above it); after its first read, `POCKET_MAX_BYTES` applies. Equal to it by default — no change until a canonical value is signed off |
+| `POCKET_NEW_NAMESPACES_PER_HOUR` | `0` *(off)* | per-IP cap on *new* namespaces (429 "too many new namespaces" past it; deposits into an existing namespace don't count, nor do refused ones). **Enable together with `TRUST_PROXY`** behind a proxy. The canonical relay runs `60` (T-168, Sep 2026) |
+| `POCKET_FIRST_MAX_BYTES` | `= POCKET_MAX_BYTES` | per-deposit cap for a namespace nobody has collected yet (413 above it); after its first read, `POCKET_MAX_BYTES` applies. Equal to it by default, and the canonical relay leaves it there (T-168, Sep 2026): a spool built alone and shared later would otherwise deposit nothing until its first read |
 
 In disk mode the read count is a `.reads` file beside a namespace's
 deposits — a plain number, never inside a deposit — restored at boot, so

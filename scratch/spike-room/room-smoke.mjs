@@ -1335,6 +1335,60 @@ await scenario("24. full is a cut, not a wall: a room that outgrows its relay's 
   }
 })
 
+// ---------- T-165 (C): the address bar drops the key once the stash holds it ----------
+
+await scenario('25. the address bar drops the key once the stash holds it; a bare link reopens through the stash; blocked storage keeps the key in the bar; a never-held bare link says so', async () => {
+  const c165 = `key-bar-${String(Math.floor(Math.random() * 1000)).padStart(3, '0')}`
+  const k165 = randomBytes(32).toString('base64url')
+  const full = `http://localhost:${ORIGINS[0]}/#spool=${c165}&relay=${encodeURIComponent(`ws://localhost:${RELAY_PORT}/yjs`)}&k=${k165}`
+  const t = await Tab.open(full)
+  await t.ready()
+  await t.eval(`window.spool.wind({ kind: 'message', body: 'kept on this device', data: { seat: localStorage.getItem('spool-seat') } })`)
+  await t.until(`!location.hash.includes('k=')`, 5_000, 'the bar dropped the key')
+  const bar = await t.eval(`({ hash: location.hash, share: window.spool.share(''), row: JSON.parse(localStorage.getItem('spools:stash'))['${c165}']?.link })`)
+  if (!bar.hash.includes(`spool=${c165}`) || !bar.hash.includes('relay=')) throw new Error(`the bar lost more than the key: ${bar.hash}`)
+  if (!bar.share.includes(`k=${k165}`)) throw new Error('share() no longer carries the key')
+  if (!bar.row?.includes(`k=${k165}`)) throw new Error('the stash row does not hold the full link')
+  // a reload is a bare link now: it must reopen keyed, through the stash
+  await t.eval(`location.reload()`)
+  await sleep(500)
+  await t.ready()
+  await t.until(`document.querySelectorAll('.bubble').length === 1`, 15_000, 'reopened from the bare link with its content')
+  const again = await t.eval(`({ fp: window.spool.keyFingerprint, share: window.spool.share(''), hash: location.hash, bare: !!document.querySelector('.notice.bareOpen') })`)
+  if (!again.fp || !again.share.includes(`k=${k165}`)) throw new Error('the reload did not reopen keyed')
+  if (again.hash.includes('k=')) throw new Error('the bar carries the key again after reload')
+  if (again.bare) throw new Error('the room called a stashed reopen a bare open')
+  await t.close()
+  // blocked storage: the registry write is swallowed → the guard keeps the key in the bar
+  const c2 = `key-jar-${String(Math.floor(Math.random() * 1000)).padStart(3, '0')}`
+  const full2 = `http://localhost:${ORIGINS[1]}/#spool=${c2}&relay=${encodeURIComponent(`ws://localhost:${RELAY_PORT}/yjs`)}&k=${k165}`
+  const blocked = await Tab.open(full2, { patch: `const set = Storage.prototype.setItem; Storage.prototype.setItem = function (k, v) { if (k === 'spools:stash') return; return set.call(this, k, v) }` })
+  await blocked.ready()
+  await sleep(1_500)
+  if (!(await blocked.eval(`location.hash.includes('k=')`))) throw new Error('blocked storage: the bar dropped the key with nowhere else to keep it')
+  await blocked.close()
+  // a bare link for a room this device never held opens keyless and says so —
+  // the keyed peer's frames are ignored, and the line names the reason
+  const holder = await Tab.open(full2.replace(`${ORIGINS[1]}`, `${ORIGINS[0]}`))
+  await holder.ready()
+  await holder.eval(`window.spool.wind({ kind: 'message', body: 'sealed', data: { seat: localStorage.getItem('spool-seat') } })`)
+  const stranger = await Tab.open(`http://localhost:${ORIGINS[2]}/#spool=${c2}&relay=${encodeURIComponent(`ws://localhost:${RELAY_PORT}/yjs`)}`)
+  await stranger.ready()
+  await holder.eval(`window.spool.wind({ kind: 'message', body: 'still sealed', data: { seat: localStorage.getItem('spool-seat') } })`)
+  await stranger.until(`document.querySelector('.notice.bareOpen')?.textContent.includes('this link has no key, and this device never held this room')`, 15_000, 'the bare-open line')
+  const strangerSaw = await stranger.eval(`document.querySelectorAll('.bubble').length`)
+  if (strangerSaw !== 0) throw new Error(`a keyless open rendered ${strangerSaw} sealed messages`)
+  // the stranger's only errors are y-websocket failing to decode sealed frames
+  // ("Unable to compute message") — that is the physics the line describes
+  const strange = stranger.errors.filter((e) => !/Unable to compute message/.test(e))
+  if (t.errors.length || blocked.errors.length || holder.errors.length || strange.length) throw new Error(`page errors: ${[...t.errors, ...blocked.errors, ...holder.errors, ...strange].join(' | ')}`)
+  if (stranger.errors.length === 0) throw new Error('the keyless open received no sealed frames to fail on — the scenario proved nothing')
+  await holder.close()
+  await stranger.close()
+  return `bar reads #spool=…&relay=… with no k=; share() and the stash row keep it; reload reopened keyed with its content; blocked storage kept k= in the bar; a never-held bare link opened keyless with the honest line and 0 sealed messages shown`
+})
+
+
 await r1?.close()
 await r2?.close()
 

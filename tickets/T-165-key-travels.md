@@ -1,7 +1,7 @@
 ---
 id: T-165
 title: "Where the key actually goes: the sync/messenger sentence, and the address-bar decision — sign-off"
-status: doing
+status: done
 milestone: M15
 depends: []
 ---
@@ -29,7 +29,7 @@ already stores the full link in localStorage, deliberately. Review finding F6.
       WHITEPAPER §7 and the SDK README's honesty bullet.
       — **done**: room (fine print, every "link copied" moment, the
       Settings link caption), WHITEPAPER §7, SDK README (5 Sep 2026).
-- [ ] The decision (**sign-off**), trade-offs written here for the owner:
+- [x] The decision (**sign-off**) — **C**, 6 Sep 2026, trade-offs written here for the owner:
       - **A. Keep the key in the address bar** (status quo). Copying from the
         URL bar works; history/tab/bookmark sync carries the key.
       - **B. Strip `k=` after open** (`replaceState` to `#spool=<code>`). The
@@ -40,7 +40,7 @@ already stores the full link in localStorage, deliberately. Review finding F6.
       - **C. Strip only once the stash confirms it holds the key.** B's
         protection with a guard against losing a room on a device whose
         storage is blocked.
-- [ ] Record the choice + why in DESIGN_DOC §5; SPEC stays untouched (the
+- [x] Record the choice + why in DESIGN_DOC §5; SPEC stays untouched (the
       link grammar doesn't move).
 
 ## Acceptance criteria
@@ -83,3 +83,28 @@ already stores the full link in localStorage, deliberately. Review finding F6.
   says "never sent to servers"; left as is, the honesty clause right below
   it now says whose. Only the A/B/C decision and the §5 row remain — the
   owner's. Ticket stays `doing`.
+- **Decided and shipped, 6 Sep 2026: option C.** Both hooks (`useRoom.ts`,
+  the mixtape's `useSpool.ts` — copied prose) gained two functions: a bare
+  link (`spool=` without `k=`) resolves through `stash.list()` to the row's
+  full link before `openSpool`; after open, the bar drops `k=` only if the
+  stash row holds a link with a key (`history.replaceState`, which never
+  fires `hashchange`, so main.tsx's reload listener stays quiet). The bar
+  keeps `#spool=<code>&relay=…` so the bare-URL fallbacks (forget, new
+  room) still know the relay. The room exposes `bareOpen` and, when a
+  never-held bare link opens, shows "this link has no key, and this device
+  never held this room. if the room is keyed, nothing here can be read —
+  open the full link someone handed you." — unconditionally, because a
+  keyless open cannot count sealed frames (`undecryptableFrames` is always 0
+  on a keyless spool), so the line rides the one fact the client can know.
+- Smoke 25: the bar drops the key within a beat of open while `share()`
+  and the stash row keep it; a reload (a bare link now) reopens keyed with
+  its content and no bare-open line; storage patched to swallow the
+  registry write keeps `k=` in the bar; a third origin opening the bare
+  link for a room it never held shows the honest line and renders zero of
+  the sealed messages. The mixtape is build-verified (tsc + vite), as with
+  T-176. §5 row: "The address bar (M15, T-165)". **Done.**
+- Lab note: a keyless open of a keyed room logs y-websocket's "Unable to
+  compute message" once per sealed frame (Yjs can't decode ciphertext) —
+  the SDK's `undecryptableFrames` stays 0 because that counter lives in the
+  encrypted transport, which a keyless spool doesn't use. Smoke 25 asserts
+  those errors are the stranger's only ones, and that there were some.

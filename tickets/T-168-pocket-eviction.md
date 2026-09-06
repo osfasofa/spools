@@ -24,8 +24,8 @@ T-124's precedent: sign-off, README honesty section updated.
       stalest — a deposit nobody ever collected is worth nothing.
 - [x] Per-IP cap on *new* namespaces per hour (needs T-161's real IP).
       *(`POCKET_NEW_NAMESPACES_PER_HOUR`, default 0 = off.)*
-- [ ] Lower size cap for a namespace's first deposit until it has been read
-      once (proposal: 1 MiB; **sign-off** — a canonical default).
+- [x] Lower size cap for a namespace's first deposit until it has been read
+      once (proposal: 1 MiB; **sign-off** — a canonical default). **Refused, 6 Sep 2026** — see Notes.
       *(The knob `POCKET_FIRST_MAX_BYTES` is shipped; its default equals
       `POCKET_MAX_BYTES`, i.e. no change. Sign-off on 1 MiB pending.)*
 - [x] Tests: a tiny budget, 20 junk namespaces, 1 real namespace that was read
@@ -111,3 +111,15 @@ T-124's precedent: sign-off, README honesty section updated.
   and `POCKET_NEW_NAMESPACES_PER_HOUR` (60 proposed, or leave it off). A
   "keep the shipped defaults" answer closes it with no keyboard step; either
   knob turned on is one `railway variables --set` and a restart.
+- **Decided, 6 Sep 2026 (owner):** `POCKET_NEW_NAMESPACES_PER_HOUR=60` on
+  the canonical relay; `POCKET_FIRST_MAX_BYTES` stays off. The refusal's
+  reason, on the record: the first-deposit cap breaks the spool built alone
+  and shared later — 413 until one read, the SDK latches too-big for the
+  session, the friend's cold open finds an empty pocket. §5 row: "Pocket
+  defaults against strangers (M15, T-168)". README's knob row names the
+  canonical value. **Keyboard step left (owner):** from
+  `packages/spools-relay`, `railway variables --set POCKET_NEW_NAMESPACES_PER_HOUR=60`
+  then `railway redeploy --json` (T-105's note: `--json` runs it
+  non-interactively), and `curl https://relay.spools.lol/` to see the
+  service back. The Railway CLI is not on this machine, so this ticket
+  stays `doing` until that lands and its Notes say so.
