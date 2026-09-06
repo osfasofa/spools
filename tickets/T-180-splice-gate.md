@@ -1,7 +1,7 @@
 ---
 id: T-180
 title: "splice() — the gate review — sign-off"
-status: doing
+status: done
 milestone: M16
 depends: []
 ---
@@ -66,7 +66,7 @@ independently want it. There are now four sources:
       reading) → `docs/riffs`-style riff in the loom. *(Answered 4–5 Sep;
       the riff is [docs/riffs/the-reel.md](../docs/riffs/the-reel.md).)*
 - [x] Brief: `docs/M16-splice-brief.md` from the riff + the spike. *(5 Sep 2026.)*
-- [ ] **Sign-off**; DESIGN_DOC §5 row; tickets for the chosen operators.
+- [x] **Sign-off**; DESIGN_DOC §5 row; tickets for the chosen operators. *(5 Sep 2026 — all five as recommended; §5 row and §2 words landed; T-186–T-188 drafted.)*
 
 ## Notes / open questions
 
@@ -98,8 +98,16 @@ independently want it. There are now four sources:
   §5.6); fork carries the history array (spools-of-spools §4). Nothing new
   was run for the brief; the ticket after sign-off runs the spike's
   numbers as its fixture.
-- The ticket stays `doing` until the owner signs off; then §5 row and
-  tickets, and this closes.
+- **Signed off, 5 Sep 2026 (owner, at the keyboard, the five decisions
+  presented with the brief's trade-offs):** all five as recommended — the
+  primitive (`splice(records)`, identity intact, idempotent, refusing a
+  dangling parent); fork and rejoin as recipes until a vessel ships
+  reunion; the names (`splice` for the primitive, *reel* and *cut* into
+  §2, `retell`/`fork`/`rejoin` unreserved); flatten as the room's thread
+  rule, said on the button; the reel-length kind and the tape counter as
+  one room ticket. Recorded as DESIGN_DOC §5 "The splice family (M16)" and
+  two §2 rows. Tickets T-186 (SDK), T-187 (room), T-188 (docs, last) are
+  in INDEX. **Done.**
 
 ## Acceptance criteria
 
