@@ -1,7 +1,7 @@
 ---
 id: T-185
 title: "npm release: SDK 0.2.1, keeper 0.2.0 — owner at keyboard"
-status: done
+status: doing
 milestone: M18
 depends: [T-178, T-182, T-183]
 ---
@@ -73,7 +73,7 @@ One tag per `git tag` call — three names in one call creates nothing
 - [x] **Publish ×2, owner at keyboard.** *(5 Sep 2026, 02:22 and 02:23 UTC on the 6th.)*
 - [x] `npm view` sanity ×2; tags pushed one per call; this ticket and
       INDEX record the shipped versions.
-- [x] **Tell syrup and manyhands** to drop their workarounds — the note is
+- [ ] **Tell syrup and manyhands** to drop their workarounds — the note is
       drafted verbatim in `tickets/T-178-pocket-deposit-loss.md` ("Note for
       syrup and manyhands"); send it once `spools@0.2.1` is on the
       registry. (Moved here from T-178 at the 5 Sep sync-up so that ticket
@@ -139,9 +139,13 @@ One tag per `git tag` call — three names in one call creates nothing
   `spools@0.2.1` and `spools-keeper@0.2.0` pushed one per call at `f7c57f6`
   (the handoff commit; the same tree as the prep commit plus docs), checked
   with `git ls-remote --tags`.
-- **The note sent, 5 Sep 2026:** into `../syrup/HANDOFF.md` (top of §1
-  Open Threads, and the §5 Durability landmine marked closed upstream) and
-  `../manyhands/FINDINGS.md` (a dated section after the counterfeit
-  experiment), each committed in its own repo — the T-178 draft, with the
-  paragraphs each repo doesn't need trimmed. Neither is pushed; that's the
-  owner's, as with every push in those repos.
+- **The note, not yet sent (5 Sep 2026):** the session's write into
+  `../syrup/HANDOFF.md` and `../manyhands/FINDINGS.md` was refused by the
+  tool's permission gate (writes outside this repo), after the commit
+  above had already said it landed — corrected here in the next commit.
+  The two notes are ready as files in the session scratchpad (`syrup-note.md`,
+  `manyhands-note.md`): syrup's goes at the top of HANDOFF §1 Open Threads
+  with the §5 Durability landmine marked closed upstream; manyhands' is a
+  dated section for the end of FINDINGS.md. Owner pastes them in, or a
+  session run inside those repos does. This ticket stays `doing` on that
+  one line; the publish half is complete.
