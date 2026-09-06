@@ -184,9 +184,10 @@ deposit budget (**24/min**) covers a couple of dozen same-NAT devices at the
 clients' own 1/min pacing — per *client* address only where `TRUST_PROXY`
 is set; a relay behind a proxy without it sees one address, and the budget
 becomes one bucket for everyone on it. And the **64 connections per room** guard counts
-tabs, not people; a 65th connection is closed with code 1013 ("room full"),
-which today's SDK experiences as an endless connect/drop cycle — a full room
-looks like a bad connection. Room codes are public by design, so one
+tabs, not people; a 65th connection is closed with code 1013 ("room full").
+The SDK (0.2.0+) reads that as "stand back": `spool.roomFull` turns true,
+`on('full')` fires with the reason, and it tries again about every 30 s
+instead of spinning; the room client shows the line. Room codes are public by design, so one
 address could fill a room to that guard by itself; `RELAY_CONNS_PER_IP_PER_ROOM`
 (off by default — it needs `TRUST_PROXY` behind a proxy) caps that, and the
 extra sockets get 1013 with the reason "too many connections from this

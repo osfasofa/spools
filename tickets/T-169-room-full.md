@@ -1,7 +1,7 @@
 ---
 id: T-169
 title: "Room-full lockout: per-IP room cap, and the SDK says 'full' instead of spinning"
-status: doing
+status: done
 milestone: M15
 depends: [T-161]
 ---
@@ -26,9 +26,10 @@ F4.
       `close` events; the plain path needs the provider's `connection-close`)
       → additive event `on('full')` and a `roomFull` getter (the status union
       stays closed, §5) → back off instead of hot-looping. *(SDK lane.)*
-- [ ] Room: notice line "this room is full — 64 connections." *(Room lane.)*
-- [ ] Docs: retire the "a full room looks like a bad connection" sentence in
-      the README and WHITEPAPER §7 once true. *(After the SDK half lands.)*
+- [x] Room: notice line "this room is full — 64 connections." *(Room lane,
+      5 Sep 2026.)*
+- [x] Docs: retire the "a full room looks like a bad connection" sentence in
+      the README and WHITEPAPER §7 once true. *(5 Sep 2026.)*
 
 ## Acceptance criteria
 
@@ -128,3 +129,49 @@ The ticket stays `doing` until those report.
 - Not touched, on purpose: the SDK's handling of 1013 (still the
   connect/drop cycle the README describes) and the room's notice line —
   other lanes. This ticket stays `doing` until those land.
+
+### Landed — the room half, and the close (5 Sep 2026)
+
+- **The line.** `useRoom` carries `roomFull` (read from the getter on every
+  `entry`/`status` event and on each `full` event — never cached on the
+  edge, per the flicker note above) and `fullReason` (the relay's close
+  reason). `App.tsx` renders one `.notice.warn.roomFull` line above the
+  other notices: *"this room is full — the relay holds 64 connections per
+  room and every one is taken. When someone leaves, this tab tries again on
+  its own (about every half minute)."* A reason containing `address` (the
+  per-IP cap) gets its own wording: *"too many tabs from this address…"*.
+  Rendered from the getter, it clears itself the moment a connection is
+  accepted — no dismiss button, nothing to remember.
+- **Acceptance run, in the smoke suite (scenario 21).** 64 raw sockets take
+  every seat of a fresh room on a local `spools-relay`; the app opens as the
+  65th. Measured: the line was on screen **1 ms after the app reported
+  ready** (the relay completes the upgrade and closes 1013 before the page
+  has finished mounting); `status` read `offline` and `roomFull` true
+  meanwhile; the raw seats were closed and the tab was **admitted after
+  29.9 s** — the SDK's stand-back, exactly — with the line gone. 21/21
+  green on the same run.
+- **Two things the run taught:**
+  1. *`status` is not the signal.* The SDK derives WebRTC signaling from the
+     relay's host, and the local relay's signaling endpoint has no room cap
+     — so with WebRTC on, `status` read `connected` (signaling reached)
+     while the relay leg was refused. The SDK half's "status reads offline
+     while standing back" is true of the websocket leg only; SDK-API §"A
+     full room says so" now says so, and the room renders from `roomFull`,
+     never from `status`. The scenario pins the ws-only contract by turning
+     `RTCPeerConnection` off (the harness's existing offline idiom).
+  2. *The first failure was the test's own link:* `room-smoke-905-full` is
+     not a spool code (`word-word-NNN`), and the app said "this room
+     wouldn't open" — which is the right behaviour for a bad link and a
+     wrong test. The scenario mints `full-room-NNN` now.
+- **Docs retired:** the relay README's "which today's SDK experiences as an
+  endless connect/drop cycle — a full room looks like a bad connection" and
+  WHITEPAPER §7's "A full room looks like a bad connection … Documented,
+  unfixed, honest" bullet. The white paper's replacement keeps the honest
+  half: there is no queue and no priority; the seat goes to whoever asks
+  first after one frees. `apps/room/TESTING.md`'s smoke row reads 21.
+- **Still the owner's, not this ticket's:** turning
+  `RELAY_CONNS_PER_IP_PER_ROOM` on for the canonical relay (8 proposed) —
+  a defaults call, now that `TRUST_PROXY` is live (T-161). The line already
+  knows how to say it.
+- Deployed with `scratch/deploy-room.sh` (gh-pages `room/` and
+  chat.spools.lol). Both acceptance criteria met; **done.**

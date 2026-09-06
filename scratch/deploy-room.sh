@@ -46,9 +46,11 @@ if [ -f apps/room/.vercel/project.json ]; then
   TD="$(mktemp -d)"
   cp -R apps/room/dist/. "$TD/"
   cp -R apps/room/.vercel "$TD/.vercel"
-  mise x -- vercel deploy --cwd "$TD" --prod --yes >/dev/null 2>&1 \
+  # no global `vercel` binary on this machine — npx fetches the CLI; the
+  # login lives in ~/Library/Application Support/com.vercel.cli (T-169 run)
+  mise x -- npx -y vercel@latest deploy --cwd "$TD" --prod --yes >/dev/null 2>&1 \
     && echo "deployed: https://$CHAT_DOMAIN/ (vercel: spools-chat)" \
-    || echo "WARN: vercel deploy failed — run: mise x -- vercel deploy --cwd apps/room/dist --prod"
+    || echo "WARN: vercel deploy failed — run: mise x -- npx -y vercel@latest deploy --cwd apps/room/dist --prod"
   rm -rf "$TD"
 else
   echo "note: apps/room/.vercel/project.json missing — vercel deploy skipped (run vercel link)"

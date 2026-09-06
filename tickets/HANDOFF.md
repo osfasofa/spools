@@ -4,23 +4,12 @@ Written 5 Sep 2026 at the sync-up; `main` at 3b61dea. Paste the block below
 as the opening prompt. Delete or rewrite this file when it's been used.
 
 ```
-Sync-up context: 5 Sep 2026. T-184 (the lone-peer socket) was signed off
-and landed the same day; T-185 (the release that carries it, plus keeper
-0.2.0) waits on the owner — do not publish anything. Two things are
-unblocked and need nobody:
+Sync-up context: 5 Sep 2026. T-184 (the lone-peer socket) and T-169 (the
+room-full line) both landed the same day; T-185 (the release that carries
+T-184, plus keeper 0.2.0) waits on the owner — do not publish anything.
+One thing is unblocked and needs nobody:
 
-1. T-169, the room-full notice (room lane). The relay and SDK halves are
-   done; the room has zero references to spool.roomFull or on('full').
-   Set T-169 to doing (frontmatter + INDEX), then: subscribe once to
-   on('full') in the room's spool hook, render a visible "room full" line
-   from the spool.roomFull getter (the ticket's Notes warn about flicker —
-   read them first), retire the two stale sentences that still describe
-   the old spin (packages/spools-relay/README.md ~188-189, WHITEPAPER.md
-   ~131), and script the 65-connection acceptance run against a local
-   relay with RELAY_CONNS_PER_IP_PER_ROOM set. Redeploy the room with
-   scratch/deploy-room.sh when green. Mark done in both places.
-
-2. T-180 task 2, the splice brief. Write docs/M16-splice-brief.md from
+1. T-180 task 2, the splice brief. Write docs/M16-splice-brief.md from
    the six evidence sources the ticket lists (spools-of-spools, syrup's
    HANDOFF, lore's brief, the reel riff, the tape-deck riff, familiar).
    Model it on docs/M10-async-brief.md: what each operator costs, what it

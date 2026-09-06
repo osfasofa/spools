@@ -12,6 +12,10 @@ export interface RoomState {
   peers: number
   /** true when local persistence held nothing at open — captured before the pocket can merge; drives the arrival overlay (T-117) */
   openedEmpty: boolean
+  /** the relay refused the last connection with 1013 (T-169); the SDK stands back ~30 s and tries again on its own */
+  roomFull: boolean
+  /** the relay's close reason on the last refusal — "room full" or "too many connections from this address" */
+  fullReason: string | null
   error: string | null
 }
 
@@ -30,6 +34,8 @@ export const useRoom = (author: string): RoomState => {
     pocket: null,
     peers: 0,
     openedEmpty: false,
+    roomFull: false,
+    fullReason: null,
     error: null,
   })
 
@@ -62,9 +68,17 @@ export const useRoom = (author: string): RoomState => {
         if (!handed) history.replaceState(null, '', spool.share())
         // the torture harnesses drive the app through this (T-104 idiom)
         ;(window as unknown as { spool?: Spool }).spool = spool
-        const sync = () => setState((s) => ({ ...s, spool, entries: spool.entries, status: spool.status }))
+        // roomFull rides every sync from the getter: the relay completes the
+        // upgrade before closing 1013, so `connected` lands a frame before
+        // the refusal — reading the getter on each event (never caching the
+        // edge) is what settles it (T-169's flicker note)
+        const sync = () =>
+          setState((s) => ({ ...s, spool, entries: spool.entries, status: spool.status, roomFull: spool.roomFull }))
         offs.push(spool.on('entry', sync))
         offs.push(spool.on('status', sync))
+        // fires on every refused attempt while the room is full; the reason
+        // tells "room full" (64 seats) from "too many from this address"
+        offs.push(spool.on('full', (reason) => setState((s) => ({ ...s, roomFull: spool.roomFull, fullReason: reason }))))
         offs.push(spool.on('undecryptable', (total) => setState((s) => ({ ...s, undecryptable: total }))))
         // midnight-collected entries arrive through ordinary entry events;
         // this only narrates what the pocket is doing (T-104)

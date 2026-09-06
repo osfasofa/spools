@@ -1125,6 +1125,39 @@ await scenario('20. copy without the Clipboard API: execCommand fallback, then t
   return 'no navigator.clipboard → execCommand("copy") → "copied ✓"; execCommand false → full link shown + selected + hint; 0 page errors'
 })
 
+await scenario('21. a full room says so: the 65th seat sees the line within seconds, and gets in when one frees (T-169)', async () => {
+  // its own room, so the count is exact: 64 raw sockets take every seat the
+  // relay allows (MAX_CONNS_PER_ROOM, a constant), and the app is the 65th
+  const fullCode = `full-room-${String(Math.floor(Math.random() * 1000)).padStart(3, '0')}`
+  const raw = []
+  for (let i = 0; i < 64; i++) raw.push(new WebSocket(`ws://127.0.0.1:${RELAY_PORT}/yjs/${fullCode}`))
+  await sleep(1_500)
+  const open = raw.filter((w) => w.readyState === WebSocket.OPEN).length
+  if (open !== 64) throw new Error(`expected 64 raw seats open, got ${open}`)
+  const link = `http://localhost:${ORIGINS[2]}/#spool=${fullCode}&relay=${encodeURIComponent(`ws://localhost:${RELAY_PORT}/yjs`)}&k=${keyB64}`
+  // WebRTC off: the SDK derives signaling from the relay's host, and the local
+  // relay's signaling endpoint has no room cap — with it on, `status` would
+  // read connected (signaling reached) while the relay leg is refused. The
+  // line is rendered from roomFull either way; this pins the ws-only contract
+  const t = await Tab.open(link, { patch: 'delete window.RTCPeerConnection; delete window.webkitRTCPeerConnection;' })
+  try {
+    await t.ready()
+  } catch (err) {
+    throw new Error(`${err.message}; page errors: ${t.errors.join(' | ') || 'none'}; status text: ${await t.eval(`document.body.innerText.slice(0, 300)`)}`)
+  }
+  const shownMs = await t.until(`document.querySelector('.notice.roomFull')?.textContent.startsWith('this room is full')`, 10_000, 'the room-full line')
+  const status = await t.eval(`window.spool.status`)
+  if (status !== 'offline') throw new Error(`status while full should read offline, got ${status}`)
+  const full = await t.eval(`window.spool.roomFull`)
+  if (!full) throw new Error('spool.roomFull is not true while the line shows')
+  // the SDK stands back ~30 s; the raw seats leave now, so its next try is admitted
+  for (const w of raw) w.close()
+  const inMs = await t.until(`window.spool.status === 'connected' && !document.querySelector('.notice.roomFull')`, 45_000, 'admitted after a seat frees, line gone')
+  if (t.errors.length) throw new Error(`page errors: ${t.errors.join(' | ')}`)
+  await t.close()
+  return `64 raw seats; the 65th showed the line ${shownMs} ms after the app was ready; status offline + roomFull true meanwhile; seats freed → connected and the line gone after ${inMs} ms`
+})
+
 await a?.close()
 await b?.close()
 await c?.close()

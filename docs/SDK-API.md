@@ -83,7 +83,7 @@ interface WindInput {
 
 `leave()` disconnects and releases resources. Local IndexedDB data is **retained** — a spool is a keepsake. (Deleting local data is a stash/archive concern, M8.)
 
-**A full room says so** (T-169). `spools-relay` closes the 65th connection to a room with code 1013 ("room full"); y-websocket's default would reconnect at once and forever, which an app sees as an endless connecting spinner. The SDK treats 1013 as "stand back": `roomFull` turns true, `on('full')` fires with the close reason, `status` reads `offline` (not `connecting`) while it waits ~30 s, then it tries once more — refused again, it says so again. The moment a connection is accepted, `roomFull` clears. The status union stays closed; this sits beside it, like `pocket`.
+**A full room says so** (T-169). `spools-relay` closes the 65th connection to a room with code 1013 ("room full"); y-websocket's default would reconnect at once and forever, which an app sees as an endless connecting spinner. The SDK treats 1013 as "stand back": `roomFull` turns true, `on('full')` fires with the close reason, the websocket leg reads `offline` (not `connecting`) while it waits ~30 s, then it tries once more — refused again, it says so again. The moment a connection is accepted, `roomFull` clears. The status union stays closed; this sits beside it, like `pocket`. One honesty note: `status` is the union of both transports, and the WebRTC leg's signaling (derived from the relay's host) is not room-capped — so in a browser with WebRTC on, `status` can read `connected` (signaling reached) while `roomFull` is true. Render the full-room line from `roomFull`, never from `status` (the room client does).
 
 ## Events: diff + getter, no replay
 

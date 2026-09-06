@@ -396,7 +396,7 @@ const Settings = ({
 
 export const App = () => {
   const [author] = useState(() => localStorage.getItem('spool-author') || 'anonymous')
-  const { spool, entries, status, undecryptable, pocket, peers, openedEmpty, error } = useRoom(author)
+  const { spool, entries, status, undecryptable, pocket, peers, openedEmpty, roomFull, fullReason, error } = useRoom(author)
   const [view, setView] = useState<'room' | 'settings'>('room')
 
   // the arrival overlay runs exactly once, and only when the room opened
@@ -821,6 +821,16 @@ export const App = () => {
         </div>
       ) : null}
 
+      {roomFull ? (
+        // the relay said no (1013), and the SDK stands back ~30 s between
+        // tries instead of spinning (T-169). Rendered from the getter, so the
+        // line clears itself the moment a connection is accepted
+        <div className="notice warn roomFull" role="status">
+          {fullReason?.includes('address')
+            ? 'too many tabs from this address — the relay caps what one address can hold in a room. Close one, and this tab tries again on its own (about every half minute).'
+            : 'this room is full — the relay holds 64 connections per room and every one is taken. When someone leaves, this tab tries again on its own (about every half minute).'}
+        </div>
+      ) : null}
       {undecryptable > 0 ? (
         <div className="notice warn">
           someone in this room isn't on your key — {undecryptable} frame
