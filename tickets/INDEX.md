@@ -186,13 +186,13 @@ Drafted 3 Sep 2026 from the ship review — design record: [docs/M15-ship-review
 
 ## M16 — the gate (evidence from the vessels)
 
-Opened 3 Sep 2026. Seven repos now consume `spools` from the registry, and two of them had filed SDK evidence in their own notes instead of here — syrup's HANDOFF and familiar/manyhands' evidence #8. ECOSYSTEM's rule 7 says friction flows back as evidence; this rail is that filing. One bug, two gate reviews; the reviews are **sign-off**. The forgetting riff the splice review waited on landed 5 Sep as [docs/riffs/the-reel.md](../docs/riffs/the-reel.md) (with [docs/riffs/tape-deck.md](../docs/riffs/tape-deck.md) as a second independent wanter), so T-180's brief (`docs/M16-splice-brief.md`) is writable now, no owner needed; the sign-off after it is the owner's. T-178 closed 5 Sep on its own acceptance criterion — the note to syrup and manyhands rides with T-185.
+Opened 3 Sep 2026. Seven repos now consume `spools` from the registry, and two of them had filed SDK evidence in their own notes instead of here — syrup's HANDOFF and familiar/manyhands' evidence #8. ECOSYSTEM's rule 7 says friction flows back as evidence; this rail is that filing. One bug, two gate reviews; the reviews are **sign-off**. The forgetting riff the splice review waited on landed 5 Sep as [docs/riffs/the-reel.md](../docs/riffs/the-reel.md) (with [docs/riffs/tape-deck.md](../docs/riffs/tape-deck.md) as a second independent wanter), and T-180's brief landed the same day — [docs/M16-splice-brief.md](../docs/M16-splice-brief.md): one primitive (`splice(records)`, identity-preserving, idempotent, refusing a dangling parent) recommended; fork and rejoin stay recipes; five decisions in its §5 wait on the owner's **sign-off**, then the §5 row and tickets T-186–T-188. T-178 closed 5 Sep on its own acceptance criterion — the note to syrup and manyhands rides with T-185.
 
 | Ticket | Title | Depends | Status |
 |---|---|---|---|
 | [T-178](T-178-pocket-deposit-loss.md) | Pocket deposits can be lost at leave — syrup + manyhands evidence | T-161 | done |
 | [T-179](T-179-stash-remember.md) | `stash.remember` — a vessel mirrors the stash's private format — **sign-off** | — | todo |
-| [T-180](T-180-splice-gate.md) | `splice()` — the gate review — **sign-off** | — | todo |
+| [T-180](T-180-splice-gate.md) | `splice()` — the gate review — **sign-off** | — | doing |
 
 ## M17 — the pegboard (the keeper's first real run)
 

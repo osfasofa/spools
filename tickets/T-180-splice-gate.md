@@ -1,7 +1,7 @@
 ---
 id: T-180
 title: "splice() — the gate review — sign-off"
-status: todo
+status: doing
 milestone: M16
 depends: []
 ---
@@ -65,8 +65,41 @@ independently want it. There are now four sources:
 - [x] Owner answers the forgetting questions (who "hosts" a spool; the reel
       reading) → `docs/riffs`-style riff in the loom. *(Answered 4–5 Sep;
       the riff is [docs/riffs/the-reel.md](../docs/riffs/the-reel.md).)*
-- [ ] Brief: `docs/M16-splice-brief.md` from the riff + the spike.
+- [x] Brief: `docs/M16-splice-brief.md` from the riff + the spike. *(5 Sep 2026.)*
 - [ ] **Sign-off**; DESIGN_DOC §5 row; tickets for the chosen operators.
+
+## Notes / open questions
+
+- **Brief written, 5 Sep 2026** ([docs/M16-splice-brief.md](../docs/M16-splice-brief.md)).
+  What the evidence decided on its own before the owner has to: the
+  "splice family" is two operators with opposite physics, and only one of
+  them lacks surface. The **fork** (whole document, lineage intact) is two
+  lines through `spool.doc` and has two wanters and no shipper — it stays a
+  recipe. The **retelling** has three shippers (lore's v1, syrup's
+  `/branch`, the room's T-164) and two measured wanters for identity (the
+  tape-deck feedback guard, the reel's cut), and the reason all three
+  reached under the SDK is one fact from `entry.ts`: `wind()` stamps `id`
+  *and* `createdAt`, so a retelling built from `wind()` loses identity and
+  **order** (a thousand entries wound in one loop land in the same
+  millisecond and sort by random id). The brief prices four options and
+  recommends **one primitive** — `splice(records)`, writing complete
+  `EntrySnapshot`-shaped records with identity intact, idempotent, and
+  **refusing a dangling parent** (the "not synced yet" lie) — with the cut,
+  the fork, and the rejoin as recipes on top. Zero protocol change.
+- Five decisions for sign-off in the brief's §5: adopt the primitive;
+  fork/rejoin stay recipes until a vessel ships reunion; names (`splice`
+  for the primitive, *reel* and *cut* into §2, `retell`/`fork`/`rejoin`
+  unreserved recipe names); flatten as the room's thread rule; the
+  reel-length kind + tape counter as one room ticket. Proposed tickets
+  T-186 (SDK), T-187 (room), T-188 (docs, last).
+- Numbers the brief leans on, all previously measured: 760 KiB preserved
+  ids vs 965 KiB with a `from` stamp vs 1 594 KiB for the old reel
+  half-hidden (reel spike, 5 000 messages); reunion resurrects (tape-deck
+  §5.6); fork carries the history array (spools-of-spools §4). Nothing new
+  was run for the brief; the ticket after sign-off runs the spike's
+  numbers as its fixture.
+- The ticket stays `doing` until the owner signs off; then §5 row and
+  tickets, and this closes.
 
 ## Acceptance criteria
 
