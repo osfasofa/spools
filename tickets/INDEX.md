@@ -209,11 +209,11 @@ Opened 4 Sep 2026 from the brand repo's second riff (`../brand/riffs/pegboard.md
 
 ## M18 — Release 3
 
-Drafted 5 Sep 2026 at the sync-up. Pure execution, like M12: `spools` 0.2.1 (T-178's last three fixes) and `spools-keeper` 0.2.0 (`--links`, narration) are on `main` with dated-`unreleased` changelogs, and the keeper's registry README describes a CLI that no longer exists — RELEASING.md's "npm would otherwise lie" trigger is met. **Shipped 5 Sep 2026 (owner at keyboard):** `spools@0.2.1` (carrying T-184) and `spools-keeper@0.2.0`, tagged at `f7c57f6`; the note to syrup and manyhands is drafted and waits on a hand inside those repos.
+Drafted 5 Sep 2026 at the sync-up. Pure execution, like M12: `spools` 0.2.1 (T-178's last three fixes) and `spools-keeper` 0.2.0 (`--links`, narration) are on `main` with dated-`unreleased` changelogs, and the keeper's registry README describes a CLI that no longer exists — RELEASING.md's "npm would otherwise lie" trigger is met. **Shipped 5 Sep 2026 (owner at keyboard):** `spools@0.2.1` (carrying T-184) and `spools-keeper@0.2.0`, tagged at `f7c57f6`; syrup upgraded itself the same night; manyhands has the note in FINDINGS.md.
 
 | Ticket | Title | Depends | Status |
 |---|---|---|---|
-| [T-185](T-185-npm-release-3.md) | npm release: SDK 0.2.1, keeper 0.2.0 — **owner at keyboard**; then the note to syrup and manyhands | T-178, T-182, T-183 | doing |
+| [T-185](T-185-npm-release-3.md) | npm release: SDK 0.2.1, keeper 0.2.0 — **owner at keyboard**; then the note to syrup and manyhands | T-178, T-182, T-183 | done |
 
 ## Parked (no ticket until evidence demands one)
 

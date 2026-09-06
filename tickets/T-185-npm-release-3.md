@@ -1,7 +1,7 @@
 ---
 id: T-185
 title: "npm release: SDK 0.2.1, keeper 0.2.0 — owner at keyboard"
-status: doing
+status: done
 milestone: M18
 depends: [T-178, T-182, T-183]
 ---
@@ -73,7 +73,7 @@ One tag per `git tag` call — three names in one call creates nothing
 - [x] **Publish ×2, owner at keyboard.** *(5 Sep 2026, 02:22 and 02:23 UTC on the 6th.)*
 - [x] `npm view` sanity ×2; tags pushed one per call; this ticket and
       INDEX record the shipped versions.
-- [ ] **Tell syrup and manyhands** to drop their workarounds — the note is
+- [x] **Tell syrup and manyhands** to drop their workarounds — the note is
       drafted verbatim in `tickets/T-178-pocket-deposit-loss.md` ("Note for
       syrup and manyhands"); send it once `spools@0.2.1` is on the
       registry. (Moved here from T-178 at the 5 Sep sync-up so that ticket
@@ -159,3 +159,7 @@ One tag per `git tag` call — three names in one call creates nothing
   `3783316`); the drafted section is the `manyhands-note.md` in the
   session scratchpad, or the T-178 draft above. The ticket stays `doing`
   on that one line.
+- **manyhands told, 5 Sep 2026:** the dated section appended to
+  `../manyhands/FINDINGS.md` and committed there (not pushed — the owner's
+  call in that repo, as always). Both notes delivered; acceptance met on
+  every line. **Done.**
