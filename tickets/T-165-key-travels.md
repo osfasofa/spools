@@ -23,12 +23,12 @@ already stores the full link in localStorage, deliberately. Review finding F6.
 
 ## Tasks
 
-- [ ] The sentence (no sign-off): fine print and the "link copied" toast:
+- [x] The sentence (no sign-off): fine print and the "link copied" toast:
       *"your browser may sync this address to its maker; send the link over
       something end-to-end encrypted, or in person."* Same sentence in
       WHITEPAPER §7 and the SDK README's honesty bullet.
-      — **room half done** (fine print, every "link copied" moment, the
-      Settings link caption); WHITEPAPER §7 + SDK README still open, see Notes.
+      — **done**: room (fine print, every "link copied" moment, the
+      Settings link caption), WHITEPAPER §7, SDK README (5 Sep 2026).
 - [ ] The decision (**sign-off**), trade-offs written here for the owner:
       - **A. Keep the key in the address bar** (status quo). Copying from the
         URL bar works; history/tab/bookmark sync carries the key.
@@ -74,3 +74,12 @@ already stores the full link in localStorage, deliberately. Review finding F6.
 - App half landed in commit `42d0b57` (room only). Open: the whitepaper /
   SDK README sentence (other lane) and the address-bar decision (owner
   sign-off) — the ticket stays `doing` for those.
+- **Docs half shipped, 5 Sep 2026 (headless).** The same sentence,
+  verbatim from `KEY_TRAVELS`, in WHITEPAPER §7's first bullet (the
+  capability one — it now says outright that "never sent to a server" is
+  true of *this project's* servers, and names browser sync and plaintext
+  messengers as the two other roads) and in the SDK README's honesty clause
+  (the relay bullet). The README's encryption bullet two lines up still
+  says "never sent to servers"; left as is, the honesty clause right below
+  it now says whose. Only the A/B/C decision and the §5 row remain — the
+  owner's. Ticket stays `doing`.
