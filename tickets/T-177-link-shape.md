@@ -109,6 +109,15 @@ and only when — it equals the SDK's `DEFAULT_RELAY`. Measured in the smoke:
   strip-trailing-slashes rule is about the *connection*, not about deciding
   what a link means. Boring on purpose: the wrong direction here strands
   people.
+- **Live 7 Sep 2026** (`scratch/deploy-room.sh`): bundle `index-C821pnOq.js`
+  on both `https://chat.spools.lol/` and
+  `https://osfasofa.github.io/spools/room/`. The deploy rebuilds from `main`,
+  so the shipped bundle also carries T-179's SDK change and its hash differs
+  from the one the first smoke run used — the suite was re-run against the
+  deployed bytes, 26/26. The mixtape at the gh-pages root is **not** in this
+  script and still serves its 5 Sep bundle: its links stay long until someone
+  rebuilds it (nothing breaks meanwhile — a long link is the old, fully
+  pinned one).
 - Option 3 (the path form, `/<code>#k=…`, ~90) stays available and unbuilt:
   it needs the host to serve `index.html` for any path, which is T-167's
   decision. Nothing in this ticket blocks it — `handOut` is the one place
