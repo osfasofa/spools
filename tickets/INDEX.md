@@ -183,6 +183,7 @@ Drafted 3 Sep 2026 from the ship review — design record: [docs/M15-ship-review
 | [T-176](T-176-off-grid-readiness.md) | Off-grid readiness: the secure-context landmines | — | doing |
 | [T-177](T-177-link-shape.md) | Link shape: shorter and prettier without lying — **sign-off** | T-160 | done |
 | [T-181](T-181-npm-release-2.md) | npm release: SDK 0.2.0, relay 0.3.0, keeper 0.1.1 — **owner at keyboard** | T-160 | done |
+| [T-189](T-189-address-bar-isnt-the-link.md) | The address bar isn't the link — say so where it fails (live finding, T-165 + T-177) | T-165, T-177 | done |
 
 ## M16 — the gate (evidence from the vessels)
 

@@ -92,3 +92,12 @@ Against <https://osfasofa.github.io/spools/room/> (deployed current):
    the sheet, react, reply, send.
 6. Tap-target feel at real finger sizes (chips especially).
 Anything architectural found → file against the owning ticket, not here.
+
+- **Found by T-189's smoke (7 Sep 2026), for this pass to settle:**
+  `.copyBtn` has `min-height: 36px` while the room's other primary tap
+  targets are 40–44 px (`.noticeClose` 40, message actions and composer 44).
+  It is the button in Settings, the cut offer, forget, and start-a-new-room —
+  every deliberate action in the room. T-189 raised only its own instance to
+  44 px, because it is read on a phone at the moment something is broken;
+  the sweep is this ticket's call, together with the real-hardware rows.
+

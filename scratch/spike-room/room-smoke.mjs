@@ -1460,6 +1460,70 @@ await scenario('26. a handed-out link drops relay= only when it is the default, 
 })
 
 
+// ---------- T-189: the address bar isn't the link ----------
+
+await scenario('27. a keyless peer makes both sides say so: the room offers the link with the key, the keyless client names the address bar', async () => {
+  const c189 = `no-key-${String(Math.floor(Math.random() * 1000)).padStart(3, '0')}`
+  const k189 = randomBytes(32).toString('base64url')
+  const relayParam = encodeURIComponent(`ws://localhost:${RELAY_PORT}/yjs`)
+  const holder = await Tab.open(`http://localhost:${ORIGINS[0]}/#spool=${c189}&relay=${relayParam}&k=${k189}`)
+  await holder.ready()
+  // headless has no clipboard: record what the app hands it (scenario 17's idiom)
+  await holder.eval(`navigator.clipboard.writeText = (t) => { localStorage.setItem('__copied', t); return Promise.resolve() }`)
+  await holder.eval(`window.spool.wind({ kind: 'message', body: 'sealed', data: { seat: localStorage.getItem('spool-seat') } })`)
+
+  // exactly what the address bar gives — the code, no key — on a device that
+  // never held this room. This is the mistake, reproduced
+  const stranger = await Tab.open(`http://localhost:${ORIGINS[2]}/#spool=${c189}&relay=${relayParam}`)
+  await stranger.ready()
+  // a sealed frame must cross *while* it is connected: the holder never answers
+  // the stranger's sync request (it arrives unsealed and is dropped), so only a
+  // fresh write reaches it — scenario 25's lesson
+  await holder.eval(`window.spool.wind({ kind: 'message', body: 'still sealed', data: { seat: localStorage.getItem('spool-seat') } })`)
+  await stranger.until(
+    `document.querySelector('.notice.bareOpen')?.textContent.includes("a link copied from the address bar doesn't carry the key")`,
+    15_000,
+    'the keyless line names the address bar'
+  )
+  const asked = await stranger.eval(`document.querySelector('.notice.bareOpen').textContent.includes("ask them for the one the room's copy button gives")`)
+  if (!asked) throw new Error('the keyless line does not say which link to ask for')
+
+  // the other side: the honest count, the likely cause, and the fix in reach
+  await holder.until(`!!document.querySelector('.notice.noKey')`, 20_000, 'the no-key line appears on the keyed side')
+  const line = await holder.eval(`document.querySelector('.notice.noKey').textContent`)
+  if (!/isn't on your key/.test(line)) throw new Error(`the count is gone from the line: ${line}`)
+  if (!line.includes("a link copied from the address bar doesn't carry the key")) throw new Error(`the cause is not named: ${line}`)
+  await holder.eval(`document.querySelector('.notice.noKey .copyBtn').click()`)
+  await holder.until(`!!localStorage.getItem('__copied')`, 5_000, 'the button copied something')
+  const copied = await holder.eval(`localStorage.getItem('__copied')`)
+  if (!copied.includes(`k=${k189}`)) throw new Error(`the offered link carries no key: ${copied}`)
+  if (copied !== (await holder.eval(`document.querySelector('.linkText')?.textContent ?? window.spool.share()`)) && !copied.includes(`spool=${c189}`))
+    throw new Error(`the offered link is not this room's: ${copied}`)
+  await holder.until(
+    `document.querySelector('.linkCopied')?.textContent.includes('hand it to someone you trust')`,
+    5_000,
+    'the copy is confirmed with the T-165 sentence'
+  )
+  await holder.eval(`localStorage.removeItem('__copied')`)
+  // it is read on a phone or nowhere: 375×667 (Tab.open's default), no
+  // sideways scroll, and a tap target the thumb can hit (scenario 4, T-125)
+  const layout = await holder.eval(
+    `({ overflow: document.documentElement.scrollWidth > window.innerWidth, tap: document.querySelector('.notice.noKey .copyBtn').getBoundingClientRect().height })`
+  )
+  if (layout.overflow) throw new Error('the no-key notice pushed the page sideways at 375 px')
+  if (layout.tap < 40) throw new Error(`the copy button is ${layout.tap} px tall — under the 40 px tap target`)
+
+  // the stranger's own errors are y-websocket failing on sealed frames — the
+  // physics both lines describe (scenario 25's filter)
+  const strange = stranger.errors.filter((e) => !/Unable to compute message/.test(e))
+  if (holder.errors.length || strange.length) throw new Error(`page errors: ${[...holder.errors, ...strange].join(' | ')}`)
+  if (stranger.errors.length === 0) throw new Error('the keyless peer never met a sealed frame — the scenario proved nothing')
+  await holder.close()
+  await stranger.close()
+  return `keyless peer in ${c189}: the room named the cause and its button copied a link carrying k=; the keyless client named the address bar and said which link to ask for`
+})
+
+
 await r1?.close()
 await r2?.close()
 

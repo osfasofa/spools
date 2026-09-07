@@ -41,6 +41,15 @@ const SEAT = typeof localStorage !== 'undefined' ? mySeat() : ''
  * browsers sync their address bars, and a link travels through whatever
  * messenger carries it. Said wherever a link is copied, and in the fine print.
  */
+/**
+ * T-189: the bar and the link differ by the one parameter that matters
+ * (`#spool=<code>` vs `#spool=<code>&k=…`), and since T-177 dropped the
+ * default `relay=` they look almost the same. Said on both sides of the
+ * mistake — the room that can't read the frames, and the client that opened
+ * without the key.
+ */
+const ADDRESS_BAR_ISNT_THE_LINK = "a link copied from the address bar doesn't carry the key."
+
 const KEY_TRAVELS =
   'your browser may sync this address to its maker; send the link over something end-to-end encrypted, or in person.'
 
@@ -1016,12 +1025,24 @@ export const App = () => {
         // the room (T-165)
         <div className="notice warn bareOpen">
           this link has no key, and this device never held this room. if the room is keyed, nothing here can be
-          read — open the full link someone handed you.
+          read — open the full link someone handed you. {ADDRESS_BAR_ISNT_THE_LINK} ask them for the one the
+          room's copy button gives.
         </div>
       ) : undecryptable > 0 ? (
-        <div className="notice warn">
-          someone in this room isn't on your key — {undecryptable} frame
-          {undecryptable === 1 ? '' : 's'} ignored.
+        // the other side of the same mistake (T-189): frames we can't read
+        // usually mean someone opened a link without the key, and the likeliest
+        // source of a keyless link is this page's own address. invite() does
+        // the copying, so T-176's fallbacks come along
+        <div className="notice warn noKey">
+          <div>
+            someone in this room isn't on your key — {undecryptable} frame
+            {undecryptable === 1 ? '' : 's'} ignored. {ADDRESS_BAR_ISNT_THE_LINK}
+          </div>
+          <div className="noticeActions">
+            <button className="copyBtn" onClick={invite}>
+              copy the link with the key
+            </button>
+          </div>
         </div>
       ) : null}
       {pocket?.phase === 'checking' ? <div className="notice">checking the pocket…</div> : null}

@@ -1177,6 +1177,23 @@ body {
   padding: 0 14px 8px;
 }
 
+/* T-189: the no-key line carries its own fix, so it holds a block, not a
+   sentence — the .notice padding moves to the text half */
+.notice.warn.noKey {
+  padding: 5px 0 0;
+}
+
+.notice.warn.noKey > div:first-child {
+  padding: 0 14px 6px;
+  line-height: 1.5;
+}
+
+/* the one .copyBtn that is a fix-it action read on a phone: the room's
+   primary tap target (44 px), not the 36 px the rest of them share (T-125) */
+.notice.noKey .copyBtn {
+  min-height: 44px;
+}
+
 .tapeLine {
   font-family: var(--mono);
   font-size: 12px;
