@@ -1,7 +1,7 @@
 ---
 id: T-167
 title: "Static hosting: leave Vercel, fix the gh-pages 404 — sign-off, owner at keyboard"
-status: todo
+status: doing
 milestone: M15
 depends: [T-160]
 ---
@@ -46,8 +46,11 @@ ticket never touches links.
 
 ## Tasks
 
-- [ ] Owner picks; record the call here.
+- [x] Owner picks; record the call here. *(C — stay on Vercel, downgrade to
+      Hobby. 7 Sep 2026.)*
 - [ ] Re-enable Pages (A), or move (B), or downgrade (C); DNS as needed.
+      *(The downgrade is a billing action in the dashboard — owner at
+      keyboard. No DNS change: the domain stays where it is.)*
 - [ ] `deploy-room.sh`: keep the target that survives, delete the other half.
 - [ ] Fix or drop the three doc citations of `osfasofa.github.io/spools/…`.
 - [ ] If leaving Vercel: delete the `spools-chat` project.
@@ -56,3 +59,60 @@ ticket never touches links.
 
 - `chat.spools.lol` serves the current build from the chosen host.
 - Every URL in README, WHITEPAPER, and docs/M11-room-brief.md returns 200.
+
+## Notes
+
+**Decided 7 Sep 2026: option C — stay on Vercel, downgrade the team to
+Hobby.** "Leave Vercel" in this ticket's title was always about leaving the
+*paid plan*, not the provider: the ship review's own sentence is "Vercel's
+own Hobby tier does for free if nothing on the team is commercial." The
+owner confirmed nothing on the team is commercial, and then, plainly, not
+to leave Vercel.
+
+**What the review's framing got wrong by the time we looked (checked 7 Sep):**
+
+- **The 404 half was already fixed.** `chat.spools.lol`, the gh-pages root
+  and `/room/` all return 200 — Pages is on, and T-177's deploy refreshed
+  the last two. So this ticket was never a repair; it was a bill.
+- **There is no `apps/room/vercel.json`.** The live response carries only
+  Vercel's default HSTS, so option C does not "keep `vercel.json` headers" —
+  nothing is set today. All three options were equally header-less; the real
+  difference was only whether T-171 *could* set real ones.
+- **Five projects on the Pro team** — `spools-chat`, `blackpeople-lol`,
+  `spools.lore`, `tape-vibes`, `souls-guru` — so the plan is an account-wide
+  decision, not a spools one. Worth knowing: `spools-chat` is still linked to
+  the `lore` GitHub repo (harmless; deploys are CLI-prebuilt), as this
+  ticket's Context already noted.
+- **Hobby keeps the custom domain.** Vercel's docs put the Hobby limit at 50
+  custom domains per project; the `custom_domain_needs_upgrade` error and the
+  "free domain" perk are about *registering* a domain through Vercel, not
+  attaching one you already own. So `chat.spools.lol` needs no DNS change and
+  no re-verification.
+
+**Why C over A and B, on the record.** A (GitHub Pages alone) is the
+tempting one — half of it already runs, the deploy script pushes `gh-pages`
+every time — but it permanently forecloses response headers, which costs
+T-171 its `frame-ancestors` and would cost T-177's option 3 its rewrite. B
+(Cloudflare Pages) buys real headers for free but adds a provider to the
+bill of accounts and a second deploy path to keep working, for something
+Vercel already does. C costs one billing click and changes nothing else.
+
+**The costs of C, stated:** Hobby forbids commercial use going forward — if
+any of those five projects ever monetizes, the team goes back to Pro
+(`vercel buy pro`, reversible). Hobby also allows no team members, so a
+collaborator means Pro again. Neither is load-bearing for spools today.
+
+**Keyboard step left (owner):** Vercel dashboard → the `osfasofa's projects`
+team → Settings → Billing → change plan to Hobby. Nothing else moves: the
+deploy script, `apps/room/.vercel`, the DNS record, and the domain all stay
+as they are. This ticket stays `doing` until that lands and its Notes say so
+— the T-168 precedent, and the M12 lesson that the record lags the keyboard.
+
+**For T-171, which this unblocks now.** The header mechanism is settled as
+`vercel.json`, and it does not depend on the plan — Hobby and Pro both serve
+it — so T-171 can start before the downgrade happens. One wrinkle to decide
+there, not here: the room is served from **two** hosts, and the gh-pages
+mirror can never carry real headers. Either T-171 accepts the split (real
+headers on chat.spools.lol, a `<meta>` CSP with no `frame-ancestors` on the
+mirror) or the mirror gets demoted to a fallback the docs stop citing.
+

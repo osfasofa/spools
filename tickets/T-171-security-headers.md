@@ -14,9 +14,15 @@ CSP, Referrer-Policy, nosniff, and frame-ancestors on chat.spools.lol.
 Only HSTS today (Vercel's default). React escapes rendered text; CSP is what
 bounds the blast radius if that ever changes, and the key sits in the page's
 address. `connect-src` must stay `wss: https:` because the link decides the
-relay. Review finding F11. Mechanism depends on T-167's host: `vercel.json`
-(Vercel), `_headers` (Cloudflare), or a `<meta http-equiv>` tag (GitHub
-Pages — no `frame-ancestors` possible there).
+relay. Review finding F11.
+
+**Mechanism settled (T-167, 7 Sep 2026): `vercel.json`** — the team stays on
+Vercel, and headers work the same on Hobby and Pro, so this ticket does not
+wait on the downgrade. One thing to decide here: the room is served from two
+hosts, and the `gh-pages` mirror can never carry response headers. Either
+accept the split (real headers on chat.spools.lol, a `<meta http-equiv>` CSP
+with no `frame-ancestors` on the mirror) or demote the mirror to a fallback
+the docs stop citing.
 
 ## Tasks
 
