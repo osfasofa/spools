@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { stash } from 'spools'
 import { Cassette } from './Cassette'
 import { copyText } from './clipboard'
+import { handOut } from './link'
 import { useSpool } from './useSpool'
 
 /**
@@ -205,7 +206,7 @@ export const App = () => {
   if (!spool) return <main className="page loading">finding the tape…</main>
 
   const share = () => {
-    const link = spool.share()
+    const link = handOut(spool.share()) // T-177: the default relay is the fallback, so it isn't carried
     void copyText(link).then((ok) => {
       if (ok) {
         setCopied(true)

@@ -20,7 +20,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 // the built SDK, for the export round-trip (T-163): importSpool runs in plain
 // Node with persist:false and no relay — the file must open where no browser is
-import { importSpool } from '../../packages/spools/dist/index.js'
+import { DEFAULT_RELAY, importSpool } from '../../packages/spools/dist/index.js'
 
 const CHROME = process.env.CHROME_BIN ?? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
 const CDP_PORT = 9347
@@ -1386,6 +1386,77 @@ await scenario('25. the address bar drops the key once the stash holds it; a bar
   await holder.close()
   await stranger.close()
   return `bar reads #spool=…&relay=… with no k=; share() and the stash row keep it; reload reopened keyed with its content; blocked storage kept k= in the bar; a never-held bare link opened keyless with the honest line and 0 sealed messages shown`
+})
+
+
+// ---------- T-177: the shape of a link handed out ----------
+
+await scenario('26. a handed-out link drops relay= only when it is the default, and the short link still names that relay', async () => {
+  // half one — a room on any other relay (this suite's local one) keeps
+  // carrying it: there the opening client's fallback lands somewhere else
+  const local = await Tab.open(linkFor(ORIGINS[0]))
+  await local.ready()
+  await local.eval(`document.querySelector('.headerTitle').click()`)
+  await local.until(`!!document.querySelector('.settingsBody')`, 5_000, 'settings open')
+  const shown = await local.eval(`({ text: document.querySelector('.linkText').textContent, share: window.spool.share(), hash: location.hash })`)
+  if (!decodeURIComponent(shown.text).includes(`relay=ws://localhost:${RELAY_PORT}/yjs`))
+    throw new Error(`a room on a self-hosted relay stopped carrying it: ${shown.text}`)
+  if (shown.text !== shown.share) throw new Error(`the shown link is not the SDK's on a self-hosted relay: ${shown.text}`)
+  if (!shown.hash.includes('relay=')) throw new Error(`the bar dropped a self-hosted relay: ${shown.hash}`)
+  await local.close()
+
+  // half two — the canonical relay, which nothing in a smoke run may actually
+  // touch: the page's socket and fetch are dead before the app loads, so what
+  // the app *attempts* is the assertion (the pre-load patch idiom of 20/25)
+  const DEAD = `
+    window.__ws = []
+    class DeadSocket extends EventTarget {
+      constructor (url) { super(); window.__ws.push(String(url)); this.url = String(url); this.readyState = 0; this.bufferedAmount = 0; this.binaryType = 'blob' }
+      send () {}
+      close () { this.readyState = 3 }
+    }
+    DeadSocket.CONNECTING = 0; DeadSocket.OPEN = 1; DeadSocket.CLOSING = 2; DeadSocket.CLOSED = 3
+    window.WebSocket = DeadSocket
+    window.fetch = () => Promise.reject(new TypeError('offline (smoke stub)'))
+  `
+  const c177 = `link-shape-${String(Math.floor(Math.random() * 1000)).padStart(3, '0')}`
+  const k177 = randomBytes(32).toString('base64url')
+  const t = await Tab.open(
+    `http://localhost:${ORIGINS[1]}/#spool=${c177}&relay=${encodeURIComponent(DEFAULT_RELAY)}&k=${k177}`,
+    { patch: DEAD, network: true }
+  )
+  await t.ready()
+  await t.eval(`document.querySelector('.headerTitle').click()`)
+  await t.until(`!!document.querySelector('.settingsBody')`, 5_000, 'settings open')
+  await t.until(`!location.hash.includes('relay=')`, 5_000, 'the bar dropped the default relay')
+  const handed = await t.eval(
+    `({ text: document.querySelector('.linkText').textContent, share: window.spool.share(), hash: location.hash, row: JSON.parse(localStorage.getItem('spools:stash'))['${c177}']?.link, ws: window.__ws })`
+  )
+  if (handed.text.includes('relay=')) throw new Error(`the handed link still pins the default relay: ${handed.text}`)
+  if (!handed.text.includes(`spool=${c177}`) || !handed.text.endsWith(`k=${k177}`))
+    throw new Error(`the handed link lost more than the relay: ${handed.text}`)
+  if (handed.text.length >= handed.share.length) throw new Error('the handed link is no shorter than the SDK\'s')
+  // app-level only: what the SDK builds, and what the stash keeps, still pin it
+  if (!handed.share.includes('relay=')) throw new Error(`share() stopped carrying the relay: ${handed.share}`)
+  if (!handed.row?.includes('relay=')) throw new Error(`the stash row stopped pinning the relay: ${handed.row}`)
+  if (!handed.hash.includes(`spool=${c177}`)) throw new Error(`the bar lost the code: ${handed.hash}`)
+  const attempted = (ws) => ws.some((u) => u === `${DEFAULT_RELAY}/${c177}`)
+  if (!attempted(handed.ws)) throw new Error(`the room did not open the canonical room: ${JSON.stringify(handed.ws)}`)
+
+  // the round trip: a device that has only the short link opens the same room
+  // on the same relay — the fallback says what the omitted parameter said
+  const stranger = await Tab.open(handed.text.replace(`localhost:${ORIGINS[1]}`, `localhost:${ORIGINS[2]}`), { patch: DEAD, network: true })
+  await stranger.ready()
+  const strangerWs = await stranger.eval(`window.__ws`)
+  if (!attempted(strangerWs)) throw new Error(`the short link named another relay: ${JSON.stringify(strangerWs)}`)
+  if (await stranger.eval(`!!document.querySelector('.notice.bareOpen')`)) throw new Error('the short link lost the key')
+  // and not one byte actually left for it
+  const leaked = [...t.requests, ...t.sockets, ...stranger.requests, ...stranger.sockets].filter((u) => u.includes('relay.spools.lol'))
+  if (leaked.length) throw new Error(`the smoke reached the canonical relay: ${leaked.join(' ')}`)
+  if (t.errors.length || stranger.errors.length) throw new Error(`page errors: ${[...t.errors, ...stranger.errors].join(' | ')}`)
+  await t.close()
+  await stranger.close()
+  return `self-hosted relay: carried (${shown.text.length} chars); default relay: dropped (${handed.text.length} vs ${handed.share.length}), bar + link short, share()/stash still pinned, both tabs opened ${DEFAULT_RELAY}/${c177} with 0 bytes to it`
 })
 
 

@@ -5,6 +5,7 @@ import { ActionSheet } from './ActionSheet'
 import { Arrival } from './Arrival'
 import { drawFavicon, pageTitle } from './badge'
 import { copyText } from './clipboard'
+import { carriedRelay, handOut } from './link'
 import { Composer } from './Composer'
 import { MessageList, seatOf, type ParentRef, type Rec } from './MessageList'
 import { normalizeEmoji, rememberEmoji } from './emoji'
@@ -205,7 +206,7 @@ const Settings = ({
   // per-device theme — the T-090 stash-label precedent: a theme is your
   // handwriting; it syncs nothing (owner-approved cut)
   const [theme, setTheme] = useState(currentTheme)
-  const link = spool.share()
+  const link = handOut(spool.share()) // T-177: the default relay is the fallback, so it isn't carried
   // T-176: no Clipboard API (plain http on a LAN) → execCommand; no copy at
   // all → show the whole link, pre-selected, with a long-press hint
   const [copyHint, setCopyHint] = useState(false)
@@ -509,7 +510,7 @@ export const App = () => {
   const startNewReel = (from: Rec) => {
     if (!spool) return
     const relay = parseSpoolLink(spool.share()).relay ?? DEFAULT_RELAY
-    const link = buildSpoolLink({ code: generateCode(), relay, key: crypto.getRandomValues(new Uint8Array(32)) })
+    const link = buildSpoolLink({ code: generateCode(), relay: carriedRelay(relay), key: crypto.getRandomValues(new Uint8Array(32)) })
     const copying = copyText(link) // synchronous first step, inside the tap (T-176)
     setCutState({ phase: 'working' })
     void (async () => {
@@ -574,7 +575,7 @@ export const App = () => {
   const [copyFallback, setCopyFallback] = useState<string | null>(null)
   const invite = () => {
     if (!spool) return
-    const link = spool.share()
+    const link = handOut(spool.share())
     void copyText(link).then((ok) => {
       if (ok) {
         setInviteCopied(true)
@@ -594,7 +595,7 @@ export const App = () => {
   const startNewRoom = () => {
     if (!spool) return
     const relay = parseSpoolLink(spool.share()).relay ?? DEFAULT_RELAY
-    const link = buildSpoolLink({ code: generateCode(), relay, key: crypto.getRandomValues(new Uint8Array(32)) })
+    const link = buildSpoolLink({ code: generateCode(), relay: carriedRelay(relay), key: crypto.getRandomValues(new Uint8Array(32)) })
     const go = (copied: boolean) => {
       try {
         sessionStorage.setItem('room-came-from', JSON.stringify({ code: spool.code, copied }))

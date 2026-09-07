@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { newSpool, openSpool, stash, type Entry, type PocketState, type Spool, type SpoolStatus } from 'spools'
+import { DEFAULT_RELAY, newSpool, openSpool, stash, type Entry, type PocketState, type Spool, type SpoolStatus } from 'spools'
+import { handOut } from './link'
 
 export interface RoomState {
   spool: Spool | null
@@ -28,6 +29,10 @@ export interface RoomState {
  * link (a bookmark, a reload, a synced tab) reopens through the stash. Only
  * once the stash confirms: a device whose storage swallowed the write keeps
  * the key in the bar, because that bar is then the only place it lives.
+ *
+ * `tidyBar` also drops `relay=` when it is the default (T-177) — the same
+ * shortening every link handed out of this room gets, applied to the one
+ * link people copy out of the browser itself.
  */
 const resolveHandedLink = async (): Promise<{ link: string; bare: boolean }> => {
   const params = new URLSearchParams(location.hash.slice(1))
@@ -39,12 +44,17 @@ const resolveHandedLink = async (): Promise<{ link: string; bare: boolean }> => 
   }
   return { link: location.href, bare: false }
 }
-const hideKeyOnceStashed = async (code: string): Promise<void> => {
+const tidyBar = async (code: string): Promise<void> => {
   const params = new URLSearchParams(location.hash.slice(1))
-  if (!params.get('k')) return
-  const row = (await stash.list()).find((r) => r.code === code)
-  if (!row?.link || !/[#&]k=/.test(row.link)) return // not confirmed: the bar keeps the key
-  params.delete('k')
+  const before = params.toString()
+  // T-177: the default relay is what a bare link falls back to anyway
+  if (params.get('relay') === DEFAULT_RELAY) params.delete('relay')
+  if (params.get('k')) {
+    const row = (await stash.list()).find((r) => r.code === code)
+    // confirmed, or the bar keeps the key — it is then the only place it lives
+    if (row?.link && /[#&]k=/.test(row.link)) params.delete('k')
+  }
+  if (params.toString() === before) return
   history.replaceState(null, '', `${location.pathname}${location.search}#${params.toString()}`)
 }
 
@@ -96,9 +106,9 @@ export const useRoom = (author: string): RoomState => {
         // fact, not a render-time one
         const openedEmpty = spool.entries.length === 0
         setState((s) => ({ ...s, openedEmpty }))
-        if (!handed) history.replaceState(null, '', spool.share())
+        if (!handed) history.replaceState(null, '', handOut(spool.share()))
         setState((s) => ({ ...s, bareOpen: resolved?.bare ?? false }))
-        void hideKeyOnceStashed(spool.code)
+        void tidyBar(spool.code)
         // the torture harnesses drive the app through this (T-104 idiom)
         ;(window as unknown as { spool?: Spool }).spool = spool
         // roomFull rides every sync from the getter: the relay completes the

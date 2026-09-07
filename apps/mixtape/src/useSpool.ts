@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { newSpool, openSpool, stash, type Entry, type PocketState, type Spool, type SpoolStatus } from 'spools'
+import { DEFAULT_RELAY, newSpool, openSpool, stash, type Entry, type PocketState, type Spool, type SpoolStatus } from 'spools'
+import { handOut } from './link'
 
 export interface SpoolState {
   spool: Spool | null
@@ -29,12 +30,16 @@ const resolveHandedLink = async (): Promise<{ link: string; bare: boolean }> => 
   }
   return { link: location.href, bare: false }
 }
-const hideKeyOnceStashed = async (code: string): Promise<void> => {
+const tidyBar = async (code: string): Promise<void> => {
   const params = new URLSearchParams(location.hash.slice(1))
-  if (!params.get('k')) return
-  const row = (await stash.list()).find((r) => r.code === code)
-  if (!row?.link || !/[#&]k=/.test(row.link)) return // not confirmed: the bar keeps the key
-  params.delete('k')
+  const before = params.toString()
+  if (params.get('relay') === DEFAULT_RELAY) params.delete('relay') // T-177
+  if (params.get('k')) {
+    const row = (await stash.list()).find((r) => r.code === code)
+    // confirmed, or the bar keeps the key — it is then the only place it lives
+    if (row?.link && /[#&]k=/.test(row.link)) params.delete('k')
+  }
+  if (params.toString() === before) return
   history.replaceState(null, '', `${location.pathname}${location.search}#${params.toString()}`)
 }
 
@@ -71,8 +76,8 @@ export const useSpool = (author: string): SpoolState => {
           return
         }
         opened = spool
-        if (!handed) history.replaceState(null, '', spool.share())
-        void hideKeyOnceStashed(spool.code)
+        if (!handed) history.replaceState(null, '', handOut(spool.share()))
+        void tidyBar(spool.code)
         const sync = () => setState((s) => ({ ...s, spool, entries: spool.entries, status: spool.status }))
         offs.push(spool.on('entry', sync))
         offs.push(spool.on('status', sync))

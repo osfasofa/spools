@@ -198,6 +198,7 @@ Encrypted spools export **decrypted** (the holder has the key; a keepsake you ca
 
 ```ts
 stash.list(): Promise<StashedSpool[]>   // union of kept IndexedDB databases + registry rows, most recent first
+stash.remember(code, link): void        // keep a link without opening it — the row an open would have written
 stash.label(code, label): void          // name a keepsake
 stash.archive(code, archived): void     // shelf flag — kept but set aside; nothing disconnects
 stash.forget(code): Promise<void>       // THE one hard delete in the system: removes the local database + registry row.
@@ -205,6 +206,8 @@ stash.forget(code): Promise<void>       // THE one hard delete in the system: re
 ```
 
 `StashedSpool`: `{ code, stored, link?, label?, archived?, lastOpened? }`. The registry lives in localStorage and **stores the full link, `k=` included** — deliberately: same device, same trust boundary as the browser history that already carries the link, and without it a sealed spool in the stash could never be reopened or exported. Persisted spools are stamped into the registry automatically on open; a link is only recorded when it carries something (relay/key), so an import never downgrades a stored sealed link.
+
+`stash.remember(code, link)` is that same stamp, made callable (T-179): for a client that opens with `persist: false` and still wants the spool on its shelf, or one handed a link to hold for later. It throws `SpoolLinkError` on a code that isn't one, a link that isn't one, or a link naming a different spool; it opens nothing and contacts nothing.
 
 ## The pocket (M10)
 
@@ -354,10 +357,11 @@ Per-spool instance bundles: `Y.Doc` + `IndexeddbPersistence` (db name = spool co
 - **Pocket ring tag persistence** — pocket.ts's 4-byte tag is per-instance,
   so every reload takes a fresh ring slot (T-124 evidence). A localStorage
   tag beside `spool-author` would pin one slot per device.
-- **`stash.remember(code, link)`** — syrup mirrors `touch()`'s localStorage
-  write by hand (same key, same row shape) because its satchel opens with
-  `persist: false`. A vessel coupled to a private format is the evidence;
-  T-179 is the review.
+- ~~**`stash.remember(code, link)`**~~ — shipped (T-179, signed off 6 Sep
+  2026). syrup was mirroring `touch()`'s localStorage write by hand (same
+  key, same row shape) because its satchel opens with `persist: false`: a
+  vessel coupled to a private format was the evidence, and one additive
+  function was the fix. Documented in the stash section above.
 - ~~**The `splice` family — fork / retelling / rejoin**~~ — reviewed
   (T-180, `docs/M16-splice-brief.md`, signed off 5 Sep 2026): the
   retelling's primitive shipped as `splice()` (T-186); fork and rejoin

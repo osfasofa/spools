@@ -16611,6 +16611,30 @@ ${reason}`);
       const codes = /* @__PURE__ */ new Set([...stored, ...Object.keys(registry).filter(isValidCode)]);
       return [...codes].map((code) => ({ code, stored: stored.has(code), ...registry[code] })).sort((a, b) => (b.lastOpened ?? 0) - (a.lastOpened ?? 0));
     },
+    /**
+     * Record a link this device keeps — without opening the spool (T-179).
+     * The row `list()` returns is exactly the one an open would have written:
+     * the link (relay and key included) and `lastOpened` stamped now.
+     *
+     * For a client that opens with `persist: false` and still wants the spool
+     * on its shelf, or one that receives a link to hold for later. The key
+     * rides in localStorage on this device — the same trust boundary this
+     * module's header describes; a spool whose link is here can be reopened
+     * by anything that can read this browser's storage.
+     *
+     * Throws `SpoolLinkError` if the code is not a spool code, the link is not
+     * a spool link, or the link names a different spool. Like `label()` and
+     * `archive()`, the write itself can throw if localStorage refuses it
+     * (a private window with storage off) — catch if the row is a courtesy.
+     * Where there is no localStorage at all (Node, SSR) it validates and does
+     * nothing, exactly as an open does.
+     */
+    remember(code, link) {
+      if (!isValidCode(code)) throw new SpoolLinkError(`bad spool code: ${code}`);
+      const parsed = parseSpoolLink(link);
+      if (parsed.code !== code) throw new SpoolLinkError(`that link is for ${parsed.code}, not ${code}`);
+      touch(code, link);
+    },
     /** name a keepsake */
     label(code, label) {
       patch(code, { label });

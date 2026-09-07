@@ -2,6 +2,8 @@
 
 ## 0.3.0 — unreleased
 
+- `stash.remember(code, link)`: keep a link on this device's shelf without opening the spool — the same registry row an open writes (the link, `lastOpened` stamped now), and nothing else: no database, no connection. For a client that opens with `persist: false` and still wants the spool listed, or one handed a link to hold for later. Throws `SpoolLinkError` if the code isn't a spool code, the link isn't a spool link, or the link names a different spool. syrup was mirroring the registry's private localStorage shape by hand to do this; it can delete that now (T-179).
+
 - `spool.splice(records)`: write complete entry records — `id`, `author`, `kind`, `createdAt`, `parent?`, `data?`, `deletedAt?`, `body` (the `EntrySnapshot` shape `rewind()` hands out) — into a spool exactly as given, in one transaction. Idempotent: an id already present is skipped, so a re-run changes no byte. Refuses the whole batch before any write when a record's `parent` is neither in the batch nor in the spool (`SpoolSpliceError`, with `.id` and `.rule`) — a dangling parent in a fresh spool would render as "not synced yet", a lie. Policy-free: what crosses, what's flattened, and the new key are the caller's. The one primitive under the cut (a new reel from here on), the fork, and the rejoin, which are recipes in SDK-API. `wind()` is untouched (T-186; the gate review is T-180, the brief `docs/M16-splice-brief.md`).
 - `entry.snapshot()`: the entry as a plain frozen `EntrySnapshot` — `keep.map((e) => e.snapshot())` is the whole selection step of a cut. `export()` is built on it now; its output is unchanged.
 
