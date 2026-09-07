@@ -1,7 +1,7 @@
 ---
 id: T-168
 title: "Pocket eviction order and namespace creation cap — sign-off"
-status: doing
+status: done
 milestone: M15
 depends: [T-161]
 ---
@@ -36,8 +36,8 @@ T-124's precedent: sign-off, README honesty section updated.
 ## Acceptance criteria
 
 - The survival test passes *(done)*; the README knob table matches the code
-  *(done)*; the canonical relay runs the agreed defaults *(pending: nothing
-  is agreed yet — sign-off below — and no default changed)*.
+  *(done)*; the canonical relay runs the agreed defaults *(done, 5 Sep 2026
+  22:02 local — verified 7 Sep, see Notes)*.
 
 ## Notes / open questions
 
@@ -123,3 +123,26 @@ T-124's precedent: sign-off, README honesty section updated.
   non-interactively), and `curl https://relay.spools.lol/` to see the
   service back. The Railway CLI is not on this machine, so this ticket
   stays `doing` until that lands and its Notes say so.
+
+- **Done — the keyboard step landed 5 Sep 2026, 22:02 local** (6 Sep
+  05:02 UTC), 26 minutes after the commit that recorded the decision;
+  verified from this session on 7 Sep. On the canonical relay:
+  `POCKET_NEW_NAMESPACES_PER_HOUR=60`, `TRUST_PROXY=1`, and no
+  `POCKET_FIRST_MAX_BYTES` at all — the refusal, shipped as an absence. The
+  live deployment (`68bab40a`, SUCCESS) was created six seconds after the
+  variable write's own redeploy, so the running process has it; the service
+  answers on `https://relay.spools.lol/`.
+- **How it was verified, since the value can't be read the obvious way:** a
+  connected OAuth app gets variable *names* only, so the MCP could confirm
+  the knob existed but not that it said 60. `railway variables --json` from
+  the owner's own CLI session prints the value; the deployment list dates it.
+  Worth knowing next time: the relay's boot log names `TRUST_PROXY` and the
+  pocket's storage mode but not the creation cap, and the health JSON reports
+  `ttlDays`/`maxBytes` and not the cap either — so nothing observable from
+  outside says what the cap is. If that matters later, one line in the boot
+  log would settle it.
+- **The record lagged the keyboard by a day** — the same shape as T-130's
+  npm release (M12's note: for "did it ship", the registry outranks this
+  table). Here the deployment history outranked the ticket: this file still
+  said the Railway CLI wasn't on this machine, and it was at
+  `~/.railway/bin/railway` the whole time.
